@@ -11,6 +11,8 @@ public class Config
     public string Hotkey { get; set; } = "Win+Alt+C";
     /// <summary>UI scale on Linux/X11 (0 = take each monitor's scale from Hyprland).</summary>
     public double Scale { get; set; }
+    /// <summary>The user's interface language, as last read from the server (empty: the system's).</summary>
+    public string Lang { get; set; } = "";
 
     public static string Dir => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "orgnotes");
     private static string FilePath => Path.Combine(Dir, "capture.json");

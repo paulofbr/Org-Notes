@@ -5,6 +5,7 @@ import { ExternalLink, ImagePlus, Link2 } from 'lucide-react'
 import { ITEM_RE } from '../org/parser'
 import { LinkDialog, uploadImageLink, type LinkTab } from './LinkDialog'
 import * as Rich from './richText'
+import { tr } from '../i18n'
 
 interface Props {
   value: string
@@ -217,10 +218,10 @@ export function OrgTextarea({ value, onChange, autoGrow, onKeyDown, path, tools,
       {tools && path && (
         // mousedown would take the focus (and the cursor position) away from the text.
         <div className="text-tools" onMouseDown={(e) => e.target !== imageInput.current && e.preventDefault()}>
-          <button type="button" title="Link para uma página web" onClick={() => setLinking({ ...selection(), only: 'external' })}><ExternalLink size={14} /> Link externo</button>
-          <button type="button" title="Link para um ficheiro ou título das notas" onClick={() => setLinking({ ...selection(), only: 'internal' })}><Link2 size={14} /> Link interno</button>
-          <button type="button" title="Inserir imagem" onClick={() => imageInput.current?.click()}><ImagePlus size={14} /> Imagem</button>
-          <span className="hint">ou cola / arrasta uma imagem para o texto</span>
+          <button type="button" title={tr('Link para uma página web')} onClick={() => setLinking({ ...selection(), only: 'external' })}><ExternalLink size={14} /> {tr('Link externo')}</button>
+          <button type="button" title={tr('Link para um ficheiro ou título das notas')} onClick={() => setLinking({ ...selection(), only: 'internal' })}><Link2 size={14} /> {tr('Link interno')}</button>
+          <button type="button" title={tr('Inserir imagem')} onClick={() => imageInput.current?.click()}><ImagePlus size={14} /> {tr('Imagem')}</button>
+          <span className="hint">{tr('ou cola / arrasta uma imagem para o texto')}</span>
           <input
             ref={imageInput}
             type="file"

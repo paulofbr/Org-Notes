@@ -8,10 +8,11 @@ import { PromptDialog } from './Dialogs'
 import { hideTemplates } from '../org/capture'
 import { TemplateDialog } from './Capture'
 import { FileIcon, IconDialog } from './FileIcon'
+import { tr } from '../i18n'
 
 const states = new Map<string, OutlineState>()
 const VIS_ORDER: Visibility[] = ['overview', 'contents', 'showall']
-const VIS_LABEL: Record<Visibility, string> = { overview: 'Visão geral', contents: 'Conteúdos', showall: 'Tudo' }
+const VIS_LABEL: Record<Visibility, string> = { overview: tr('Visão geral'), contents: tr('Conteúdos'), showall: tr('Tudo') }
 
 /** File-level commands, shared by the file menu and the command palette. */
 export function fileActions(app: AppCtx, path: string, onRemoved: () => void): { label: string; icon: ReactNode; run: () => void; danger?: boolean }[] {
@@ -19,23 +20,23 @@ export function fileActions(app: AppCtx, path: string, onRemoved: () => void): {
   const doc = store.docs[path]
   const title = doc?.keywords.TITLE || path.replace(/\.org$/, '')
   return [
-    { label: 'Exportar HTML', icon: <Download size={15} />, run: () => import('../export').then((x) => x.download(path.replace(/\.org$/, '.html').split('/').pop()!, x.exportHtml(doc, title), 'text/html')) },
-    { label: 'Descarregar .org', icon: <FileText size={15} />, run: () => import('../export').then((x) => x.download(path.split('/').pop()!, store.get(path) ?? '', 'text/plain')) },
-    { label: 'Imprimir / PDF', icon: <Printer size={15} />, run: () => window.print() },
-    { label: 'Template de captura', icon: <Inbox size={15} />, run: () => app.showDialog(<TemplateDialog path={path} />) },
-    { label: 'Mudar ícone do ficheiro', icon: <FileIcon path={path} icon={doc?.keywords.ICON} />, run: () => app.showDialog(<IconDialog path={path} />) },
+    { label: tr('Exportar HTML'), icon: <Download size={15} />, run: () => import('../export').then((x) => x.download(path.replace(/\.org$/, '.html').split('/').pop()!, x.exportHtml(doc, title), 'text/html')) },
+    { label: tr('Descarregar .org'), icon: <FileText size={15} />, run: () => import('../export').then((x) => x.download(path.split('/').pop()!, store.get(path) ?? '', 'text/plain')) },
+    { label: tr('Imprimir / PDF'), icon: <Printer size={15} />, run: () => window.print() },
+    { label: tr('Template de captura'), icon: <Inbox size={15} />, run: () => app.showDialog(<TemplateDialog path={path} />) },
+    { label: tr('Mudar ícone do ficheiro'), icon: <FileIcon path={path} icon={doc?.keywords.ICON} />, run: () => app.showDialog(<IconDialog path={path} />) },
     {
-      label: 'Mudar nome do ficheiro',
+      label: tr('Mudar nome do ficheiro'),
       icon: <Pencil size={15} />,
       run: () =>
         app.showDialog(
-          <PromptDialog title="Mudar nome" label="Novo nome" initial={path} onSubmit={(v) => {
+          <PromptDialog title={tr('Mudar nome')} label={tr('Novo nome')} initial={path} onSubmit={(v) => {
             const to = v.endsWith('.org') ? v : `${v}.org`
             if (to !== path) store.rename(path, to).then(() => app.open(to), (e) => alert(e.message))
           }} />,
         ),
     },
-    { label: 'Apagar ficheiro', icon: <Trash2 size={15} />, danger: true, run: () => confirm(`Apagar ${path}?`) && store.remove(path).then(onRemoved) },
+    { label: tr('Apagar ficheiro'), icon: <Trash2 size={15} />, danger: true, run: () => confirm(tr('Apagar {path}?', { path })) && store.remove(path).then(onRemoved) },
   ]
 }
 
@@ -74,7 +75,7 @@ export function DocView({ path, focus, onRemoved }: { path: string; focus?: { li
     return () => window.removeEventListener('keydown', onKey)
   })
 
-  if (!doc) return <div className="empty">Ficheiro não encontrado</div>
+  if (!doc) return <div className="empty">{tr('Ficheiro não encontrado')}</div>
   const title = doc.keywords.TITLE || path.replace(/\.org$/, '')
 
   return (
@@ -82,7 +83,7 @@ export function DocView({ path, focus, onRemoved }: { path: string; focus?: { li
       <header className="doc-header">
         <div className="doc-title">
           <h1>
-            <button className="doc-icon" title="Mudar ícone" onClick={() => app.showDialog(<IconDialog path={path} />)}><FileIcon path={path} icon={doc.keywords.ICON} size={26} /></button>
+            <button className="doc-icon" title={tr('Mudar ícone')} onClick={() => app.showDialog(<IconDialog path={path} />)}><FileIcon path={path} icon={doc.keywords.ICON} size={26} /></button>
             {title}
           </h1>
           <span className="muted">{path}</span>
@@ -94,7 +95,7 @@ export function DocView({ path, focus, onRemoved }: { path: string; focus?: { li
                 <Search size={15} />
                 <input
                   ref={filterRef}
-                  placeholder="Filtrar (texto ou +etiqueta)"
+                  placeholder={tr('Filtrar (texto ou +etiqueta)')}
                   value={filter}
                   onChange={(e) => setFilter(e.target.value)}
                   onKeyDown={(e) => {
@@ -104,14 +105,14 @@ export function DocView({ path, focus, onRemoved }: { path: string; focus?: { li
                 />
                 <kbd className="in-input">f</kbd>
               </div>
-              <button onClick={cycleVisibility} title="Visibilidade global"><Layers size={15} /> {VIS_LABEL[state.visibility]} <kbd>Shift+Tab</kbd></button>
+              <button onClick={cycleVisibility} title={tr('Visibilidade global')}><Layers size={15} /> {VIS_LABEL[state.visibility]} <kbd>Shift+Tab</kbd></button>
             </>
           )}
-          <div className="segmented" title="Alternar com m">
-            <button className={mode === 'outline' ? 'active' : ''} onClick={() => setMode('outline')}><ListTree size={15} /> Estrutura</button>
-            <button className={mode === 'source' ? 'active' : ''} onClick={() => setMode('source')}><Code2 size={15} /> Texto <kbd>m</kbd></button>
+          <div className="segmented" title={tr('Alternar com m')}>
+            <button className={mode === 'outline' ? 'active' : ''} onClick={() => setMode('outline')}><ListTree size={15} /> {tr('Estrutura')}</button>
+            <button className={mode === 'source' ? 'active' : ''} onClick={() => setMode('source')}><Code2 size={15} /> {tr('Texto')} <kbd>m</kbd></button>
           </div>
-          <Menu label="Ficheiro (também em Ctrl+K)">
+          <Menu label={tr('Ficheiro (também em Ctrl+K)')}>
             {fileActions(app, path, onRemoved).map((a) => <MenuItem key={a.label} icon={a.icon} label={a.label} danger={a.danger} onClick={a.run} />)}
           </Menu>
         </div>

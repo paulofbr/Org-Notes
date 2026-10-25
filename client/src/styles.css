@@ -350,7 +350,7 @@ table.props th { width: 40%; background: none; }
 .day { margin-bottom: 1.25rem; }
 .day h4 { margin: 0 0 0.35rem; font-size: 0.85rem; text-transform: capitalize; color: var(--muted); font-weight: 600; }
 .day.today h4 { color: var(--accent); }
-.day.today h4::after { content: ' · hoje'; }
+.day.today h4::after { content: ' · ' attr(data-today); }
 .day .empty { text-align: left; padding: 0.2rem 0.6rem; justify-content: flex-start; }
 .agenda-row { display: flex; align-items: center; gap: 0.6rem; padding: 0.45rem 0.6rem; border-radius: 8px; cursor: pointer; border: 1px solid transparent; }
 .agenda-row:hover { background: var(--bg-soft); border-color: var(--border); }

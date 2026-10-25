@@ -15,18 +15,24 @@ public static class Login
     {
         bool IsAllowed(string email) => allowed.Any(a => Users.KeyOfEmail(a) == Users.KeyOfEmail(email));
 
-        app.MapGet("/login", (string? returnUrl) => Page(returnUrl, providers, ""));
+        // ?lang= picks the page's language (kept in a cookie) before the user has a setting of their own.
+        app.MapGet("/login", (string? returnUrl, string? lang, HttpContext ctx) =>
+        {
+            if (Strings.IsLang(lang)) ctx.Response.Cookies.Append("lang", lang!, new CookieOptions { MaxAge = TimeSpan.FromDays(365), SameSite = SameSiteMode.Lax });
+            return Page(returnUrl, providers, "", Strings.IsLang(lang) ? lang! : Strings.Of(ctx));
+        });
 
         app.MapPost("/login", async (HttpContext ctx, Users users) =>
         {
             var form = await ctx.Request.ReadFormAsync();
             string email = form["email"].ToString().Trim(), password = form["password"].ToString(), returnUrl = form["returnUrl"].ToString();
             var key = Users.KeyOfEmail(email);
-            IResult Error(string message) => Page(returnUrl, providers, message, email);
+            var lang = Strings.Of(ctx);
+            IResult Error(string message, params object[] args) => Page(returnUrl, providers, Strings.Tr(lang, message, args), lang, email);
 
             if (form["action"] == "register")
             {
-                if (!IsAllowed(email)) return Error($"{email} não está autorizado.");
+                if (!IsAllowed(email)) return Error("{0} não está autorizado.", email);
                 if (users.HasPassword(key)) return Error("Esta conta já tem password: entra com ela.");
                 if (password.Length < 8) return Error("A password precisa de pelo menos 8 caracteres.");
                 users.SetPassword(key, password);
@@ -53,17 +59,19 @@ public static class Login
     /// <summary>Only same-site paths, so the login cannot be used to redirect elsewhere.</summary>
     private static string Local(string? url) => url is ['/', not '/' and not '\\', ..] or "/" ? url : "/";
 
-    private static IResult Page(string? returnUrl, string[] providers, string error, string email = "")
+    private static IResult Page(string? returnUrl, string[] providers, string error, string lang, string email = "")
     {
         static string E(string s) => WebUtility.HtmlEncode(s);
+        string T(string pt, params object[] args) => E(Strings.Tr(lang, pt, args));
+        var langs = string.Join(" · ", Strings.Langs.Select(l => l == lang ? $"<b>{l.ToUpperInvariant()}</b>" : $"""<a href="/login?lang={l}&returnUrl={Uri.EscapeDataString(Local(returnUrl))}">{l.ToUpperInvariant()}</a>"""));
         var buttons = string.Concat(providers.Select(p =>
-            $"""<a class="btn" href="/login/{p}?returnUrl={Uri.EscapeDataString(Local(returnUrl))}">Entrar com {(p == "Microsoft" ? "Microsoft (Office)" : p)}</a>"""));
+            $"""<a class="btn" href="/login/{p}?returnUrl={Uri.EscapeDataString(Local(returnUrl))}">{T("Entrar com {0}", p == "Microsoft" ? "Microsoft (Office)" : p)}</a>"""));
         var html = $$"""
             <!doctype html>
-            <html lang="pt">
+            <html lang="{{lang}}">
             <head>
             <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-            <title>Entrar · Org Notes</title>
+            <title>{{T("Entrar")}} · Org Notes</title>
             <style>
               :root { color-scheme: light dark; --bg: #f6f6f4; --card: #fff; --fg: #222; --muted: #666; --line: #ddd; --accent: #3b6ea8; }
               @media (prefers-color-scheme: dark) { :root { --bg: #1b1b1d; --card: #252528; --fg: #e6e6e6; --muted: #999; --line: #3a3a3e; --accent: #7aa7e0; } }
@@ -77,6 +85,8 @@ public static class Login
               .error { color: #c0392b; margin: 0 0 8px; }
               .hint { color: var(--muted); font-size: 13px; }
               hr { border: 0; border-top: 1px solid var(--line); margin: 18px 0 6px; }
+              .langs { margin: 14px 0 0; text-align: center; color: var(--muted); font-size: 13px; }
+              .langs a { color: var(--muted); }
             </style>
             </head>
             <body>
@@ -87,12 +97,13 @@ public static class Login
                 <input type="hidden" name="returnUrl" value="{{E(Local(returnUrl))}}">
                 <label for="email">Email</label>
                 <input id="email" name="email" type="email" autocomplete="username" required autofocus value="{{E(email)}}">
-                <label for="password">Password</label>
+                <label for="password">{{T("Password")}}</label>
                 <input id="password" name="password" type="password" autocomplete="current-password" required>
-                <button class="primary" name="action" value="login">Entrar</button>
-                <button name="action" value="register">Criar password (primeira vez)</button>
+                <button class="primary" name="action" value="login">{{T("Entrar")}}</button>
+                <button name="action" value="register">{{T("Criar password (primeira vez)")}}</button>
               </form>
               {{(buttons == "" ? "" : "<hr>" + buttons)}}
+              <p class="langs">{{langs}}</p>
             </main>
             </body>
             </html>

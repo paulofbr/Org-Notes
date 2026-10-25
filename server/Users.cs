@@ -7,7 +7,7 @@ using System.Text.RegularExpressions;
 namespace OrgNotes.Server;
 
 /// <param name="SummarySent">Day the daily summary last went out, so a restart does not send it again.</param>
-public record UserSettings(string NtfyTopic, bool Notify, string? ApiToken = null, DateOnly? SummarySent = null, string? PasswordHash = null);
+public record UserSettings(string NtfyTopic, bool Notify, string? ApiToken = null, DateOnly? SummarySent = null, string? PasswordHash = null, string? Lang = null);
 
 /// <summary>
 /// Per-user file stores: each user gets `users/&lt;email&gt;/` under the root. Files left in the root by the

@@ -8,33 +8,33 @@ public class SettingsWindow : Window
 {
     public SettingsWindow(Config config)
     {
-        Title = "Definições · Org Notes Capture";
+        Title = L.Tr("Definições · Org Notes Capture");
         Width = 480;
         SizeToContent = SizeToContent.Height;
         CanResize = false;
         WindowStartupLocation = WindowStartupLocation.CenterScreen;
 
         var server = new TextBox { Text = config.Server };
-        var token = new TextBox { Text = config.Token, PasswordChar = '•', PlaceholderText = "Só necessário com login Google" };
+        var token = new TextBox { Text = config.Token, PasswordChar = '•', PlaceholderText = L.Tr("Só necessário com login Google") };
         var hotkey = new TextBox { Text = config.Hotkey, IsVisible = OperatingSystem.IsWindows() };
         var autostart = new CheckBox
         {
-            Content = "Arrancar com o Windows",
+            Content = L.Tr("Arrancar com o Windows"),
             IsVisible = OperatingSystem.IsWindows(),
             IsChecked = OperatingSystem.IsWindows() && WindowsStartup.IsEnabled,
         };
         var status = new TextBlock { Opacity = 0.7, TextWrapping = Avalonia.Media.TextWrapping.Wrap };
-        var test = new Button { Content = "Testar ligação" };
-        var save = new Button { Content = "Guardar", Classes = { "accent" } };
+        var test = new Button { Content = L.Tr("Testar ligação") };
+        var save = new Button { Content = L.Tr("Guardar"), Classes = { "accent" } };
 
         Config Edited() => new() { Server = server.Text?.Trim() ?? "", Token = token.Text?.Trim() ?? "", Hotkey = hotkey.Text?.Trim() ?? config.Hotkey };
         test.Click += async (_, _) =>
         {
-            status.Text = "A testar…";
+            status.Text = L.Tr("A testar…");
             try
             {
                 var list = await new Api(Edited()).Templates();
-                status.Text = $"Ligação OK · {list.Count} templates.";
+                status.Text = L.Tr("Ligação OK · {0} templates.", list.Count);
             }
             catch (Exception e) when (e is HttpRequestException or TaskCanceledException or UriFormatException or InvalidOperationException)
             {
@@ -56,13 +56,13 @@ public class SettingsWindow : Window
             Spacing = 8,
             Children =
             {
-                new TextBlock { Text = "Servidor" }, server,
-                new TextBlock { Text = "Token (no site: sino → Conta e notificações)" }, token,
-                new TextBlock { Text = "Atalho global, ex. Win+Alt+C (reinicia a app para aplicar)", IsVisible = OperatingSystem.IsWindows() }, hotkey,
+                new TextBlock { Text = L.Tr("Servidor") }, server,
+                new TextBlock { Text = L.Tr("Token (no site: sino → Conta e notificações)") }, token,
+                new TextBlock { Text = L.Tr("Atalho global, ex. Win+Alt+C (reinicia a app para aplicar)"), IsVisible = OperatingSystem.IsWindows() }, hotkey,
                 autostart,
                 new TextBlock
                 {
-                    Text = "No Linux o atalho é definido no ambiente de trabalho: liga uma tecla a «OrgNotes.Capture --show».",
+                    Text = L.Tr("No Linux o atalho é definido no ambiente de trabalho: liga uma tecla a «OrgNotes.Capture --show»."),
                     IsVisible = !OperatingSystem.IsWindows(),
                     Opacity = 0.7,
                     TextWrapping = Avalonia.Media.TextWrapping.Wrap,

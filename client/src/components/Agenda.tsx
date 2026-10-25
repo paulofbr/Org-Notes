@@ -8,10 +8,11 @@ import { useKeys, moveFocus } from '../shortcuts'
 import { KeywordDialog } from './Dialogs'
 import { addDays, dateKey, formatDuration, toDate } from '../org/timestamp'
 import { Inline, formatDate } from './Inline'
+import { tr } from '../i18n'
 
 type Tab = 'day' | 'week' | 'todo' | 'search' | 'clock'
 
-const TABS: [Tab, string][] = [['day', 'Dia'], ['week', 'Semana'], ['todo', 'Tarefas'], ['search', 'Procurar'], ['clock', 'Relógio']]
+const TABS: [Tab, string][] = [['day', tr('Dia')], ['week', tr('Semana')], ['todo', tr('Tarefas')], ['search', tr('Procurar')], ['clock', tr('Relógio')]]
 
 export function AgendaView({ initialTab = 'week' }: { initialTab?: Tab }) {
   const [tab, setTab] = useState<Tab>(initialTab)
@@ -52,16 +53,16 @@ function Calendar({ span }: { span: number }) {
   return (
     <>
       <div className="range-nav">
-        <button onClick={() => setAnchor(addDays(anchor, -span))} title="Anterior"><ChevronLeft size={16} /><kbd>b</kbd></button>
-        <button onClick={() => setAnchor(today)}>Hoje <kbd>.</kbd></button>
-        <button onClick={() => setAnchor(addDays(anchor, span))} title="Seguinte"><kbd>f</kbd><ChevronRight size={16} /></button>
+        <button onClick={() => setAnchor(addDays(anchor, -span))} title={tr('Anterior')}><ChevronLeft size={16} /><kbd>b</kbd></button>
+        <button onClick={() => setAnchor(today)}>{tr('Hoje')} <kbd>.</kbd></button>
+        <button onClick={() => setAnchor(addDays(anchor, span))} title={tr('Seguinte')}><kbd>f</kbd><ChevronRight size={16} /></button>
         <span className="range-label">
           {span === 1 ? formatDate(from, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }) : `${formatDate(from, { day: 'numeric', month: 'short' })} – ${formatDate(to, { day: 'numeric', month: 'short', year: 'numeric' })}`}
         </span>
       </div>
       {[...days].map(([day, items]) => (
         <div key={day} className={`day ${day === today ? 'today' : ''} ${[0, 6].includes(toDate(day).getDay()) ? 'weekend' : ''}`}>
-          <h4>{formatDate(day, { weekday: 'long', day: 'numeric', month: 'long' })}</h4>
+          <h4 data-today={tr('hoje')}>{formatDate(day, { weekday: 'long', day: 'numeric', month: 'long' })}</h4>
           {items.length ? items.map((it, i) => <AgendaRow key={i} e={it} item={it} />) : <div className="empty">—</div>}
         </div>
       ))}
@@ -71,11 +72,11 @@ function Calendar({ span }: { span: number }) {
 
 const KIND_LABEL = (it: AgendaItem) => {
   switch (it.kind) {
-    case 'scheduled': return 'Agendado'
-    case 'deadline': return 'Prazo'
-    case 'overdue': return `Atrasado ${it.days}d`
-    case 'upcoming': return `Prazo em ${it.days}d`
-    case 'sched-past': return `Agendado há ${it.days}d`
+    case 'scheduled': return tr('Agendado')
+    case 'deadline': return tr('Prazo')
+    case 'overdue': return tr('Atrasado {n}d', { n: it.days })
+    case 'upcoming': return tr('Prazo em {n}d', { n: it.days })
+    case 'sched-past': return tr('Agendado há {n}d', { n: it.days })
     default: return ''
   }
 }
@@ -109,7 +110,7 @@ function AgendaRow({ e, item, extra }: { e: Entry; item?: AgendaItem; extra?: st
       {h.keyword && (
         <button
           className={`kw ${h.done ? 'kw-done' : 'kw-todo'} kw-${h.keyword.toLowerCase()}`}
-          title="Mudar estado (t)"
+          title={tr('Mudar estado (t)')}
           tabIndex={-1}
           onClick={(ev) => (ev.stopPropagation(), pickKeyword())}
         >
@@ -135,13 +136,13 @@ function TodoList() {
   return (
     <>
       <div className="chips">
-        <button className={`tag ${!kw ? 'active' : ''}`} onClick={() => setKw('')}>Todas ({all.length})</button>
+        <button className={`tag ${!kw ? 'active' : ''}`} onClick={() => setKw('')}>{tr('Todas')} ({all.length})</button>
         {keywords.map((k) => (
           <button key={k} className={`tag ${kw === k ? 'active' : ''}`} onClick={() => setKw(k)}>{k} ({all.filter((e) => e.h.keyword === k).length})</button>
         ))}
       </div>
       {shown.map((e) => <AgendaRow key={`${e.path}:${e.h.line}`} e={e} />)}
-      {!shown.length && <div className="empty">Nada por fazer 🎉</div>}
+      {!shown.length && <div className="empty">{tr('Nada por fazer')} 🎉</div>}
     </>
   )
 }
@@ -165,13 +166,13 @@ function Search() {
     <>
       <div className="search-bar">
         <select value={mode} onChange={(e) => setMode(e.target.value as 'text')}>
-          <option value="text">Texto</option>
-          <option value="match">Etiquetas / propriedades</option>
+          <option value="text">{tr('Texto')}</option>
+          <option value="match">{tr('Etiquetas / propriedades')}</option>
         </select>
         <input
           autoFocus
           id="global-search"
-          placeholder={mode === 'text' ? 'palavras  -excluir' : 'trabalho+urgente-casa|TODO="NEXT"'}
+          placeholder={mode === 'text' ? tr('palavras  -excluir') : tr('trabalho+urgente-casa|TODO="NEXT"')}
           value={q}
           onChange={(e) => setQ(e.target.value)}
           onKeyDown={(e) => {
@@ -179,11 +180,11 @@ function Search() {
             if (e.key === 'ArrowDown' || e.key === 'Enter') (e.preventDefault(), document.querySelector<HTMLElement>('.content .agenda-row')?.focus())
           }}
         />
-        <label className="inline"><input type="checkbox" checked={todoOnly} onChange={(e) => setTodoOnly(e.target.checked)} /> Só tarefas abertas</label>
+        <label className="inline"><input type="checkbox" checked={todoOnly} onChange={(e) => setTodoOnly(e.target.checked)} /> {tr('Só tarefas abertas')}</label>
       </div>
       {mode === 'match' && (
         <p className="hint">
-          Sintaxe org: <code>tag1+tag2-tag3</code>, <code>a|b</code> (ou), <code>TODO="NEXT"</code>, <code>PRIORITY="A"</code>, <code>Effort&gt;1:00</code>, <code>LEVEL=2</code>, <code>{'{regex}'}</code>, e <code>/NEXT|TODO</code> para filtrar estados.
+          {tr('Sintaxe org:')} <code>tag1+tag2-tag3</code>, <code>a|b</code> ({tr('ou')}), <code>TODO="NEXT"</code>, <code>PRIORITY="A"</code>, <code>Effort&gt;1:00</code>, <code>LEVEL=2</code>, <code>{'{regex}'}</code>, {tr('e')} <code>/NEXT|TODO</code> {tr('para filtrar estados.')}
         </p>
       )}
       {results.map((e) => (
@@ -192,7 +193,7 @@ function Search() {
           <div className="crumb">{[e.path, ...outlinePath(e.h)].join(' › ')}</div>
         </div>
       ))}
-      {q && !results.length && <div className="empty">Sem resultados</div>}
+      {q && !results.length && <div className="empty">{tr('Sem resultados')}</div>}
     </>
   )
 }
@@ -209,10 +210,10 @@ function ClockReport() {
   return (
     <>
       <div className="range-nav">
-        <button onClick={() => setAnchor(addDays(anchor, -7))} title="Anterior"><ChevronLeft size={16} /><kbd>b</kbd></button>
-        <button onClick={() => setAnchor(today)}>Esta semana <kbd>.</kbd></button>
-        <button onClick={() => setAnchor(addDays(anchor, 7))} title="Seguinte"><kbd>f</kbd><ChevronRight size={16} /></button>
-        <span className="range-label">{formatDate(from, { day: 'numeric', month: 'short' })} – {formatDate(to, { day: 'numeric', month: 'short' })} · total <b>{formatDuration(total)}</b></span>
+        <button onClick={() => setAnchor(addDays(anchor, -7))} title={tr('Anterior')}><ChevronLeft size={16} /><kbd>b</kbd></button>
+        <button onClick={() => setAnchor(today)}>{tr('Esta semana')} <kbd>.</kbd></button>
+        <button onClick={() => setAnchor(addDays(anchor, 7))} title={tr('Seguinte')}><kbd>f</kbd><ChevronRight size={16} /></button>
+        <span className="range-label">{formatDate(from, { day: 'numeric', month: 'short' })} – {formatDate(to, { day: 'numeric', month: 'short' })} · {tr('total')} <b>{formatDuration(total)}</b></span>
       </div>
       {rows.map((r) => (
         <div key={`${r.path}:${r.h.line}`} className="clock-row">
@@ -220,7 +221,7 @@ function ClockReport() {
           <div className="bar" style={{ width: `${(100 * r.minutes) / (rows[0]?.minutes || 1)}%` }} />
         </div>
       ))}
-      {!rows.length && <div className="empty">Sem tempo registado nesta semana</div>}
+      {!rows.length && <div className="empty">{tr('Sem tempo registado nesta semana')}</div>}
     </>
   )
 }

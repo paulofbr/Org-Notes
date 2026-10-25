@@ -14,6 +14,8 @@ public class App(bool showOnStart) : Application
 {
     private readonly Config _config = Config.Load();
     private CaptureWindow? _capture;
+    private TrayIcon? _tray;
+    private bool _hotkey;
     private WindowIcon? _icon;
 
     public override void Initialize()
@@ -24,24 +26,31 @@ public class App(bool showOnStart) : Application
 
     public override void OnFrameworkInitializationCompleted()
     {
+        L.Lang = L.Initial(_config.Lang);
         _icon = new WindowIcon(new Bitmap(AssetLoader.Open(new Uri("avares://OrgNotes.Capture/Assets/icon.png"))));
-        var menu = new NativeMenu();
-        menu.Add(Item("Capturar", ShowCapture));
-        menu.Add(Item("Definições", ShowSettings));
-        menu.Add(new NativeMenuItemSeparator());
-        menu.Add(Item("Sair", () => (ApplicationLifetime as IClassicDesktopStyleApplicationLifetime)?.Shutdown()));
-        var tray = new TrayIcon { Icon = _icon, ToolTipText = "Org Notes · Capturar", Menu = menu };
-        tray.Clicked += (_, _) => ShowCapture();
-        TrayIcon.SetIcons(this, [tray]);
+        _tray = new TrayIcon { Icon = _icon };
+        _tray.Clicked += (_, _) => ShowCapture();
+        TrayIcon.SetIcons(this, [_tray]);
+        _hotkey = !OperatingSystem.IsWindows() || WindowsHotkey.Register(_config.Hotkey, () => Dispatcher.UIThread.Post(ShowCapture));
+        RenderTray();
 
         _ = ListenForShow();
-        if (OperatingSystem.IsWindows())
-            tray.ToolTipText = WindowsHotkey.Register(_config.Hotkey, () => Dispatcher.UIThread.Post(ShowCapture))
-                ? $"Org Notes · Capturar ({_config.Hotkey})"
-                : $"Org Notes · atalho {_config.Hotkey} indisponível (muda nas Definições)";
         if (!Config.Exists) ShowSettings();
         else if (showOnStart) ShowCapture();
         base.OnFrameworkInitializationCompleted();
+    }
+
+    private void RenderTray()
+    {
+        var menu = new NativeMenu();
+        menu.Add(Item(L.Tr("Capturar"), ShowCapture));
+        menu.Add(Item(L.Tr("Definições"), ShowSettings));
+        menu.Add(new NativeMenuItemSeparator());
+        menu.Add(Item(L.Tr("Sair"), () => (ApplicationLifetime as IClassicDesktopStyleApplicationLifetime)?.Shutdown()));
+        _tray!.Menu = menu;
+        _tray.ToolTipText = !OperatingSystem.IsWindows() ? L.Tr("Org Notes · Capturar")
+            : _hotkey ? L.Tr("Org Notes · Capturar ({0})", _config.Hotkey)
+            : L.Tr("Org Notes · atalho {0} indisponível (muda nas Definições)", _config.Hotkey);
     }
 
     private static NativeMenuItem Item(string header, Action run)
@@ -53,8 +62,23 @@ public class App(bool showOnStart) : Application
 
     private void ShowCapture()
     {
-        _capture ??= new CaptureWindow(new Api(_config)) { Icon = _icon };
+        if (_capture == null)
+        {
+            _capture = new CaptureWindow(new Api(_config)) { Icon = _icon };
+            _capture.LanguageChanged += ChangeLanguage;
+        }
         _capture.ShowForCapture();
+    }
+
+    /// <summary>Follows the user's language from the server: remembers it and rebuilds the texts.</summary>
+    private void ChangeLanguage(string lang)
+    {
+        _config.Lang = L.Lang = lang;
+        _config.Save();
+        RenderTray();
+        _capture?.Discard();
+        _capture = null;
+        ShowCapture();
     }
 
     private void ShowSettings() => new SettingsWindow(_config) { Icon = _icon }.Show();

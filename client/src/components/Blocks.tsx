@@ -1,6 +1,7 @@
 import { useState, type ReactNode } from 'react'
 import { parseBlocks, type Block, type ListItem } from '../org/parser'
 import { Inline, type InlineOptions } from './Inline'
+import { tr } from '../i18n'
 
 export interface BlockOptions extends InlineOptions {
   onCheckbox?: (line: number) => void
@@ -140,7 +141,7 @@ function CodeBlock({ lang, content }: { lang: string; content: string }) {
   return (
     <div className="src">
       {lang && <span className="lang">{lang}</span>}
-      <button className="copy" onClick={(e) => (e.stopPropagation(), navigator.clipboard?.writeText(content))}>Copiar</button>
+      <button className="copy" onClick={(e) => (e.stopPropagation(), navigator.clipboard?.writeText(content))}>{tr('Copiar')}</button>
       <pre><code>{parts}</code></pre>
     </div>
   )

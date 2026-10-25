@@ -1,7 +1,8 @@
 # Org Notes
 
 Org-mode on the web: **React + TypeScript** (Vite) on the frontend, **ASP.NET Core (.NET 10)** on the backend.
-Files are plain `.org` files kept in a folder, so they stay compatible with Emacs. The interface is in Portuguese.
+Files are plain `.org` files kept in a folder, so they stay compatible with Emacs. The interface is available in
+Portuguese, English, French and Spanish (the screenshots and the labels quoted below are the Portuguese ones).
 
 ![Outline of an org file with tasks, dates, tags, a checklist and a table](docs/images/outline.png)
 
@@ -27,6 +28,14 @@ cd client && npm test
 The notes folder is set in `server/appsettings.json` → `OrgDirectory`
 (default `server/data`; it can be e.g. `/home/me/org`). Each user's files live in `<OrgDirectory>/users/<email>/`;
 every new user starts with `todo.org`, `agenda.org`, `notes.org`, `contacts.org` and `archive.org`.
+
+## Languages
+
+The language is a per-user setting, chosen in *Conta e notificações* (Account and notifications) or in the command
+palette (<kbd>Ctrl+K</kbd>). It is stored on the server, so the site on every device, the notifications and the capture
+app all follow it. Before signing in, the login page uses the browser's language and has its own PT · EN · FR · ES links.
+The site's texts are keyed by their Portuguese wording: translations live in `client/src/i18n/{en,fr,es}.ts`
+(a test checks that every text has all three), and the server's and the capture app's in their `Strings.cs`.
 
 ## Windows installer
 
@@ -223,6 +232,7 @@ Register-ScheduledTask OrgNotes -Action $a -Trigger (New-ScheduledTaskTrigger -A
 - **Editing**: per-section editing (Enter), double-click a headline's title or description to edit just that, full text mode, undo/redo, autosave, reloads external changes when the window regains focus.
 - **Files**: folders (optionally created with a set of files), file icons.
 - **Export**: HTML, `.org`, print/PDF. Light/dark theme, phone layout. Shortcuts: press `?`.
+- **Languages**: Portuguese, English, French and Spanish, per user; dates follow the chosen language.
 
 ## Not included
 

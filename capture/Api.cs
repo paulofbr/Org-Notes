@@ -8,6 +8,8 @@ public record Template(string Key, string Name, string File, bool Datetree, bool
 
 public record Improved(Dictionary<string, string> Fields, string[] Changes);
 
+public record Me(bool Ai, string? Lang);
+
 /// <summary>The Org Notes server's capture endpoints, authenticated with the user's personal token.</summary>
 public class Api(Config config)
 {
@@ -28,13 +30,14 @@ public class Api(Config config)
         return await response.Content.ReadFromJsonAsync<List<Template>>(Json) ?? [];
     }
 
-    /// <summary>Whether the server has AI proofreading configured.</summary>
-    public async Task<bool> AiEnabled()
+    /// <summary>Whether the server has AI proofreading configured, and the user's interface language.</summary>
+    public async Task<Me> Me()
     {
         using var response = await Http.SendAsync(Request(HttpMethod.Get, "/api/me"));
         await Check(response);
         using var doc = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
-        return doc.RootElement.TryGetProperty("ai", out var ai) && ai.GetBoolean();
+        var root = doc.RootElement;
+        return new(root.TryGetProperty("ai", out var ai) && ai.GetBoolean(), root.TryGetProperty("lang", out var lang) ? lang.GetString() : null);
     }
 
     public async Task<Improved> Improve(Dictionary<string, string> fields, string mode)
@@ -49,10 +52,10 @@ public class Api(Config config)
             string? detail = null;
             try { detail = JsonDocument.Parse(text).RootElement.GetProperty("detail").GetString(); }
             catch (Exception e) when (e is JsonException or KeyNotFoundException or InvalidOperationException) { }
-            throw new HttpRequestException(detail ?? $"Erro {(int)response.StatusCode}: {text}");
+            throw new HttpRequestException(detail ?? L.Tr("Erro {0}: {1}", (int)response.StatusCode, text));
         }
         await Check(response);
-        return await response.Content.ReadFromJsonAsync<Improved>(Json) ?? throw new HttpRequestException("Resposta vazia.");
+        return await response.Content.ReadFromJsonAsync<Improved>(Json) ?? throw new HttpRequestException(L.Tr("Resposta vazia."));
     }
 
     public async Task Capture(Template t, string title, string body, DateOnly? date, TimeOnly? time, Dictionary<string, string> props)
@@ -69,9 +72,9 @@ public class Api(Config config)
         var text = await response.Content.ReadAsStringAsync();
         throw new HttpRequestException((int)response.StatusCode switch
         {
-            401 => "Token em falta ou inválido (vê Conta e notificações no site).",
-            403 => "Este utilizador não tem acesso ao servidor.",
-            _ => $"Erro {(int)response.StatusCode}: {text.Trim('"')}",
+            401 => L.Tr("Token em falta ou inválido (vê Conta e notificações no site)."),
+            403 => L.Tr("Este utilizador não tem acesso ao servidor."),
+            _ => L.Tr("Erro {0}: {1}", (int)response.StatusCode, text.Trim('"')),
         });
     }
 }

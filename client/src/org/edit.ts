@@ -1,5 +1,6 @@
 import { HEADLINE_RE, parseOrg, serializeHeadline, refreshCookies, outlinePath, type Headline, type OrgDoc } from './parser'
 import { formatTimestamp, nowStamp, shiftRepeater, dateKey, formatDuration, parseTimestamp, wallMinutes, type Timestamp } from './timestamp'
+import { tr } from '../i18n'
 
 // All edits take the file text plus the headline's line and return new text.
 // The headline is re-resolved from the line so callers can pass stale objects safely.
@@ -212,7 +213,7 @@ export function refile(
   const doc = parseOrg(srcText)
   const h = at(doc, line)
   const same = dstText === undefined
-  if (same && targetLine !== undefined && targetLine >= h.line && targetLine < h.end) throw new Error('Não é possível mover para dentro de si próprio')
+  if (same && targetLine !== undefined && targetLine >= h.line && targetLine < h.end) throw new Error(tr('Não é possível mover para dentro de si próprio'))
   const srcLines = [...doc.lines]
   srcLines.splice(h.line, h.end - h.line)
   const dst = parseOrg(same ? srcLines.join('\n') : dstText!)
@@ -251,7 +252,7 @@ export function archive(srcText: string, line: number, srcPath: string, archiveT
   }
   const srcLines = [...doc.lines]
   srcLines.splice(h.line, h.end - h.line)
-  const base = archiveText.trim() ? archiveText.replace(/\n*$/, '\n') : `#+TITLE: Arquivo de ${srcPath}\n\n`
+  const base = archiveText.trim() ? archiveText.replace(/\n*$/, '\n') : `#+TITLE: ${tr('Arquivo de {path}', { path: srcPath })}\n\n`
   return { src: refreshCookies(srcLines.join('\n')), archive: base + movedLines.join('\n') + '\n' }
 }
 

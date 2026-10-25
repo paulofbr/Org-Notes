@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { SHORTCUTS, type ShortcutContext } from '../shortcuts'
+import { tr } from '../i18n'
 
 function contextOf(el: Element | null, view: 'doc' | 'agenda'): ShortcutContext {
   if (el?.closest('.entry-editor')) return 'editor'
@@ -28,7 +29,7 @@ export function ShortcutBar({ view }: { view: 'doc' | 'agenda' }) {
   const global = ctx === 'editor' || ctx === 'source' ? [] : SHORTCUTS.global.keys.filter(([k]) => !busy || k === '?')
   const keys = [...SHORTCUTS[ctx].keys.filter((k) => k[2] !== false), ...global]
   return (
-    <div className="shortcut-bar" aria-label="Atalhos de teclado">
+    <div className="shortcut-bar" aria-label={tr('Atalhos de teclado')}>
       <span className="ctx">{SHORTCUTS[ctx].title}</span>
       {keys.map(([k, label]) => (
         <span key={k + label} className="sc"><kbd>{k}</kbd> {label}</span>

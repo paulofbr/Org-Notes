@@ -94,7 +94,7 @@ app.Use(async (ctx, next) =>
     if (!allowed.Any(a => Users.KeyOfEmail(a) == Users.KeyOfEmail(email)))
     {
         ctx.Response.StatusCode = 403;
-        await ctx.Response.WriteAsync($"Sem acesso: {email} não está autorizado. Sair: /logout");
+        await ctx.Response.WriteAsync(Strings.Tr(ctx, "Sem acesso: {0} não está autorizado. Sair: /logout", email));
         return;
     }
     await next();
@@ -131,10 +131,10 @@ files.MapDelete("/{*path}", (string path, HttpContext ctx, Users users) => users
 app.MapGet("/api/folders", (HttpContext ctx, Users users) => users.For(ctx.User).Folders());
 
 app.MapPost("/api/folders", (FolderRequest req, HttpContext ctx, Users users) =>
-    users.For(ctx.User).CreateFolder(req.Path) ? Results.NoContent() : Results.BadRequest("Nome de pasta inválido"));
+    users.For(ctx.User).CreateFolder(req.Path) ? Results.NoContent() : Results.BadRequest(Strings.Tr(ctx, "Nome de pasta inválido")));
 
 app.MapDelete("/api/folders/{*path}", (string path, HttpContext ctx, Users users) =>
-    users.For(ctx.User).DeleteFolder(path) ? Results.NoContent() : Results.BadRequest("Só se pode apagar uma pasta vazia"));
+    users.For(ctx.User).DeleteFolder(path) ? Results.NoContent() : Results.BadRequest(Strings.Tr(ctx, "Só se pode apagar uma pasta vazia")));
 
 app.MapPost("/api/rename", (RenameRequest req, HttpContext ctx, Users users) =>
     users.For(ctx.User).Rename(req.From, req.To) ? Results.NoContent() : Results.BadRequest("Cannot rename"));
@@ -142,7 +142,16 @@ app.MapPost("/api/rename", (RenameRequest req, HttpContext ctx, Users users) =>
 app.MapGet("/api/me", (HttpContext ctx, Users users, Notifier notifier, AiAssistant ai) =>
 {
     var s = users.Settings(users.Key(ctx.User));
-    return new { email = ctx.User.FindFirstValue(ClaimTypes.Email), ai = ai.Enabled, token = users.Token(users.Key(ctx.User)), ntfy = new { server = notifier.NtfyServer, topic = s.NtfyTopic, enabled = s.Notify } };
+    return new { email = ctx.User.FindFirstValue(ClaimTypes.Email), ai = ai.Enabled, token = users.Token(users.Key(ctx.User)), ntfy = new { server = notifier.NtfyServer, topic = s.NtfyTopic, enabled = s.Notify }, lang = s.Lang };
+});
+
+// The interface language is a user setting, so notifications and the capture app follow it too.
+app.MapPut("/api/me/lang", (LangRequest req, HttpContext ctx, Users users) =>
+{
+    if (!Strings.IsLang(req.Lang)) return Results.BadRequest();
+    var key = users.Key(ctx.User);
+    users.Save(key, users.Settings(key) with { Lang = req.Lang });
+    return Results.NoContent();
 });
 
 app.MapPut("/api/me/notify", (NotifyRequest req, HttpContext ctx, Users users) =>
@@ -160,7 +169,7 @@ app.MapPost("/api/icons", async (HttpContext ctx, Users users) =>
     using var buffer = new MemoryStream();
     await ctx.Request.Body.CopyToAsync(buffer);
     var png = buffer.ToArray();
-    if (png.Length > 256 * 1024 || !png.AsSpan().StartsWith((byte[])[0x89, (byte)'P', (byte)'N', (byte)'G'])) return Results.BadRequest("O ícone tem de ser um PNG até 256 KB");
+    if (png.Length > 256 * 1024 || !png.AsSpan().StartsWith((byte[])[0x89, (byte)'P', (byte)'N', (byte)'G'])) return Results.BadRequest(Strings.Tr(ctx, "O ícone tem de ser um PNG até 256 KB"));
     var dir = users.IconsDir(users.Key(ctx.User));
     Directory.CreateDirectory(dir);
     var name = Convert.ToHexStringLower(SHA256.HashData(png))[..16] + ".png";
@@ -178,7 +187,7 @@ var imageTypes = new Dictionary<string, string> { [".png"] = "image/png", [".jpg
 
 app.MapPost("/api/images", async (string file, HttpContext ctx, Users users) =>
 {
-    if (users.For(ctx.User).ImagesFolder(file) is not { } folder) return Results.BadRequest("Ficheiro inválido");
+    if (users.For(ctx.User).ImagesFolder(file) is not { } folder) return Results.BadRequest(Strings.Tr(ctx, "Ficheiro inválido"));
     using var buffer = new MemoryStream();
     await ctx.Request.Body.CopyToAsync(buffer);
     var data = buffer.ToArray();
@@ -191,7 +200,7 @@ app.MapPost("/api/images", async (string file, HttpContext ctx, Users users) =>
         [(byte)'R', (byte)'I', (byte)'F', (byte)'F', _, _, _, _, (byte)'W', (byte)'E', (byte)'B', (byte)'P', ..] => ".webp",
         _ => null,
     };
-    if (ext == null || data.Length > 10 * 1024 * 1024) return Results.BadRequest("A imagem tem de ser PNG, JPEG, GIF ou WebP, até 10 MB");
+    if (ext == null || data.Length > 10 * 1024 * 1024) return Results.BadRequest(Strings.Tr(ctx, "A imagem tem de ser PNG, JPEG, GIF ou WebP, até 10 MB"));
     var dir = Path.Combine(users.Root(users.Key(ctx.User)), folder);
     Directory.CreateDirectory(dir);
     var name = Convert.ToHexStringLower(SHA256.HashData(data))[..16] + ext;
@@ -229,8 +238,8 @@ app.MapPost("/api/capture", (CaptureRequest req, HttpContext ctx, Users users) =
 {
     var store = users.For(ctx.User);
     var text = store.Read(req.File) ?? "";
-    if (OrgCapture.TemplatesIn(req.File, text).FirstOrDefault(t => t.Key == req.Key) is not { } tpl) return Results.NotFound("Template não encontrado");
-    if (string.IsNullOrWhiteSpace(req.Title)) return Results.BadRequest("Falta o título");
+    if (OrgCapture.TemplatesIn(req.File, text).FirstOrDefault(t => t.Key == req.Key) is not { } tpl) return Results.NotFound(Strings.Tr(ctx, "Template não encontrado"));
+    if (string.IsNullOrWhiteSpace(req.Title)) return Results.BadRequest(Strings.Tr(ctx, "Falta o título"));
     // The client's local time, so %U and the datetree follow the user's clock rather than the server's.
     var now = req.Now ?? DateTime.Now;
     var entry = OrgCapture.Expand(tpl, req.Title.Trim(), req.Body ?? "", req.Date, req.Time, now, req.Props);
@@ -238,31 +247,31 @@ app.MapPost("/api/capture", (CaptureRequest req, HttpContext ctx, Users users) =
     return Results.Ok(new { file = req.File });
 });
 
-app.MapPost("/api/ai/improve", async (ImproveRequest req, AiAssistant ai, ILogger<AiAssistant> log, CancellationToken ct) =>
+app.MapPost("/api/ai/improve", async (ImproveRequest req, HttpContext ctx, AiAssistant ai, ILogger<AiAssistant> log, CancellationToken ct) =>
 {
-    if (!ai.Enabled) return Results.NotFound("IA não configurada");
+    if (!ai.Enabled) return Results.NotFound(Strings.Tr(ctx, "IA não configurada"));
     try { return Results.Ok(await ai.Improve(req.Fields, req.Mode ?? "develop", ct)); }
-    catch (Exception e) when (AiAssistant.IsRateLimit(e)) { return Results.Problem("Demasiados pedidos à IA; tenta daqui a pouco.", statusCode: 429); }
+    catch (Exception e) when (AiAssistant.IsRateLimit(e)) { return Results.Problem(Strings.Tr(ctx, "Demasiados pedidos à IA; tenta daqui a pouco."), statusCode: 429); }
     catch (Exception e) when (e is AnthropicException or HttpRequestException or JsonException or KeyNotFoundException)
     {
         log.LogWarning(e, "AI request failed");
-        return Results.Problem($"A IA falhou: {AiAssistant.ProviderMessage(e)}", statusCode: 502);
+        return Results.Problem(Strings.Tr(ctx, "A IA falhou: {0}", AiAssistant.ProviderMessage(e)), statusCode: 502);
     }
-    catch (InvalidOperationException e) { return Results.Problem(e.Message, statusCode: 502); }
+    catch (InvalidOperationException e) { return Results.Problem(Strings.Tr(ctx, e.Message), statusCode: 502); }
 });
 
-app.MapPost("/api/ai/template", async (TemplateRequest req, AiAssistant ai, ILogger<AiAssistant> log, CancellationToken ct) =>
+app.MapPost("/api/ai/template", async (TemplateRequest req, HttpContext ctx, AiAssistant ai, ILogger<AiAssistant> log, CancellationToken ct) =>
 {
-    if (!ai.Enabled) return Results.NotFound("IA não configurada");
-    if (string.IsNullOrWhiteSpace(req.Description)) return Results.BadRequest("Falta a descrição");
+    if (!ai.Enabled) return Results.NotFound(Strings.Tr(ctx, "IA não configurada"));
+    if (string.IsNullOrWhiteSpace(req.Description)) return Results.BadRequest(Strings.Tr(ctx, "Falta a descrição"));
     try { return Results.Ok(await ai.Template(req.Description, ct)); }
-    catch (Exception e) when (AiAssistant.IsRateLimit(e)) { return Results.Problem("Demasiados pedidos à IA; tenta daqui a pouco.", statusCode: 429); }
+    catch (Exception e) when (AiAssistant.IsRateLimit(e)) { return Results.Problem(Strings.Tr(ctx, "Demasiados pedidos à IA; tenta daqui a pouco."), statusCode: 429); }
     catch (Exception e) when (e is AnthropicException or HttpRequestException or JsonException or KeyNotFoundException)
     {
         log.LogWarning(e, "AI request failed");
-        return Results.Problem($"A IA falhou: {AiAssistant.ProviderMessage(e)}", statusCode: 502);
+        return Results.Problem(Strings.Tr(ctx, "A IA falhou: {0}", AiAssistant.ProviderMessage(e)), statusCode: 502);
     }
-    catch (InvalidOperationException e) { return Results.Problem(e.Message, statusCode: 502); }
+    catch (InvalidOperationException e) { return Results.Problem(Strings.Tr(ctx, e.Message), statusCode: 502); }
 });
 
 app.MapFallbackToFile("index.html", staticOptions);
@@ -279,4 +288,5 @@ partial class Program
 record NotifyRequest(bool Enabled);
 record ImproveRequest(Dictionary<string, string> Fields, string? Mode);
 record TemplateRequest(string Description);
+record LangRequest(string Lang);
 record CaptureRequest(string File, string Key, string Title, string? Body, DateOnly? Date, TimeOnly? Time, DateTime? Now, Dictionary<string, string>? Props);

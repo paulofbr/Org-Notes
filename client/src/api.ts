@@ -11,6 +11,7 @@ export interface Me {
   ai: boolean
   token: string
   ntfy: { server: string; topic: string; enabled: boolean }
+  lang?: string
 }
 
 async function check(res: Response) {
@@ -48,6 +49,8 @@ export const api = {
   uploadIcon: async (png: Blob): Promise<{ name: string }> =>
     (await check(await fetch('/api/icons', { method: 'POST', body: png, headers: { 'Content-Type': 'image/png' } }))).json(),
   newToken: async (): Promise<{ token: string }> => (await check(await fetch('/api/me/token', { method: 'POST' }))).json(),
+  setLang: async (lang: string) =>
+    check(await fetch('/api/me/lang', { method: 'PUT', body: JSON.stringify({ lang }), headers: { 'Content-Type': 'application/json' } })),
   setNotify: async (enabled: boolean) =>
     check(await fetch('/api/me/notify', { method: 'PUT', body: JSON.stringify({ enabled }), headers: { 'Content-Type': 'application/json' } })),
 }

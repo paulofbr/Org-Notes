@@ -6,6 +6,7 @@ import { refile } from '../org/edit'
 import { SHORTCUTS } from '../shortcuts'
 import { api, type Me } from '../api'
 import { OrgTextarea } from './OrgTextarea'
+import { LANGS, isLang, lang, rememberLang, tr, type Lang } from '../i18n'
 
 export function Modal({ title, children, onClose, wide }: { title: string; children: ReactNode; onClose?: () => void; wide?: boolean }) {
   const { closeDialog } = useApp()
@@ -33,7 +34,7 @@ export function DescriptionDialog({ path, title, initial, onSubmit }: { path: st
   const [value, setValue] = useState(initial)
   const save = () => (closeDialog(), value !== initial && onSubmit(value))
   return (
-    <Modal title={`Descrição · ${title}`} onClose={closeDialog} wide>
+    <Modal title={`${tr('Descrição')} · ${title}`} onClose={closeDialog} wide>
       <OrgTextarea
         className="description"
         autoFocus
@@ -43,13 +44,13 @@ export function DescriptionDialog({ path, title, initial, onSubmit }: { path: st
         path={path}
         tools
         rich
-        placeholder="Notas, listas, tabelas, links e imagens…"
+        placeholder={tr('Notas, listas, tabelas, links e imagens…')}
         onKeyDown={(e) => e.key === 'Enter' && (e.ctrlKey || e.metaKey) && (e.preventDefault(), save())}
       />
       <div className="actions">
-        <span className="hint"><kbd>Ctrl+Enter</kbd> guardar · <kbd>Esc</kbd> cancelar</span>
-        <button type="button" onClick={closeDialog}>Cancelar</button>
-        <button className="primary" onClick={save}>Guardar</button>
+        <span className="hint"><kbd>Ctrl+Enter</kbd> {tr('guardar')} · <kbd>Esc</kbd> {tr('cancelar')}</span>
+        <button type="button" onClick={closeDialog}>{tr('Cancelar')}</button>
+        <button className="primary" onClick={save}>{tr('Guardar')}</button>
       </div>
     </Modal>
   )
@@ -68,19 +69,19 @@ export function NewEntryDialog({ path, keywords, initialKeyword, onSubmit }: {
   const [description, setDescription] = useState('')
   const save = () => title.trim() && (closeDialog(), onSubmit({ title: title.trim(), keyword: keyword || undefined, description }))
   return (
-    <Modal title="Novo título" onClose={closeDialog} wide>
+    <Modal title={tr('Novo título')} onClose={closeDialog} wide>
       <form onSubmit={(e) => (e.preventDefault(), save())} onKeyDown={(e) => e.key === 'Enter' && (e.ctrlKey || e.metaKey) && (e.preventDefault(), save())}>
         <div className="row">
-          <label className="keyword-pick">Estado
+          <label className="keyword-pick">{tr('Estado')}
             <select value={keyword} onChange={(e) => setKeyword(e.target.value)}>
-              <option value="">— (nota)</option>
+              <option value="">— ({tr('nota')})</option>
               {keywords.map((k) => <option key={k} value={k}>{k}</option>)}
             </select>
           </label>
-          <label>Título<input autoFocus value={title} onChange={(e) => setTitle(e.target.value)} /></label>
+          <label>{tr('Título')}<input autoFocus value={title} onChange={(e) => setTitle(e.target.value)} /></label>
         </div>
         {/* Not a <label>: a click in it would be forwarded to its first button (Link externo). */}
-        <div className="field">Descrição (opcional)
+        <div className="field">{tr('Descrição (opcional)')}
           <OrgTextarea
             className="description"
             value={description}
@@ -88,13 +89,13 @@ export function NewEntryDialog({ path, keywords, initialKeyword, onSubmit }: {
             path={path}
             tools
             rich
-            placeholder="Notas, listas, links e imagens…"
+            placeholder={tr('Notas, listas, links e imagens…')}
           />
         </div>
         <div className="actions">
-          <span className="hint"><kbd>Enter</kbd> no título ou <kbd>Ctrl+Enter</kbd> guarda</span>
-          <button type="button" onClick={closeDialog}>Cancelar</button>
-          <button className="primary" disabled={!title.trim()}>Criar</button>
+          <span className="hint"><kbd>Enter</kbd> {tr('no título ou')} <kbd>Ctrl+Enter</kbd> {tr('guarda')}</span>
+          <button type="button" onClick={closeDialog}>{tr('Cancelar')}</button>
+          <button className="primary" disabled={!title.trim()}>{tr('Criar')}</button>
         </div>
       </form>
     </Modal>
@@ -109,7 +110,7 @@ export function PromptDialog({ title, label, initial = '', onSubmit }: { title: 
       <form onSubmit={(e) => (e.preventDefault(), closeDialog(), onSubmit(value))}>
         <label>{label}<input autoFocus value={value} onChange={(e) => setValue(e.target.value)} /></label>
         <div className="actions">
-          <button type="button" onClick={closeDialog}>Cancelar</button>
+          <button type="button" onClick={closeDialog}>{tr('Cancelar')}</button>
           <button className="primary">OK</button>
         </div>
       </form>
@@ -123,20 +124,20 @@ export function NewFolderDialog({ onSubmit }: { onSubmit: (name: string, files: 
   const [files, setFiles] = useState('')
   const list = files.split(',').map((f) => f.trim().replace(/\.org$/, '')).filter(Boolean)
   return (
-    <Modal title="Nova pasta" onClose={closeDialog}>
+    <Modal title={tr('Nova pasta')} onClose={closeDialog}>
       <form onSubmit={(e) => (e.preventDefault(), name.trim() && (closeDialog(), onSubmit(name, list)))}>
-        <label>Nome (ex: projetos ou projetos/casa)<input autoFocus value={name} onChange={(e) => setName(e.target.value)} /></label>
-        <label>Ficheiros (opcional, separados por vírgulas, sem .org)<input value={files} placeholder="ex: tarefas, notas" onChange={(e) => setFiles(e.target.value)} /></label>
+        <label>{tr('Nome (ex: projetos ou projetos/casa)')}<input autoFocus value={name} onChange={(e) => setName(e.target.value)} /></label>
+        <label>{tr('Ficheiros (opcional, separados por vírgulas, sem .org)')}<input value={files} placeholder={tr('ex: tarefas, notas')} onChange={(e) => setFiles(e.target.value)} /></label>
         <div className="actions">
-          <button type="button" onClick={closeDialog}>Cancelar</button>
-          <button className="primary" disabled={!name.trim()}>Criar</button>
+          <button type="button" onClick={closeDialog}>{tr('Cancelar')}</button>
+          <button className="primary" disabled={!name.trim()}>{tr('Criar')}</button>
         </div>
       </form>
     </Modal>
   )
 }
 
-const QUICK: [string, number][] = [['Hoje', 0], ['Amanhã', 1], ['+1 semana', 7]]
+const QUICK: [string, number][] = [[tr('Hoje'), 0], [tr('Amanhã'), 1], [tr('+1 semana'), 7]]
 
 export function DateDialog({ title, initial, onSubmit }: { title: string; initial?: Timestamp; onSubmit: (ts?: Omit<Timestamp, 'raw'>) => void }) {
   const { closeDialog } = useApp()
@@ -167,28 +168,28 @@ export function DateDialog({ title, initial, onSubmit }: { title: string; initia
           ))}
         </div>
         <div className="row">
-          <label>Data<input type="date" autoFocus value={date} onChange={(e) => setDate(e.target.value)} required /></label>
-          <label>Hora<input type="time" value={time} onChange={(e) => setTime(e.target.value)} /></label>
-          <label>Até<input type="time" value={endTime} onChange={(e) => setEndTime(e.target.value)} disabled={!time} /></label>
+          <label>{tr('Data')}<input type="date" autoFocus value={date} onChange={(e) => setDate(e.target.value)} required /></label>
+          <label>{tr('Hora')}<input type="time" value={time} onChange={(e) => setTime(e.target.value)} /></label>
+          <label>{tr('Até')}<input type="time" value={endTime} onChange={(e) => setEndTime(e.target.value)} disabled={!time} /></label>
         </div>
         <div className="row">
-          <label>Repetir<select value={repeat} onChange={(e) => setRepeat(e.target.value)}>
-            <option value="">Não</option>
-            <option value="+1d">Diariamente (+1d)</option>
-            <option value="+1w">Semanalmente (+1w)</option>
-            <option value="+2w">Quinzenalmente (+2w)</option>
-            <option value="+1m">Mensalmente (+1m)</option>
-            <option value="+1y">Anualmente (+1y)</option>
-            <option value=".+1d">1 dia após concluir (.+1d)</option>
-            <option value="++1w">Próxima semana futura (++1w)</option>
+          <label>{tr('Repetir')}<select value={repeat} onChange={(e) => setRepeat(e.target.value)}>
+            <option value="">{tr('Não')}</option>
+            <option value="+1d">{tr('Diariamente')} (+1d)</option>
+            <option value="+1w">{tr('Semanalmente')} (+1w)</option>
+            <option value="+2w">{tr('Quinzenalmente')} (+2w)</option>
+            <option value="+1m">{tr('Mensalmente')} (+1m)</option>
+            <option value="+1y">{tr('Anualmente')} (+1y)</option>
+            <option value=".+1d">{tr('1 dia após concluir')} (.+1d)</option>
+            <option value="++1w">{tr('Próxima semana futura')} (++1w)</option>
             {repeat && !['+1d', '+1w', '+2w', '+1m', '+1y', '.+1d', '++1w'].includes(repeat) && <option value={repeat}>{repeat}</option>}
           </select></label>
-          <label>Aviso antecipado<input placeholder="ex: 3d" value={warn} onChange={(e) => setWarn(e.target.value)} /></label>
+          <label>{tr('Aviso antecipado')}<input placeholder={tr('ex: 3d')} value={warn} onChange={(e) => setWarn(e.target.value)} /></label>
         </div>
         <div className="actions">
-          {initial && <button type="button" className="danger" onClick={() => (closeDialog(), onSubmit(undefined))}>Remover</button>}
-          <button type="button" onClick={closeDialog}>Cancelar</button>
-          <button className="primary">Guardar</button>
+          {initial && <button type="button" className="danger" onClick={() => (closeDialog(), onSubmit(undefined))}>{tr('Remover')}</button>}
+          <button type="button" onClick={closeDialog}>{tr('Cancelar')}</button>
+          <button className="primary">{tr('Guardar')}</button>
         </div>
       </form>
     </Modal>
@@ -213,22 +214,22 @@ export function TagsDialog({ initial, onSubmit }: { initial: string[]; onSubmit:
     setInput('')
   }
   return (
-    <Modal title="Etiquetas" onClose={closeDialog}>
+    <Modal title={tr('Etiquetas')} onClose={closeDialog}>
       <form onSubmit={(e) => (e.preventDefault(), input.trim() ? add(input) : (closeDialog(), onSubmit(tags)))}>
         <div className="chips">
           {tags.map((t) => (
             <button type="button" className="tag active" key={t} onClick={() => setTags(tags.filter((x) => x !== t))}>{t} ×</button>
           ))}
         </div>
-        <input autoFocus placeholder="Nova etiqueta + Enter" value={input} onChange={(e) => setInput(e.target.value)} />
+        <input autoFocus placeholder={tr('Nova etiqueta + Enter')} value={input} onChange={(e) => setInput(e.target.value)} />
         <div className="chips">
           {known.filter((t) => !tags.includes(t) && t.toLowerCase().includes(input.toLowerCase())).map((t) => (
             <button type="button" className="tag" key={t} onClick={() => add(t)}>{t}</button>
           ))}
         </div>
         <div className="actions">
-          <button type="button" onClick={closeDialog}>Cancelar</button>
-          <button type="button" className="primary" onClick={() => (closeDialog(), onSubmit(input.trim() ? [...tags, input.trim()] : tags))}>Guardar</button>
+          <button type="button" onClick={closeDialog}>{tr('Cancelar')}</button>
+          <button type="button" className="primary" onClick={() => (closeDialog(), onSubmit(input.trim() ? [...tags, input.trim()] : tags))}>{tr('Guardar')}</button>
         </div>
       </form>
     </Modal>
@@ -240,7 +241,7 @@ export function PropertyDialog({ properties, onSubmit }: { properties: Record<st
   const [key, setKey] = useState('')
   const [value, setValue] = useState('')
   return (
-    <Modal title="Propriedades" onClose={closeDialog}>
+    <Modal title={tr('Propriedades')} onClose={closeDialog}>
       {Object.keys(properties).length > 0 && (
         <table className="props">
           <tbody>
@@ -249,7 +250,7 @@ export function PropertyDialog({ properties, onSubmit }: { properties: Record<st
                 <th>{k}</th>
                 <td>{v}</td>
                 <td>
-                  <button onClick={() => (setKey(k), setValue(v))}>Editar</button>
+                  <button onClick={() => (setKey(k), setValue(v))}>{tr('Editar')}</button>
                   <button className="danger" onClick={() => (closeDialog(), onSubmit(k, undefined))}>×</button>
                 </td>
               </tr>
@@ -259,13 +260,13 @@ export function PropertyDialog({ properties, onSubmit }: { properties: Record<st
       )}
       <form onSubmit={(e) => (e.preventDefault(), key.trim() && (closeDialog(), onSubmit(key.trim().replace(/\s+/g, '_'), value)))}>
         <div className="row">
-          <label>Nome<input autoFocus value={key} list="prop-names" onChange={(e) => setKey(e.target.value)} placeholder="Effort" /></label>
-          <label>Valor<input value={value} onChange={(e) => setValue(e.target.value)} /></label>
+          <label>{tr('Nome')}<input autoFocus value={key} list="prop-names" onChange={(e) => setKey(e.target.value)} placeholder="Effort" /></label>
+          <label>{tr('Valor')}<input value={value} onChange={(e) => setValue(e.target.value)} /></label>
         </div>
         <datalist id="prop-names">{['Effort', 'CATEGORY', 'ID', 'CUSTOM_ID', 'ORDERED', 'LOCATION'].map((p) => <option key={p} value={p} />)}</datalist>
         <div className="actions">
-          <button type="button" onClick={closeDialog}>Fechar</button>
-          <button className="primary">Definir</button>
+          <button type="button" onClick={closeDialog}>{tr('Fechar')}</button>
+          <button className="primary">{tr('Definir')}</button>
         </div>
       </form>
     </Modal>
@@ -303,8 +304,8 @@ export function RefileDialog({ path, line }: { path: string; line: number }) {
     }
   }
   return (
-    <Modal title="Mover para… (refile)" onClose={closeDialog} wide>
-      <input autoFocus placeholder="Procurar destino…" value={q} onChange={(e) => setQ(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && targets[0] && choose(targets[0])} />
+    <Modal title={tr('Mover para… (refile)')} onClose={closeDialog} wide>
+      <input autoFocus placeholder={tr('Procurar destino…')} value={q} onChange={(e) => setQ(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && targets[0] && choose(targets[0])} />
       <ul className="pick-list">
         {targets.map((t) => (
           <li key={`${t.path}:${t.line}`}><button onClick={() => choose(t)}>{t.line === undefined ? <b>{t.label}</b> : t.label}</button></li>
@@ -322,10 +323,10 @@ export function HelpDialog() {
   const all = Object.values(SHORTCUTS).flatMap(({ title, keys }) => keys.map(([key, label]) => ({ group: title, key, label })))
   const shown = all.filter((s) => words.every((w) => `${s.group} ${s.key} ${s.label}`.toLowerCase().includes(w)))
   return (
-    <Modal title="Atalhos de teclado" wide>
+    <Modal title={tr('Atalhos de teclado')} wide>
       <input
         autoFocus
-        placeholder="Procurar atalho, tecla ou contexto…"
+        placeholder={tr('Procurar atalho, tecla ou contexto…')}
         value={q}
         onChange={(e) => (setQ(e.target.value), setSel(0))}
         onKeyDown={(e) => {
@@ -345,9 +346,9 @@ export function HelpDialog() {
             </li>
           </Fragment>
         ))}
-        {shown.length === 0 && <li className="hint">Nenhum atalho encontrado.</li>}
+        {shown.length === 0 && <li className="hint">{tr('Nenhum atalho encontrado.')}</li>}
       </ul>
-      <div className="hint"><kbd>↑ ↓</kbd> navegar · <kbd>Esc</kbd> fechar</div>
+      <div className="hint"><kbd>↑ ↓</kbd> {tr('navegar')} · <kbd>Esc</kbd> {tr('fechar')}</div>
     </Modal>
   )
 }
@@ -359,26 +360,36 @@ export function AccountDialog() {
   useEffect(() => void api.me().then(setMe, (e) => setError(String(e))), [])
   const toggle = (enabled: boolean) => me && api.setNotify(enabled).then(() => setMe({ ...me, ntfy: { ...me.ntfy, enabled } }), (e) => setError(String(e)))
   const url = me && `${me.ntfy.server}/${me.ntfy.topic}`
+  // The language is a user setting, so the server (notifications, capture app) knows it too.
+  const changeLang = (l: Lang) => api.setLang(l).then(() => rememberLang(l), (e) => setError(String(e)))
   return (
-    <Modal title="Conta e notificações" onClose={closeDialog}>
+    <Modal title={tr('Conta e notificações')} onClose={closeDialog}>
       {error && <p className="hint">{error}</p>}
-      {me && <p>Sessão: <b>{me.email}</b> · <a href="/logout">Sair</a></p>}
+      {me && <p>{tr('Sessão')}: <b>{me.email}</b> · <a href="/logout">{tr('Sair')}</a></p>}
+      {me && (
+        <label>
+          {tr('Língua')}
+          <select value={lang} onChange={(e) => isLang(e.target.value) && changeLang(e.target.value)}>
+            {LANGS.map(([l, name]) => <option key={l} value={l}>{name}</option>)}
+          </select>
+        </label>
+      )}
       {me && (
         <>
-          <label className="inline"><input type="checkbox" checked={me.ntfy.enabled} onChange={(e) => toggle(e.target.checked)} /> Enviar lembretes da agenda pelo ntfy</label>
-          <p>Tópico: <a href={url} target="_blank" rel="noreferrer"><code>{url}</code></a></p>
+          <label className="inline"><input type="checkbox" checked={me.ntfy.enabled} onChange={(e) => toggle(e.target.checked)} /> {tr('Enviar lembretes da agenda pelo ntfy')}</label>
+          <p>{tr('Tópico')}: <a href={url} target="_blank" rel="noreferrer"><code>{url}</code></a></p>
           <p className="hint">
-            Subscreve este tópico na app ntfy (Android/iOS) ou no PC com <code>ntfy subscribe {url}</code>. Recebes um aviso antes de cada item
-            com hora e um resumo diário, mesmo com o site fechado. Quem souber o tópico vê os títulos das tarefas: não o partilhes.
+            {tr('Subscreve este tópico na app ntfy (Android/iOS) ou no PC com')} <code>ntfy subscribe {url}</code>.{' '}
+            {tr('Recebes um aviso antes de cada item com hora e um resumo diário, mesmo com o site fechado. Quem souber o tópico vê os títulos das tarefas: não o partilhes.')}
           </p>
-          <h4>App de captura</h4>
-          <p>Servidor: <code>{location.origin}</code></p>
+          <h4>{tr('App de captura')}</h4>
+          <p>{tr('Servidor')}: <code>{location.origin}</code></p>
           <p>
             Token: <code>{me.token}</code>{' '}
-            <button type="button" onClick={() => navigator.clipboard.writeText(me.token)}>Copiar</button>{' '}
-            <button type="button" title="O token antigo deixa de funcionar" onClick={() => api.newToken().then((r) => setMe({ ...me, token: r.token }), (e) => setError(String(e)))}>Gerar novo</button>
+            <button type="button" onClick={() => navigator.clipboard.writeText(me.token)}>{tr('Copiar')}</button>{' '}
+            <button type="button" title={tr('O token antigo deixa de funcionar')} onClick={() => api.newToken().then((r) => setMe({ ...me, token: r.token }), (e) => setError(String(e)))}>{tr('Gerar novo')}</button>
           </p>
-          <p className="hint">O token dá acesso às tuas notas: guarda-o só na app de captura e gera um novo se o perderes.</p>
+          <p className="hint">{tr('O token dá acesso às tuas notas: guarda-o só na app de captura e gera um novo se o perderes.')}</p>
         </>
       )}
       <div className="actions"><button className="primary" onClick={closeDialog}>OK</button></div>
@@ -406,7 +417,7 @@ export function KeywordDialog({ keywords, current, onSubmit }: { keywords: strin
   const ref = useRef<HTMLDivElement>(null)
   useEffect(() => ref.current?.focus(), [])
   return (
-    <Modal title="Estado">
+    <Modal title={tr('Estado')}>
       <div
         className="pick-keys"
         tabIndex={-1}
@@ -423,12 +434,12 @@ export function KeywordDialog({ keywords, current, onSubmit }: { keywords: strin
       >
         {choices.map((kw, i) => (
           <button key={kw ?? ''} tabIndex={-1} className={i === sel ? 'active' : ''} onMouseEnter={() => setSel(i)} onClick={() => pick(kw)}>
-            {kw ? <><kbd>{keys[i][0]}</kbd> {kw}</> : <><kbd>Espaço</kbd> sem estado</>}
-            {kw === current && <span className="muted"> · atual</span>}
+            {kw ? <><kbd>{keys[i][0]}</kbd> {kw}</> : <><kbd>{tr('Espaço')}</kbd> {tr('sem estado')}</>}
+            {kw === current && <span className="muted"> · {tr('atual')}</span>}
           </button>
         ))}
       </div>
-      <div className="hint"><kbd>↑</kbd> <kbd>↓</kbd> escolher · <kbd>Enter</kbd> confirmar · ou a tecla do estado</div>
+      <div className="hint"><kbd>↑</kbd> <kbd>↓</kbd> {tr('escolher')} · <kbd>Enter</kbd> {tr('confirmar')} · {tr('ou a tecla do estado')}</div>
     </Modal>
   )
 }
@@ -449,10 +460,10 @@ export function CommandPalette({ commands }: { commands: Command[] }) {
   const shown = commands.filter((c) => words.every((w) => fold(c.label).includes(w))).slice(0, 50)
   const run = (c?: Command) => c && (closeDialog(), c.run())
   return (
-    <Modal title="Comandos" wide>
+    <Modal title={tr('Comandos')} wide>
       <input
         autoFocus
-        placeholder="Escreve para procurar ficheiros e comandos…"
+        placeholder={tr('Escreve para procurar ficheiros e comandos…')}
         value={q}
         onChange={(e) => (setQ(e.target.value), setSel(0))}
         onKeyDown={(e) => {
@@ -470,7 +481,7 @@ export function CommandPalette({ commands }: { commands: Command[] }) {
           </li>
         ))}
       </ul>
-      <div className="hint"><kbd>↑ ↓</kbd> escolher · <kbd>Enter</kbd> executar · <kbd>Esc</kbd> fechar</div>
+      <div className="hint"><kbd>↑ ↓</kbd> {tr('escolher')} · <kbd>Enter</kbd> {tr('executar')} · <kbd>Esc</kbd> {tr('fechar')}</div>
     </Modal>
   )
 }

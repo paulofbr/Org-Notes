@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { ChevronDown, ChevronRight, FilePlus, Folder, FolderOpen, Trash2 } from 'lucide-react'
 import { FileIcon } from './FileIcon'
 import type { OrgStore } from '../store'
+import { tr } from '../i18n'
 
 const parentOf = (p: string) => p.slice(0, Math.max(p.lastIndexOf('/'), 0))
 
@@ -49,9 +50,9 @@ export function FileTree({ store, active, onOpen, onNewFile }: { store: OrgStore
               {open ? <FolderOpen size={15} /> : <Folder size={15} />}
               <span className="name">{d.split('/').pop()}</span>
             </button>
-            <button className="icon-btn folder-action" title="Novo ficheiro nesta pasta" aria-label="Novo ficheiro nesta pasta" onClick={() => onNewFile(d)}><FilePlus size={14} /></button>
+            <button className="icon-btn folder-action" title={tr('Novo ficheiro nesta pasta')} aria-label={tr('Novo ficheiro nesta pasta')} onClick={() => onNewFile(d)}><FilePlus size={14} /></button>
             {empty && (
-              <button className="icon-btn folder-action" title="Apagar pasta vazia" aria-label="Apagar pasta vazia" onClick={() => store.removeFolder(d).catch((e) => alert(e.message))}><Trash2 size={14} /></button>
+              <button className="icon-btn folder-action" title={tr('Apagar pasta vazia')} aria-label={tr('Apagar pasta vazia')} onClick={() => store.removeFolder(d).catch((e) => alert(e.message))}><Trash2 size={14} /></button>
             )}
           </div>
           {open && <ul>{render(d, depth + 1)}</ul>}

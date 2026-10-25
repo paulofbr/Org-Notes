@@ -1,13 +1,14 @@
 import { useEffect, useRef, useState } from 'react'
 import { Briefcase, ChevronDown, ListCollapse, ListTodo, Loader2, Sparkles, SpellCheck, Wand2 } from 'lucide-react'
 import { api } from '../api'
+import { tr } from '../i18n'
 
 const MODES = [
-  { id: 'develop', label: 'Desenvolver', icon: <Wand2 size={15} />, hint: 'Alt+R' },
-  { id: 'fix', label: 'Corrigir', icon: <SpellCheck size={15} />, hint: 'Alt+Shift+R' },
-  { id: 'summarize', label: 'Resumir', icon: <ListCollapse size={15} /> },
-  { id: 'formal', label: 'Tom profissional', icon: <Briefcase size={15} /> },
-  { id: 'tasks', label: 'Extrair tarefas', icon: <ListTodo size={15} /> },
+  { id: 'develop', label: tr('Desenvolver'), icon: <Wand2 size={15} />, hint: 'Alt+R' },
+  { id: 'fix', label: tr('Corrigir'), icon: <SpellCheck size={15} />, hint: 'Alt+Shift+R' },
+  { id: 'summarize', label: tr('Resumir'), icon: <ListCollapse size={15} /> },
+  { id: 'formal', label: tr('Tom profissional'), icon: <Briefcase size={15} /> },
+  { id: 'tasks', label: tr('Extrair tarefas'), icon: <ListTodo size={15} /> },
 ]
 
 let enabled: Promise<boolean> | undefined
@@ -67,7 +68,7 @@ export function useAiReview(fields: Record<string, string>, onAccept: (f: Record
   const keep = (e: { preventDefault: () => void }) => e.preventDefault()
   const button = (
     <div className="menu ai-menu" ref={menuRef} onMouseDown={keep}>
-      <button type="button" className="icon-btn ai-btn" onClick={() => setOpen(!open)} disabled={busy} title="IA: desenvolver, corrigir, resumir… (Alt+R)" aria-label="IA">
+      <button type="button" className="icon-btn ai-btn" onClick={() => setOpen(!open)} disabled={busy} title={tr('IA: desenvolver, corrigir, resumir… (Alt+R)')} aria-label={tr('IA')}>
         {busy ? <Loader2 size={16} className="spin" /> : <Sparkles size={16} />}
         <ChevronDown size={12} />
       </button>
@@ -89,7 +90,7 @@ export function useAiReview(fields: Record<string, string>, onAccept: (f: Record
       {result && changed && (
         <>
           {changed.length === 0 ? (
-            <p className="hint">Sem sugestões: o texto parece estar bem.</p>
+            <p className="hint">{tr('Sem sugestões: o texto parece estar bem.')}</p>
           ) : (
             <>
               {changed.map((k) => (
@@ -104,9 +105,9 @@ export function useAiReview(fields: Record<string, string>, onAccept: (f: Record
             </>
           )}
           <div className="actions">
-            <button type="button" onClick={() => setResult(undefined)}>Descartar</button>
+            <button type="button" onClick={() => setResult(undefined)}>{tr('Descartar')}</button>
             {changed.length > 0 && (
-              <button type="button" className="primary" onClick={() => (onAccept({ ...fields, ...result.fields }), setResult(undefined))}>Aceitar</button>
+              <button type="button" className="primary" onClick={() => (onAccept({ ...fields, ...result.fields }), setResult(undefined))}>{tr('Aceitar')}</button>
             )}
           </div>
         </>

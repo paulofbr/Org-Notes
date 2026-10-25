@@ -13,23 +13,23 @@ namespace OrgNotes.Capture;
 public class CaptureWindow : Window
 {
     private readonly Api _api;
-    private readonly ComboBox _templates = new() { HorizontalAlignment = HorizontalAlignment.Stretch, PlaceholderText = "Ficheiro" };
-    private readonly TextBox _title = new() { PlaceholderText = "Título" };
+    private readonly ComboBox _templates = new() { HorizontalAlignment = HorizontalAlignment.Stretch, PlaceholderText = L.Tr("Ficheiro") };
+    private readonly TextBox _title = new() { PlaceholderText = L.Tr("Título") };
     // One box per empty property of the selected template, like the web dialog.
     private readonly StackPanel _props = new() { Spacing = 10 };
-    private readonly CalendarDatePicker _date = new() { PlaceholderText = "Data", HorizontalAlignment = HorizontalAlignment.Stretch };
-    private readonly TextBox _time = new() { PlaceholderText = "Hora (HH:MM)", Width = 130 };
+    private readonly CalendarDatePicker _date = new() { PlaceholderText = L.Tr("Data"), HorizontalAlignment = HorizontalAlignment.Stretch };
+    private readonly TextBox _time = new() { PlaceholderText = L.Tr("Hora (HH:MM)"), Width = 130 };
     private readonly Grid _when = new() { ColumnDefinitions = new("*,Auto"), ColumnSpacing = 8 };
     private readonly TextBox _body = new()
     {
-        PlaceholderText = "Notas (opcional, sintaxe org)",
+        PlaceholderText = L.Tr("Notas (opcional, sintaxe org)"),
         AcceptsReturn = true,
         TextWrapping = TextWrapping.Wrap,
         Height = 120,
         FontFamily = new FontFamily("monospace"),
     };
     private readonly TextBlock _status = new() { Opacity = 0.7, TextWrapping = TextWrapping.Wrap };
-    private readonly Button _save = new() { Content = "Guardar (Ctrl+Enter)", IsDefault = false, Classes = { "accent" } };
+    private readonly Button _save = new() { Content = L.Tr("Guardar (Ctrl+Enter)"), IsDefault = false, Classes = { "accent" } };
     // Four-point sparkle, like the web's AI button.
     private readonly Button _ai = new()
     {
@@ -47,22 +47,26 @@ public class CaptureWindow : Window
     };
 
     // Same modes as the web; ids match the server's AiAssistant.Modes.
-    private static readonly (string Id, string Label, string? Gesture)[] AiModes =
+    private readonly (string Id, string Label, string? Gesture)[] AiModes =
     [
-        ("develop", "Desenvolver", "Alt+R"),
-        ("fix", "Corrigir", "Alt+Shift+R"),
-        ("summarize", "Resumir", null),
-        ("formal", "Tom profissional", null),
-        ("tasks", "Extrair tarefas", null),
+        ("develop", L.Tr("Desenvolver"), "Alt+R"),
+        ("fix", L.Tr("Corrigir"), "Alt+Shift+R"),
+        ("summarize", L.Tr("Resumir"), null),
+        ("formal", L.Tr("Tom profissional"), null),
+        ("tasks", L.Tr("Extrair tarefas"), null),
     ];
     private readonly AiReviewPanel _aiPanel = new();
     private List<Template> _list = [];
+    private bool _discarded;
+
+    /// <summary>Raised when the server says the user's language differs from the one this window was built in.</summary>
+    public event Action<string>? LanguageChanged;
     private Template? _selected;
 
     public CaptureWindow(Api api)
     {
         _api = api;
-        Title = "Capturar · Org Notes";
+        Title = L.Tr("Capturar · Org Notes");
         Width = 560;
         SizeToContent = SizeToContent.Height;
         CanResize = false;
@@ -72,10 +76,10 @@ public class CaptureWindow : Window
         _when.Children.Add(_date);
         Grid.SetColumn(_time, 1);
         _when.Children.Add(_time);
-        var cancel = new Button { Content = "Cancelar" };
+        var cancel = new Button { Content = L.Tr("Cancelar") };
         cancel.Click += (_, _) => Hide();
         _save.Click += async (_, _) => await Save();
-        ToolTip.SetTip(_ai, "IA: desenvolver, corrigir, resumir… (Alt+R)");
+        ToolTip.SetTip(_ai, L.Tr("IA: desenvolver, corrigir, resumir… (Alt+R)"));
         var flyout = new MenuFlyout { Placement = PlacementMode.TopEdgeAlignedLeft };
         foreach (var (id, label, gesture) in AiModes)
         {
@@ -102,7 +106,7 @@ public class CaptureWindow : Window
             Children =
             {
                 _templates,
-                new TextBlock { Text = "Escolhe o ficheiro na lista (↑ ↓) ou pela tecla do template; Enter passa ao título.", Opacity = 0.6, FontSize = 12 },
+                new TextBlock { Text = L.Tr("Escolhe o ficheiro na lista (↑ ↓) ou pela tecla do template; Enter passa ao título."), Opacity = 0.6, FontSize = 12 },
                 _title,
                 _props,
                 _when,
@@ -116,6 +120,7 @@ public class CaptureWindow : Window
         // Hide instead of closing so the next capture opens instantly.
         Closing += (_, e) =>
         {
+            if (_discarded) return;
             e.Cancel = true;
             Hide();
         };
@@ -129,22 +134,35 @@ public class CaptureWindow : Window
         _title.Text = _body.Text = _time.Text = "";
         _date.SelectedDate = null;
         _aiPanel.IsVisible = false;
-        _status.Text = "A carregar templates…";
+        _status.Text = L.Tr("A carregar templates…");
         Show();
         Activate();
         _templates.Focus();
         try
         {
             _list = await _api.Templates();
-            _ai.IsVisible = await _api.AiEnabled();
+            var me = await _api.Me();
+            if (L.Langs.Contains(me.Lang) && me.Lang != L.Lang)
+            {
+                LanguageChanged?.Invoke(me.Lang!);
+                return;
+            }
+            _ai.IsVisible = me.Ai;
             RenderTemplates();
             Select(_list.FirstOrDefault(t => t.File == _selected?.File && t.Key == _selected?.Key) ?? _list.FirstOrDefault());
-            _status.Text = _list.Count == 0 ? "Nenhum ficheiro tem template de captura." : "";
+            _status.Text = _list.Count == 0 ? L.Tr("Nenhum ficheiro tem template de captura.") : "";
         }
         catch (Exception e) when (e is HttpRequestException or TaskCanceledException)
         {
-            _status.Text = $"Não foi possível ligar ao servidor: {e.Message}";
+            _status.Text = L.Tr("Não foi possível ligar ao servidor: {0}", e.Message);
         }
+    }
+
+    /// <summary>Closes the window for good, e.g. to rebuild it in another language.</summary>
+    public void Discard()
+    {
+        _discarded = true;
+        Close();
     }
 
     private void RenderTemplates() => _templates.ItemsSource = _list.Select(t => $"{t.Key}   {t.Name}  →  {t.File}").ToList();
@@ -183,16 +201,16 @@ public class CaptureWindow : Window
         e.Handled = true;
     }
 
-    private static readonly string[] ReviewMessages =
+    private readonly string[] ReviewMessages =
     [
-        "A afiar o lápis vermelho…",
-        "A consultar a professora de Português…",
-        "À caça de acentos fugitivos…",
-        "A pôr as vírgulas no sítio…",
-        "A tirar o pó ao dicionário…",
-        "A convencer o corretor ortográfico a trabalhar ao domingo…",
-        "A procurar o «ç» que caiu atrás do sofá…",
-        "A passar a limpo, com letra bonita…",
+        L.Tr("A afiar o lápis vermelho…"),
+        L.Tr("A consultar a professora de Português…"),
+        L.Tr("À caça de acentos fugitivos…"),
+        L.Tr("A pôr as vírgulas no sítio…"),
+        L.Tr("A tirar o pó ao dicionário…"),
+        L.Tr("A convencer o corretor ortográfico a trabalhar ao domingo…"),
+        L.Tr("A procurar o «ç» que caiu atrás do sofá…"),
+        L.Tr("A passar a limpo, com letra bonita…"),
     ];
 
     private async Task Review(string mode)
@@ -203,7 +221,7 @@ public class CaptureWindow : Window
         _aiPanel.ShowMessage(ReviewMessages[Random.Shared.Next(ReviewMessages.Length)]);
         try
         {
-            _aiPanel.ShowResult(fields, await _api.Improve(fields, mode), new() { ["title"] = "Título", ["body"] = "Notas" });
+            _aiPanel.ShowResult(fields, await _api.Improve(fields, mode), new() { ["title"] = L.Tr("Título"), ["body"] = L.Tr("Notas") });
         }
         catch (Exception e) when (e is HttpRequestException or TaskCanceledException)
         {
@@ -223,7 +241,7 @@ public class CaptureWindow : Window
         {
             if (!TimeOnly.TryParse(_time.Text, out var parsed))
             {
-                _status.Text = "Hora inválida (usa HH:MM).";
+                _status.Text = L.Tr("Hora inválida (usa HH:MM).");
                 return;
             }
             time = parsed;

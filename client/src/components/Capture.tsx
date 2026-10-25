@@ -5,6 +5,7 @@ import { Modal } from './Dialogs'
 import { OrgTextarea } from './OrgTextarea'
 import { aiEnabled, useAiReview } from './AiReview'
 import { api } from '../api'
+import { tr } from '../i18n'
 
 /** Captures into a template's file; with `path` (the open page), that page's template is chosen first. */
 export function CaptureDialog({ path }: { path?: string }) {
@@ -20,7 +21,7 @@ export function CaptureDialog({ path }: { path?: string }) {
   const pickerRef = useRef<HTMLSelectElement>(null)
   useEffect(() => pickerRef.current?.focus(), [])
   const choose = (t: CaptureTemplate) => (setTpl(t), titleRef.current?.focus())
-  const ai = useAiReview({ title, body }, (f) => (setTitle(f.title), setBody(f.body)), { title: 'Título', body: 'Descrição' })
+  const ai = useAiReview({ title, body }, (f) => (setTitle(f.title), setBody(f.body)), { title: tr('Título'), body: tr('Descrição') })
 
   const save = () => {
     if (!title.trim() || !tpl) return
@@ -31,14 +32,14 @@ export function CaptureDialog({ path }: { path?: string }) {
 
   if (!tpl)
     return (
-      <Modal title="Capturar" onClose={closeDialog}>
-        <p>Nenhum ficheiro tem um template de captura. Abre um ficheiro e usa <b>Template de captura</b> no menu do ficheiro.</p>
+      <Modal title={tr('Capturar')} onClose={closeDialog}>
+        <p>{tr('Nenhum ficheiro tem um template de captura. Abre um ficheiro e usa')} <b>{tr('Template de captura')}</b> {tr('no menu do ficheiro.')}</p>
         <div className="actions"><button className="primary" onClick={closeDialog}>OK</button></div>
       </Modal>
     )
 
   return (
-    <Modal title="Capturar" onClose={closeDialog}>
+    <Modal title={tr('Capturar')} onClose={closeDialog}>
       <form
         onSubmit={(e) => (e.preventDefault(), save())}
         onKeyDown={(e) => e.key === 'Enter' && (e.ctrlKey || e.metaKey) && (e.preventDefault(), save())}
@@ -59,8 +60,8 @@ export function CaptureDialog({ path }: { path?: string }) {
             <option key={t.file + t.key} value={i}>{t.key} · {t.name} → {t.file}</option>
           ))}
         </select>
-        <div className="hint">Escolhe o ficheiro na lista (<kbd>↑</kbd> <kbd>↓</kbd>) ou pela tecla do template; <kbd>Enter</kbd> passa ao título.</div>
-        <input ref={titleRef} placeholder="Título" value={title} onChange={(e) => setTitle(e.target.value)} />
+        <div className="hint">{tr('Escolhe o ficheiro na lista')} (<kbd>↑</kbd> <kbd>↓</kbd>) {tr('ou pela tecla do template;')} <kbd>Enter</kbd> {tr('passa ao título.')}</div>
+        <input ref={titleRef} placeholder={tr('Título')} value={title} onChange={(e) => setTitle(e.target.value)} />
         {emptyProps(tpl).map((k) => {
           const options = propertyOptions(store.files[tpl.file] ?? '')[k.toUpperCase()]
           return (
@@ -73,16 +74,16 @@ export function CaptureDialog({ path }: { path?: string }) {
         })}
         {usesWhen(tpl) && (
           <div className="row">
-            <label>Data<input type="date" value={date} onChange={(e) => setDate(e.target.value)} /></label>
-            <label>Hora<input type="time" value={time} onChange={(e) => setTime(e.target.value)} /></label>
+            <label>{tr('Data')}<input type="date" value={date} onChange={(e) => setDate(e.target.value)} /></label>
+            <label>{tr('Hora')}<input type="time" value={time} onChange={(e) => setTime(e.target.value)} /></label>
           </div>
         )}
-        <OrgTextarea className="capture-body" placeholder="Descrição (opcional): notas, links e imagens…" value={body} onChange={setBody} rows={4} path={tpl.file} tools rich />
+        <OrgTextarea className="capture-body" placeholder={tr('Descrição (opcional): notas, links e imagens…')} value={body} onChange={setBody} rows={4} path={tpl.file} tools rich />
         {ai.panel}
         <div className="actions">
           {ai.button}
-          <button type="button" onClick={closeDialog}>Cancelar</button>
-          <button className="primary" disabled={!title.trim()}>Guardar <kbd>Ctrl+Enter</kbd></button>
+          <button type="button" onClick={closeDialog}>{tr('Cancelar')}</button>
+          <button className="primary" disabled={!title.trim()}>{tr('Guardar')} <kbd>Ctrl+Enter</kbd></button>
         </div>
       </form>
     </Modal>
@@ -94,26 +95,26 @@ type Draft = TemplateDraft
 const DEFAULT_BODY = '* %{title}\n%U\n%{body}'
 
 const PRESETS: { name: string; body: string; datetree?: boolean }[] = [
-  { name: 'Tarefa', body: '* TODO %{title}\nSCHEDULED: %{when}\n%U\n%{body}' },
-  { name: 'Evento', body: '* %{title}\n%{when}\n%{body}' },
-  { name: 'Nota', body: DEFAULT_BODY },
-  { name: 'Contacto', body: '* %{title}\n:PROPERTIES:\n:EMAIL:\n:PHONE:\n:COMPANY:\n:END:\n%{body}' },
-  { name: 'Diário', body: '**** %{time} %{title}\n%{body}', datetree: true },
+  { name: tr('Tarefa'), body: '* TODO %{title}\nSCHEDULED: %{when}\n%U\n%{body}' },
+  { name: tr('Evento'), body: '* %{title}\n%{when}\n%{body}' },
+  { name: tr('Nota'), body: DEFAULT_BODY },
+  { name: tr('Contacto'), body: '* %{title}\n:PROPERTIES:\n:EMAIL:\n:PHONE:\n:COMPANY:\n:END:\n%{body}' },
+  { name: tr('Diário'), body: '**** %{time} %{title}\n%{body}', datetree: true },
 ]
 
 // [label, text, title, whole line?]
 const SNIPPETS: [string, string, string, boolean?][] = [
-  ['Título', '%{title}', 'O título escrito na captura'],
-  ['Notas', '%{body}', 'As notas escritas na captura'],
-  ['Data escolhida', '%{when}', 'Data/hora escolhida na captura; a linha é omitida se ficar vazia'],
-  ['Hora atual', '%{time}', 'Hora da captura (HH:MM)'],
-  ['Agora', '%U', 'Timestamp inativo do momento da captura'],
-  ['Agora (ativo)', '%T', 'Timestamp ativo do momento da captura (aparece na agenda)'],
-  ['TODO', '* TODO %{title}', 'Título com estado TODO', true],
-  ['SCHEDULED', 'SCHEDULED: %{when}', 'Agendar para a data escolhida', true],
-  ['DEADLINE', 'DEADLINE: %{when}', 'Prazo na data escolhida', true],
-  ['Etiqueta', ' :etiqueta:', 'Etiqueta no fim do título'],
-  ['Propriedades', ':PROPERTIES:\n:CHAVE: valor\n:END:', 'Gaveta de propriedades', true],
+  [tr('Título'), '%{title}', tr('O título escrito na captura')],
+  [tr('Notas'), '%{body}', tr('As notas escritas na captura')],
+  [tr('Data escolhida'), '%{when}', tr('Data/hora escolhida na captura; a linha é omitida se ficar vazia')],
+  [tr('Hora atual'), '%{time}', tr('Hora da captura (HH:MM)')],
+  [tr('Agora'), '%U', tr('Timestamp inativo do momento da captura')],
+  [tr('Agora (ativo)'), '%T', tr('Timestamp ativo do momento da captura (aparece na agenda)')],
+  ['TODO', '* TODO %{title}', tr('Título com estado TODO'), true],
+  ['SCHEDULED', 'SCHEDULED: %{when}', tr('Agendar para a data escolhida'), true],
+  ['DEADLINE', 'DEADLINE: %{when}', tr('Prazo na data escolhida'), true],
+  [tr('Etiqueta'), ` :${tr('etiqueta')}:`, tr('Etiqueta no fim do título')],
+  [tr('Propriedades'), `:PROPERTIES:\n:${tr('CHAVE')}: ${tr('valor')}\n:END:`, tr('Gaveta de propriedades'), true],
 ]
 
 function TemplateFields({ t, onChange, onRemove }: { t: Draft; onChange: (patch: Partial<Draft>) => void; onRemove?: () => void }) {
@@ -145,36 +146,36 @@ function TemplateFields({ t, onChange, onRemove }: { t: Draft; onChange: (patch:
   return (
     <fieldset className="template-edit">
       <div className="row">
-        <label>Tecla<input maxLength={1} value={t.key} onChange={(e) => onChange({ key: e.target.value })} /></label>
-        <label>Nome<input value={t.name} onChange={(e) => onChange({ name: e.target.value })} /></label>
-        <label className="inline"><input type="checkbox" checked={t.datetree} onChange={(e) => onChange({ datetree: e.target.checked })} /> Datetree (ano/mês/dia)</label>
-        {onRemove && <button type="button" className="danger" onClick={onRemove}>Remover</button>}
+        <label>{tr('Tecla')}<input maxLength={1} value={t.key} onChange={(e) => onChange({ key: e.target.value })} /></label>
+        <label>{tr('Nome')}<input value={t.name} onChange={(e) => onChange({ name: e.target.value })} /></label>
+        <label className="inline"><input type="checkbox" checked={t.datetree} onChange={(e) => onChange({ datetree: e.target.checked })} /> Datetree ({tr('ano/mês/dia')})</label>
+        {onRemove && <button type="button" className="danger" onClick={onRemove}>{tr('Remover')}</button>}
       </div>
       {ai && (
         <div className="row">
           <label>
-            Descreve o template e a IA cria-o
+            {tr('Descreve o template e a IA cria-o')}
             <input
               value={describe}
-              placeholder="ex: contacto com email, telefone e empresa (Acme, Globex)"
+              placeholder={tr('ex: contacto com email, telefone e empresa (Acme, Globex)')}
               onChange={(e) => setDescribe(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), generate())}
             />
           </label>
-          <button type="button" onClick={generate} disabled={busy || !describe.trim()}>{busy ? 'A criar…' : 'Criar com IA'}</button>
+          <button type="button" onClick={generate} disabled={busy || !describe.trim()}>{busy ? tr('A criar…') : tr('Criar com IA')}</button>
         </div>
       )}
       {error && <p className="hint">{error}</p>}
       <div className="chips">
-        <span className="muted">Modelos:</span>
+        <span className="muted">{tr('Modelos:')}</span>
         {PRESETS.map((p) => (
-          <button type="button" key={p.name} className="tag" title="Substitui o corpo do template" onClick={() => onChange({ body: p.body, datetree: !!p.datetree, name: t.name || p.name })}>
+          <button type="button" key={p.name} className="tag" title={tr('Substitui o corpo do template')} onClick={() => onChange({ body: p.body, datetree: !!p.datetree, name: t.name || p.name })}>
             {p.name}
           </button>
         ))}
       </div>
       <div className="chips">
-        <span className="muted">Inserir:</span>
+        <span className="muted">{tr('Inserir:')}</span>
         {SNIPPETS.map(([label, text, title, line]) => (
           <button type="button" key={label} className="tag" title={title} onMouseDown={(e) => e.preventDefault()} onClick={() => insert(text, line)}>
             {label}
@@ -186,7 +187,7 @@ function TemplateFields({ t, onChange, onRemove }: { t: Draft; onChange: (patch:
       </div>
       {t.options && Object.keys(t.options).length > 0 && (
         <p className="hint">
-          Opções ({Object.entries(t.options).map(([k, v]) => `${k}: ${v.join(', ')}`).join(' · ')}), guardadas no ficheiro como <code>#+PROPERTY: …_ALL</code>.
+          {tr('Opções')} ({Object.entries(t.options).map(([k, v]) => `${k}: ${v.join(', ')}`).join(' · ')}), {tr('guardadas no ficheiro como')} <code>#+PROPERTY: …_ALL</code>.
         </p>
       )}
     </fieldset>
@@ -196,8 +197,8 @@ function TemplateFields({ t, onChange, onRemove }: { t: Draft; onChange: (patch:
 function PlaceholderHelp() {
   return (
     <p className="hint">
-      <code>%{'{title}'}</code> título · <code>%{'{body}'}</code> notas · <code>%{'{when}'}</code> data/hora escolhida (a linha é omitida se ficar vazia) ·{' '}
-      <code>%{'{time}'}</code> hora atual · <code>%U</code> / <code>%T</code> agora (inativo / ativo). Com datetree, usa títulos de nível 4 (<code>****</code>).
+      <code>%{'{title}'}</code> {tr('título')} · <code>%{'{body}'}</code> {tr('notas')} · <code>%{'{when}'}</code> {tr('data/hora escolhida (a linha é omitida se ficar vazia)')} ·{' '}
+      <code>%{'{time}'}</code> {tr('hora atual')} · <code>%U</code> / <code>%T</code> {tr('agora (inativo / ativo).')} {tr('Com datetree, usa títulos de nível 4')} (<code>****</code>).
     </p>
   )
 }
@@ -222,15 +223,15 @@ export function TemplateDialog({ path }: { path: string }) {
   }, [list, store.files, path])
   const save = () => (edit(path, (text) => saveDrafts(text, shown.filter((t) => t.key.trim()))), closeDialog())
   return (
-    <Modal title={`Template de captura · ${path}`} onClose={closeDialog} wide>
+    <Modal title={`${tr('Template de captura')} · ${path}`} onClose={closeDialog} wide>
       {shown.map((t, i) => (
         <TemplateFields key={i} t={t} onChange={(patch) => change(i, patch)} onRemove={() => setList(list.filter((_, j) => j !== i))} />
       ))}
       <PlaceholderHelp />
       <div className="actions">
-        <button type="button" onClick={() => setList([...list, { key: '', name: '', datetree: false, body: DEFAULT_BODY }])}>Adicionar template</button>
-        <button type="button" onClick={closeDialog}>Cancelar</button>
-        <button className="primary" onClick={save}>Guardar</button>
+        <button type="button" onClick={() => setList([...list, { key: '', name: '', datetree: false, body: DEFAULT_BODY }])}>{tr('Adicionar template')}</button>
+        <button type="button" onClick={closeDialog}>{tr('Cancelar')}</button>
+        <button className="primary" onClick={save}>{tr('Guardar')}</button>
       </div>
     </Modal>
   )
@@ -247,20 +248,20 @@ export function NewFileDialog({ dir, onSubmit }: { dir?: string; onSubmit: (path
   const [tpl, setTpl] = useState<Draft>({ key: '', name: '', datetree: false, body: DEFAULT_BODY })
   const shown = { ...tpl, key: tpl.key || freeKey(base, used), name: tpl.name || base }
   return (
-    <Modal title="Novo ficheiro" onClose={closeDialog} wide={withTemplate}>
+    <Modal title={tr('Novo ficheiro')} onClose={closeDialog} wide={withTemplate}>
       <form onSubmit={(e) => (e.preventDefault(), name.trim() && (closeDialog(), onSubmit(name.trim(), withTemplate && shown.key ? shown : undefined)))}>
-        <label>Nome (ex: projetos/casa.org)<input autoFocus value={name} onChange={(e) => setName(e.target.value)} /></label>
-        <label className="inline"><input type="checkbox" checked={withTemplate} onChange={(e) => setWithTemplate(e.target.checked)} /> Definir template de captura</label>
+        <label>{tr('Nome (ex: projetos/casa.org)')}<input autoFocus value={name} onChange={(e) => setName(e.target.value)} /></label>
+        <label className="inline"><input type="checkbox" checked={withTemplate} onChange={(e) => setWithTemplate(e.target.checked)} /> {tr('Definir template de captura')}</label>
         {withTemplate && (
           <>
-            {used.has(shown.key) && <p className="hint">A tecla «{shown.key}» já é usada por outro template.</p>}
+            {used.has(shown.key) && <p className="hint">{tr('A tecla «{key}» já é usada por outro template.', { key: shown.key })}</p>}
             <TemplateFields t={shown} onChange={(patch) => setTpl({ ...shown, ...patch })} />
             <PlaceholderHelp />
           </>
         )}
         <div className="actions">
-          <button type="button" onClick={closeDialog}>Cancelar</button>
-          <button className="primary" disabled={!name.trim()}>Criar</button>
+          <button type="button" onClick={closeDialog}>{tr('Cancelar')}</button>
+          <button className="primary" disabled={!name.trim()}>{tr('Criar')}</button>
         </div>
       </form>
     </Modal>

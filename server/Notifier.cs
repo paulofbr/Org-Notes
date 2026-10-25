@@ -48,6 +48,8 @@ public class Notifier(Users users, IConfiguration config, IHttpClientFactory htt
     {
         var settings = users.Settings(key);
         if (!native && !settings.Notify) return;
+        var lang = Strings.IsLang(settings.Lang) ? settings.Lang! : "pt";
+        string T(string pt, params object[] args) => Strings.Tr(lang, pt, args);
         async Task Send(string title, string body)
         {
             if (native) ShowNative(title, body);
@@ -65,14 +67,14 @@ public class Notifier(Users users, IConfiguration config, IHttpClientFactory htt
             var at = today.ToDateTime(it.Time!.Value);
             if (now < at - lead || now >= at + TimeSpan.FromMinutes(1) || !_sent.Add($"{key}|{it.Kind}|{it.Time}|{it.Title}")) continue;
             var mins = (int)Math.Ceiling((at - now).TotalMinutes);
-            var when = mins > 0 ? $"em {mins} min" : "agora";
-            await Send($"{(it.Kind == "deadline" ? "Prazo" : "Agenda")} {it.Time:HH\\:mm} · {when}", it.Title);
+            var when = mins > 0 ? T("em {0} min", mins) : T("agora");
+            await Send($"{T(it.Kind == "deadline" ? "Prazo" : "Agenda")} {it.Time:HH\\:mm} · {when}", it.Title);
         }
 
         if (settings.SummarySent != today && TimeOnly.FromDateTime(now) >= summaryAt)
         {
             users.Save(key, users.Settings(key) with { SummarySent = today });
-            if (Summary(items) is { } body) await Send("Agenda de hoje", body);
+            if (Summary(items, lang) is { } body) await Send(T("Agenda de hoje"), body);
 
             // A reminder of its own for each deadline that is N days away (by default 7, 3, 1 and 0 days).
             foreach (var it in items.Where(i => i.Kind is "deadline" or "upcoming"))
@@ -81,27 +83,28 @@ public class Notifier(Users users, IConfiguration config, IHttpClientFactory htt
                 if (!DeadlineDays.Contains(days)) continue;
                 // A deadline less than an hour away already gets (or got) its "in N min" reminder.
                 if (days == 0 && it.Time is { } at && today.ToDateTime(at) - now < TimeSpan.FromHours(1)) continue;
-                var when = days switch { 0 => "Prazo hoje", 1 => "Prazo amanhã", _ => $"Prazo em {days} dias" };
-                await Send(it.Time is { } t ? $"{when} às {t:HH\\:mm}" : when, it.Title);
+                var when = days switch { 0 => T("Prazo hoje"), 1 => T("Prazo amanhã"), _ => T("Prazo em {0} dias", days) };
+                await Send(it.Time is { } t ? T("{0} às {1}", when, t.ToString("HH\\:mm")) : when, it.Title);
             }
         }
     }
 
-    private static string? Summary(List<AgendaItem> items)
+    private static string? Summary(List<AgendaItem> items, string lang)
     {
         if (items.Count == 0) return null;
+        string T(string pt, params object[] args) => Strings.Tr(lang, pt, args);
         var lines = items
             .OrderBy(i => i.Kind is "overdue" or "sched-past" or "upcoming").ThenBy(i => i.Time ?? TimeOnly.MaxValue)
             .Select(i => i.Kind switch
             {
-                "overdue" => $"⚠ Prazo há {i.Days} d: {i.Title}",
-                "sched-past" => $"Agendado há {i.Days} d: {i.Title}",
-                "upcoming" => $"Prazo em {i.Days} d: {i.Title}",
-                "deadline" => $"{i.Time:HH\\:mm} Prazo: {i.Title}".TrimStart(),
+                "overdue" => T("⚠ Prazo há {0} d: {1}", i.Days, i.Title),
+                "sched-past" => T("Agendado há {0} d: {1}", i.Days, i.Title),
+                "upcoming" => T("Prazo em {0} d: {1}", i.Days, i.Title),
+                "deadline" => T("{0} Prazo: {1}", i.Time?.ToString("HH\\:mm") ?? "", i.Title).TrimStart(),
                 _ => $"{i.Time:HH\\:mm} {i.Title}".TrimStart(),
             })
             .ToList();
-        return string.Join('\n', lines.Take(8)) + (lines.Count > 8 ? $"\n… e mais {lines.Count - 8}" : "");
+        return string.Join('\n', lines.Take(8)) + (lines.Count > 8 ? "\n" + T("… e mais {0}", lines.Count - 8) : "");
     }
 
     private async Task Ntfy(string topic, string title, string body, CancellationToken stop)

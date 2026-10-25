@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
 import { TIMESTAMP_RE, parseTimestamp, toDate } from '../org/timestamp'
+import { locale } from '../i18n'
 
 export interface InlineOptions {
   onLink?: (target: string) => void
@@ -21,7 +22,7 @@ const PRE = /[\s(\-'"{]/
 const IMAGE = /\.(png|jpe?g|gif|svg|webp)$/i
 
 export function formatDate(key: string, opts: Intl.DateTimeFormatOptions = { weekday: 'short', day: 'numeric', month: 'short' }) {
-  return toDate(key).toLocaleDateString(undefined, opts)
+  return toDate(key).toLocaleDateString(locale, opts)
 }
 
 /** Renders org inline markup (emphasis, links, timestamps, footnotes...) to React nodes. */

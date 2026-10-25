@@ -30,7 +30,7 @@ public class AiReviewPanel : Border
     {
         var changed = original.Keys.Where(k => result.Fields.GetValueOrDefault(k, original[k]) != original[k]).ToList();
         var stack = new StackPanel { Spacing = 6 };
-        if (changed.Count == 0) stack.Children.Add(new TextBlock { Text = "Sem sugestões: o texto parece estar bem.", Opacity = 0.75 });
+        if (changed.Count == 0) stack.Children.Add(new TextBlock { Text = L.Tr("Sem sugestões: o texto parece estar bem."), Opacity = 0.75 });
         foreach (var k in changed)
         {
             stack.Children.Add(new TextBlock { Text = labels.GetValueOrDefault(k, k), Opacity = 0.6, FontSize = 12 });
@@ -46,12 +46,12 @@ public class AiReviewPanel : Border
         }
         foreach (var c in result.Changes) stack.Children.Add(new TextBlock { Text = "• " + c, Opacity = 0.75, TextWrapping = TextWrapping.Wrap, FontSize = 12 });
 
-        var discard = new Button { Content = "Descartar" };
+        var discard = new Button { Content = L.Tr("Descartar") };
         discard.Click += (_, _) => IsVisible = false;
         var buttons = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Spacing = 8, Children = { discard } };
         if (changed.Count > 0)
         {
-            var accept = new Button { Content = "Aceitar", Classes = { "accent" } };
+            var accept = new Button { Content = L.Tr("Aceitar"), Classes = { "accent" } };
             accept.Click += (_, _) =>
             {
                 IsVisible = false;

@@ -3,6 +3,7 @@ import { api } from '../api'
 import { useApp } from '../context'
 import { orgLink, relativePath } from '../org/links'
 import { Modal } from './Dialogs'
+import { tr } from '../i18n'
 
 export type LinkTab = 'external' | 'internal' | 'image'
 
@@ -14,7 +15,7 @@ export async function uploadImageLink(from: string, file: Blob) {
   return orgLink(`file:${relativePath(from, path)}`)
 }
 
-const TITLES: Record<LinkTab, string> = { external: 'Link externo', internal: 'Link interno', image: 'Inserir imagem' }
+const TITLES: Record<LinkTab, string> = { external: tr('Link externo'), internal: tr('Link interno'), image: tr('Inserir imagem') }
 
 /**
  * Builds an org link written in file `path`: to a web page, to another file or heading, or to an uploaded image.
@@ -60,26 +61,26 @@ export function LinkDialog({ path, initialText = '', only, onInsert, onClose }: 
   }
 
   return (
-    <Modal title={only ? TITLES[only] : 'Inserir link ou imagem'} onClose={onClose} wide>
+    <Modal title={only ? TITLES[only] : tr('Inserir link ou imagem')} onClose={onClose} wide>
       <div className="tabs" hidden={!!only}>
-        {([['external', 'Externo'], ['internal', 'Interno'], ['image', 'Imagem']] as const).map(([t, label]) => (
+        {([['external', tr('Externo')], ['internal', tr('Interno')], ['image', tr('Imagem')]] as const).map(([t, label]) => (
           <button key={t} type="button" className={tab === t ? 'active' : ''} onClick={() => setTab(t)}>{label}</button>
         ))}
       </div>
       {error && <p className="hint">{error}</p>}
       {tab === 'external' && (
         <form onSubmit={(e) => (e.preventDefault(), e.stopPropagation(), insertExternal())}>
-          <label>Endereço<input autoFocus placeholder="https://…" value={url} onChange={(e) => setUrl(e.target.value)} /></label>
-          <label>Texto (opcional)<input value={text} onChange={(e) => setText(e.target.value)} /></label>
+          <label>{tr('Endereço')}<input autoFocus placeholder="https://…" value={url} onChange={(e) => setUrl(e.target.value)} /></label>
+          <label>{tr('Texto (opcional)')}<input value={text} onChange={(e) => setText(e.target.value)} /></label>
           <div className="actions">
-            <button type="button" onClick={onClose}>Cancelar</button>
-            <button className="primary" disabled={!url.trim()}>Inserir</button>
+            <button type="button" onClick={onClose}>{tr('Cancelar')}</button>
+            <button className="primary" disabled={!url.trim()}>{tr('Inserir')}</button>
           </div>
         </form>
       )}
       {tab === 'internal' && (
         <form onSubmit={(e) => (e.preventDefault(), e.stopPropagation(), insertInternal())}>
-          <label>Procurar ficheiro ou título<input autoFocus value={query} onChange={(e) => setQuery(e.target.value)} /></label>
+          <label>{tr('Procurar ficheiro ou título')}<input autoFocus value={query} onChange={(e) => setQuery(e.target.value)} /></label>
           <ul className="pick-list link-targets">
             {shown.map((t) => (
               <li key={`${t.file}::${t.heading ?? ''}`}>
@@ -89,20 +90,20 @@ export function LinkDialog({ path, initialText = '', only, onInsert, onClose }: 
               </li>
             ))}
           </ul>
-          <label>Texto (opcional)<input value={text} onChange={(e) => setText(e.target.value)} /></label>
+          <label>{tr('Texto (opcional)')}<input value={text} onChange={(e) => setText(e.target.value)} /></label>
           <div className="actions">
-            <button type="button" onClick={onClose}>Cancelar</button>
-            <button className="primary" disabled={!target}>Inserir</button>
+            <button type="button" onClick={onClose}>{tr('Cancelar')}</button>
+            <button className="primary" disabled={!target}>{tr('Inserir')}</button>
           </div>
         </form>
       )}
       {tab === 'image' && (
         <>
-          <p className="hint">PNG, JPEG, GIF ou WebP até 10 MB. Também podes colar (<kbd>Ctrl+V</kbd>) ou arrastar uma imagem para o texto.</p>
+          <p className="hint">{tr('PNG, JPEG, GIF ou WebP até 10 MB. Também podes colar')} (<kbd>Ctrl+V</kbd>) {tr('ou arrastar uma imagem para o texto.')}</p>
           <input ref={fileInput} type="file" accept="image/png,image/jpeg,image/gif,image/webp" hidden onChange={(e) => insertImage(e.target.files?.[0])} />
           <div className="actions">
-            <button type="button" onClick={onClose}>Cancelar</button>
-            <button type="button" className="primary" autoFocus disabled={busy} onClick={() => fileInput.current?.click()}>{busy ? 'A carregar…' : 'Escolher imagem'}</button>
+            <button type="button" onClick={onClose}>{tr('Cancelar')}</button>
+            <button type="button" className="primary" autoFocus disabled={busy} onClick={() => fileInput.current?.click()}>{busy ? tr('A carregar…') : tr('Escolher imagem')}</button>
           </div>
         </>
       )}

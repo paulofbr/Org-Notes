@@ -17,6 +17,7 @@ import { OrgTextarea } from './OrgTextarea'
 import { DateDialog, DescriptionDialog, KeywordDialog, NewEntryDialog, PropertyDialog, TagsDialog } from './Dialogs'
 import { moveFocus } from '../shortcuts'
 import { useAiReview } from './AiReview'
+import { tr } from '../i18n'
 
 export type Fold = 'folded' | 'children' | 'subtree'
 export type Visibility = 'overview' | 'contents' | 'showall'
@@ -127,7 +128,7 @@ export function Outline({ path, doc, state, setState, filter, narrow, setNarrow,
       {!narrowed && !matcher && <Preamble path={path} doc={doc} editing={editing === 'preamble'} setEditing={setEditing} />}
       {narrowed && (
         <div className="banner">
-          A mostrar apenas «{narrowed.title}» <button onClick={() => setNarrow(undefined)}>Mostrar tudo</button>
+          {tr('A mostrar apenas «{title}»', { title: narrowed.title })} <button onClick={() => setNarrow(undefined)}>{tr('Mostrar tudo')}</button>
         </div>
       )}
       {tops.map((h) => <Node key={h.key} h={h} ops={ops} />)}
@@ -143,7 +144,7 @@ export function Outline({ path, doc, state, setState, filter, narrow, setNarrow,
             )
           }}
         >
-          <Plus size={16} /> Novo título <kbd>Ctrl+Enter</kbd>
+          <Plus size={16} /> {tr('Novo título')} <kbd>Ctrl+Enter</kbd>
         </button>
       )}
     </div>
@@ -229,8 +230,8 @@ function HeadlineRow({ h, ops, fold }: { h: Headline; ops: NodeOps; fold: Fold }
     )
 
   const actions = {
-    schedule: () => app.showDialog(<DateDialog title="Agendar (SCHEDULED)" initial={h.planning.scheduled} onSubmit={(ts) => edit((t) => E.setPlanning(t, h.line, 'scheduled', ts), h)} />),
-    deadline: () => app.showDialog(<DateDialog title="Prazo (DEADLINE)" initial={h.planning.deadline} onSubmit={(ts) => edit((t) => E.setPlanning(t, h.line, 'deadline', ts), h)} />),
+    schedule: () => app.showDialog(<DateDialog title={tr('Agendar (SCHEDULED)')} initial={h.planning.scheduled} onSubmit={(ts) => edit((t) => E.setPlanning(t, h.line, 'scheduled', ts), h)} />),
+    deadline: () => app.showDialog(<DateDialog title={tr('Prazo (DEADLINE)')} initial={h.planning.deadline} onSubmit={(ts) => edit((t) => E.setPlanning(t, h.line, 'deadline', ts), h)} />),
     tags: () => app.showDialog(<TagsDialog initial={h.tags} onSubmit={(tags) => edit((t) => E.setTags(t, h.line, tags), h)} />),
     link: () => app.showDialog(<LinkDialog path={path} onClose={app.closeDialog} onInsert={(link) => edit((t) => E.setDescription(t, h.line, [description, link].filter(Boolean).join('\n')), h)} />),
     description: () => app.showDialog(<DescriptionDialog path={path} title={h.title} initial={description} onSubmit={(v) => edit((t) => E.setDescription(t, h.line, v), h)} />),
@@ -238,7 +239,7 @@ function HeadlineRow({ h, ops, fold }: { h: Headline; ops: NodeOps; fold: Fold }
     clock: () => (running ? app.clockOut() : app.clockIn(path, h.line)),
     child: () => newEntry('child'),
     sibling: () => newEntry('sibling'),
-    remove: () => confirm(`Apagar «${h.title}» e todo o seu conteúdo?`) && edit((t) => E.deleteSubtree(t, h.line)),
+    remove: () => confirm(tr('Apagar «{title}» e todo o seu conteúdo?', { title: h.title })) && edit((t) => E.deleteSubtree(t, h.line)),
     move: (d: 1 | -1) => edit((t) => E.moveSubtree(t, h.line, d), h),
     level: (d: 1 | -1) => edit((t) => E.shiftLevel(t, h.line, d), h),
     keyword: (kw?: string) => edit((t) => E.setKeyword(t, h.line, kw), h),
@@ -288,7 +289,7 @@ function HeadlineRow({ h, ops, fold }: { h: Headline; ops: NodeOps; fold: Fold }
   return (
     <div className={`hl-row ${h.done ? 'done' : ''} ${running ? 'running' : ''}`} tabIndex={0} data-line={h.line} onKeyDown={onKey}>
       <div className="hl-main">
-        <button className={`caret ${fold !== 'folded' ? 'open' : ''} ${hasBody ? '' : 'empty'}`} onClick={() => ops.cycle(h)} tabIndex={-1} aria-label="Dobrar">
+        <button className={`caret ${fold !== 'folded' ? 'open' : ''} ${hasBody ? '' : 'empty'}`} onClick={() => ops.cycle(h)} tabIndex={-1} aria-label={tr('Dobrar')}>
           <ChevronRight size={16} />
         </button>
         <select
@@ -296,7 +297,7 @@ function HeadlineRow({ h, ops, fold }: { h: Headline; ops: NodeOps; fold: Fold }
           value={h.keyword ?? ''}
           onChange={(e) => actions.keyword(e.target.value || undefined)}
           tabIndex={-1}
-          title="Estado (t)"
+          title={tr('Estado (t)')}
         >
           <option value="">{h.keyword ? '—' : '○'}</option>
           {[...doc.todo.todo, ...doc.todo.done].map((k) => <option key={k} value={k}>{k}</option>)}
@@ -323,40 +324,40 @@ function HeadlineRow({ h, ops, fold }: { h: Headline; ops: NodeOps; fold: Fold }
           />
         ) : (
           <span className="title" onDoubleClick={() => setTitleEdit(h.title)} onClick={() => fold === 'folded' && hasBody && ops.cycle(h)}>
-            {h.title ? <Inline text={h.title} opts={linkOpts} /> : <i className="muted">(sem título)</i>}
+            {h.title ? <Inline text={h.title} opts={linkOpts} /> : <i className="muted">({tr('sem título')})</i>}
           </span>
         )}
         <span className="hl-meta">
           {description && fold !== 'subtree' && (
-            <button className="badge desc-badge" title={`Tem descrição: ${description.split('\n')[0]} (e)`} onClick={actions.description} tabIndex={-1}><NotebookText size={13} /></button>
+            <button className="badge desc-badge" title={`${tr('Tem descrição')}: ${description.split('\n')[0]} (e)`} onClick={actions.description} tabIndex={-1}><NotebookText size={13} /></button>
           )}
-          {h.properties.Effort && <span className="badge" title="Esforço estimado">≈ {h.properties.Effort}</span>}
+          {h.properties.Effort && <span className="badge" title={tr('Esforço estimado')}>≈ {h.properties.Effort}</span>}
           {Object.entries(h.properties).map(([k, v]) => v && ops.shownProps.has(k.toUpperCase()) && <span key={k} className="badge" title={k}>{v}</span>)}
-          {clocked > 0 && <span className="badge" title="Tempo registado">⏱ {formatDuration(clocked)}</span>}
+          {clocked > 0 && <span className="badge" title={tr('Tempo registado')}>⏱ {formatDuration(clocked)}</span>}
           {h.tags.map((t) => <span key={t} className="tag">{t}</span>)}
         </span>
         <span className="hl-actions">
-          <IconBtn title="Agendar (s)" onClick={actions.schedule}><CalendarClock size={16} /></IconBtn>
-          <IconBtn title="Prazo (d)" onClick={actions.deadline}><AlarmClock size={16} /></IconBtn>
-          <IconBtn title="Etiquetas (q)" onClick={actions.tags}><Tag size={16} /></IconBtn>
-          <IconBtn title={running ? 'Parar relógio (o)' : 'Iniciar relógio (i)'} onClick={actions.clock}>{running ? <Square size={16} /> : <Play size={16} />}</IconBtn>
-          <IconBtn title="Adicionar subtítulo (Ctrl+Shift+Enter)" onClick={actions.child}><Plus size={16} /></IconBtn>
+          <IconBtn title={tr('Agendar (s)')} onClick={actions.schedule}><CalendarClock size={16} /></IconBtn>
+          <IconBtn title={tr('Prazo (d)')} onClick={actions.deadline}><AlarmClock size={16} /></IconBtn>
+          <IconBtn title={tr('Etiquetas (q)')} onClick={actions.tags}><Tag size={16} /></IconBtn>
+          <IconBtn title={running ? tr('Parar relógio (o)') : tr('Iniciar relógio (i)')} onClick={actions.clock}>{running ? <Square size={16} /> : <Play size={16} />}</IconBtn>
+          <IconBtn title={tr('Adicionar subtítulo (Ctrl+Shift+Enter)')} onClick={actions.child}><Plus size={16} /></IconBtn>
           <Menu>
-            <MenuItem icon={<Pencil size={15} />} label="Editar texto" hint="Enter" onClick={() => ops.setEditing(h.line)} />
-            <MenuItem icon={<Pencil size={15} />} label="Editar título" hint="F2" onClick={() => setTitleEdit(h.title)} />
-            <MenuItem icon={<NotebookText size={15} />} label={description ? 'Editar descrição' : 'Adicionar descrição'} hint="e" onClick={actions.description} />
-            <MenuItem icon={<Link2 size={15} />} label="Adicionar link ou imagem" hint="l" onClick={actions.link} />
-            <MenuItem icon={<CheckCircle2 size={15} />} label="Mudar estado" hint="t" onClick={actions.pickKeyword} />
-            <MenuItem icon={<Plus size={15} />} label="Novo título irmão" hint="Ctrl+Enter" onClick={actions.sibling} />
-            <MenuItem icon={<Settings2 size={15} />} label="Propriedades" hint="p" onClick={actions.props} />
-            <MenuItem icon={<ArrowUp size={15} />} label="Mover para cima" hint="Alt+↑" onClick={() => actions.move(-1)} />
-            <MenuItem icon={<ArrowDown size={15} />} label="Mover para baixo" hint="Alt+↓" onClick={() => actions.move(1)} />
-            <MenuItem icon={<ArrowLeft size={15} />} label="Promover" hint="Alt+←" onClick={() => actions.level(-1)} />
-            <MenuItem icon={<ArrowRight size={15} />} label="Despromover" hint="Alt+→" onClick={() => actions.level(1)} />
-            <MenuItem icon={<CornerDownRight size={15} />} label="Mover para… (refile)" hint="w" onClick={() => app.refile(path, h.line)} />
-            <MenuItem icon={<Archive size={15} />} label="Arquivar" hint="$" onClick={() => app.archive(path, h.line)} />
-            <MenuItem icon={<Focus size={15} />} label="Focar subárvore" hint="n" onClick={() => ops.setNarrow(h.key)} />
-            <MenuItem icon={<Trash2 size={15} />} label="Apagar" hint="Del" danger onClick={actions.remove} />
+            <MenuItem icon={<Pencil size={15} />} label={tr('Editar texto')} hint="Enter" onClick={() => ops.setEditing(h.line)} />
+            <MenuItem icon={<Pencil size={15} />} label={tr('Editar título')} hint="F2" onClick={() => setTitleEdit(h.title)} />
+            <MenuItem icon={<NotebookText size={15} />} label={description ? tr('Editar descrição') : tr('Adicionar descrição')} hint="e" onClick={actions.description} />
+            <MenuItem icon={<Link2 size={15} />} label={tr('Adicionar link ou imagem')} hint="l" onClick={actions.link} />
+            <MenuItem icon={<CheckCircle2 size={15} />} label={tr('Mudar estado')} hint="t" onClick={actions.pickKeyword} />
+            <MenuItem icon={<Plus size={15} />} label={tr('Novo título irmão')} hint="Ctrl+Enter" onClick={actions.sibling} />
+            <MenuItem icon={<Settings2 size={15} />} label={tr('Propriedades')} hint="p" onClick={actions.props} />
+            <MenuItem icon={<ArrowUp size={15} />} label={tr('Mover para cima')} hint="Alt+↑" onClick={() => actions.move(-1)} />
+            <MenuItem icon={<ArrowDown size={15} />} label={tr('Mover para baixo')} hint="Alt+↓" onClick={() => actions.move(1)} />
+            <MenuItem icon={<ArrowLeft size={15} />} label={tr('Promover')} hint="Alt+←" onClick={() => actions.level(-1)} />
+            <MenuItem icon={<ArrowRight size={15} />} label={tr('Despromover')} hint="Alt+→" onClick={() => actions.level(1)} />
+            <MenuItem icon={<CornerDownRight size={15} />} label={tr('Mover para… (refile)')} hint="w" onClick={() => app.refile(path, h.line)} />
+            <MenuItem icon={<Archive size={15} />} label={tr('Arquivar')} hint="$" onClick={() => app.archive(path, h.line)} />
+            <MenuItem icon={<Focus size={15} />} label={tr('Focar subárvore')} hint="n" onClick={() => ops.setNarrow(h.key)} />
+            <MenuItem icon={<Trash2 size={15} />} label={tr('Apagar')} hint="Del" danger onClick={actions.remove} />
           </Menu>
         </span>
       </div>
@@ -408,7 +409,7 @@ function Body({ h, ops }: { h: Headline; ops: NodeOps }) {
           {props.map(([k, v]) => <div key={k}><span className="muted">{k.charAt(0) + k.slice(1).toLowerCase()}:</span> {v}</div>)}
         </div>
       )}
-      {logbook && <Drawer name="Registo (LOGBOOK)" content={logbook} />}
+      {logbook && <Drawer name={tr('Registo (LOGBOOK)')} content={logbook} />}
       {editingDesc ? (
         <EntryEditor
           path={ops.path}
@@ -455,7 +456,7 @@ function EntryEditor({ path, initial, onDone }: { path: string; initial: string;
       />
       {ai.panel}
       <div className="editor-foot">
-        <div className="hint">Ctrl+Enter para guardar · Esc para cancelar · Ctrl+L link ou imagem · Tab alinha tabelas · Alt+Enter novo item</div>
+        <div className="hint">{tr('Ctrl+Enter para guardar · Esc para cancelar · Ctrl+L link ou imagem · Tab alinha tabelas · Alt+Enter novo item')}</div>
         {ai.button}
       </div>
     </div>
@@ -466,7 +467,7 @@ function IconBtn({ title, onClick, children }: { title: string; onClick: () => v
   return <button className="icon-btn" title={title} aria-label={title} tabIndex={-1} onClick={(e) => (e.stopPropagation(), onClick())}>{children}</button>
 }
 
-export function Menu({ children, icon = <MoreHorizontal size={16} />, label = 'Mais' }: { children: ReactNode; icon?: ReactNode; label?: string }) {
+export function Menu({ children, icon = <MoreHorizontal size={16} />, label = tr('Mais') }: { children: ReactNode; icon?: ReactNode; label?: string }) {
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
   useEffect(() => {

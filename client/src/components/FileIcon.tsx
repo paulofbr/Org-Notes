@@ -8,6 +8,7 @@ import { api } from '../api'
 import { useApp } from '../context'
 import { setFileKeyword } from '../org/edit'
 import { Modal } from './Dialogs'
+import { tr } from '../i18n'
 
 /** The predefined icons, by the name stored in `#+ICON:`. */
 const ICONS: Record<string, LucideIcon> = {
@@ -31,7 +32,7 @@ async function toIconPng(file: File): Promise<Blob> {
   const canvas = document.createElement('canvas')
   canvas.width = canvas.height = 64
   canvas.getContext('2d')!.drawImage(img, (img.width - side) / 2, (img.height - side) / 2, side, side, 0, 0, 64, 64)
-  return new Promise((resolve, reject) => canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('Imagem inválida'))), 'image/png'))
+  return new Promise((resolve, reject) => canvas.toBlob((b) => (b ? resolve(b) : reject(new Error(tr('Imagem inválida')))), 'image/png'))
 }
 
 export function IconDialog({ path }: { path: string }) {
@@ -43,7 +44,7 @@ export function IconDialog({ path }: { path: string }) {
   const upload = (file?: File) =>
     file && toIconPng(file).then(api.uploadIcon).then((r) => choose(r.name), (e) => setError(e instanceof Error ? e.message : String(e)))
   return (
-    <Modal title={`Ícone · ${path}`} onClose={closeDialog}>
+    <Modal title={`${tr('Ícone')} · ${path}`} onClose={closeDialog}>
       {error && <p className="hint">{error}</p>}
       <div className="icon-grid">
         {Object.keys(ICONS).map((name) => (
@@ -54,9 +55,9 @@ export function IconDialog({ path }: { path: string }) {
       </div>
       <input ref={input} type="file" accept="image/*" hidden onChange={(e) => upload(e.target.files?.[0])} />
       <div className="actions">
-        <button type="button" onClick={() => input.current?.click()}><Upload size={15} /> Carregar imagem</button>
-        <button type="button" onClick={() => choose(undefined)}>Predefinido</button>
-        <button type="button" onClick={closeDialog}>Cancelar</button>
+        <button type="button" onClick={() => input.current?.click()}><Upload size={15} /> {tr('Carregar imagem')}</button>
+        <button type="button" onClick={() => choose(undefined)}>{tr('Predefinido')}</button>
+        <button type="button" onClick={closeDialog}>{tr('Cancelar')}</button>
       </div>
     </Modal>
   )

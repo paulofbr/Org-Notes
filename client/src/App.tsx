@@ -14,6 +14,8 @@ import { DocView, fileActions } from './components/DocView'
 import { ShortcutBar } from './components/ShortcutBar'
 import { isTyping, moveFocus } from './shortcuts'
 import { Inline } from './components/Inline'
+import { LANGS, isLang, lang, rememberLang, tr } from './i18n'
+import { api } from './api'
 
 type Nav = { view: 'agenda'; tab?: 'week' | 'search' } | { view: 'doc'; path: string; focus?: { line: number } }
 
@@ -56,6 +58,14 @@ export default function App() {
     }
   }, [theme])
 
+  // The language is a user setting: the server's value wins over this browser's, and a user without one gets this browser's.
+  useEffect(() => {
+    api.me().then(
+      (me) => void (isLang(me.lang) ? rememberLang(me.lang) : api.setLang(lang)),
+      () => {},
+    )
+  }, [])
+
   const running = useMemo<RunningClock | undefined>(() => {
     for (const [path, doc] of Object.entries(store.docs))
       for (const h of doc.all) {
@@ -84,7 +94,7 @@ export default function App() {
       // Relative to the linking file (as Emacs writes them), else from the root.
       const path = m[1] ? (store.files[resolvePath(from, m[1])] !== undefined ? resolvePath(from, m[1]) : m[1]) : from
       const doc = store.docs[path]
-      if (!doc) return void alert(`Ficheiro não encontrado: ${path}`)
+      if (!doc) return void alert(tr('Ficheiro não encontrado: {path}', { path }))
       const search = m[2]
       const h = search?.startsWith('*')
         ? doc.all.find((x) => x.title.toLowerCase() === search.slice(1).trim().toLowerCase())
@@ -130,20 +140,21 @@ export default function App() {
     setTheme(document.documentElement.matches('[data-theme="dark"]') || (!theme && matchMedia('(prefers-color-scheme: dark)').matches) ? 'light' : 'dark')
 
   const commands = (): Command[] => [
-    ...Object.keys(store.files).sort().map((p) => ({ label: `Abrir ${p}`, run: () => ctx.open(p) })),
-    { label: 'Agenda', hint: 'a', run: () => setNav({ view: 'agenda' }) },
-    { label: 'Procurar', hint: '/', run: () => setNav({ view: 'agenda', tab: 'search' }) },
-    { label: 'Capturar', hint: 'c', run: () => ctx.showDialog(<CaptureDialog path={nav.view === 'doc' ? nav.path : undefined} />) },
-    { label: 'Novo ficheiro', run: () => newFile() },
-    { label: 'Nova pasta', run: newFolder },
-    { label: 'Conta e notificações', run: () => ctx.showDialog(<AccountDialog />) },
+    ...Object.keys(store.files).sort().map((p) => ({ label: tr('Abrir {path}', { path: p }), run: () => ctx.open(p) })),
+    { label: tr('Agenda'), hint: 'a', run: () => setNav({ view: 'agenda' }) },
+    { label: tr('Procurar'), hint: '/', run: () => setNav({ view: 'agenda', tab: 'search' }) },
+    { label: tr('Capturar'), hint: 'c', run: () => ctx.showDialog(<CaptureDialog path={nav.view === 'doc' ? nav.path : undefined} />) },
+    { label: tr('Novo ficheiro'), run: () => newFile() },
+    { label: tr('Nova pasta'), run: newFolder },
+    { label: tr('Conta e notificações'), run: () => ctx.showDialog(<AccountDialog />) },
     ...(nav.view === 'doc' ? fileActions(ctx, nav.path, () => setNav({ view: 'agenda' })).map((a) => ({ label: a.label, run: a.run })) : []),
-    ...(running ? [{ label: `Parar relógio: ${running.h.title}`, hint: 'o', run: ctx.clockOut }] : []),
-    { label: 'Desfazer', hint: 'Ctrl+Z', run: () => store.undo() },
-    { label: 'Refazer', hint: 'Ctrl+Y', run: () => store.redo() },
-    { label: 'Alternar tema claro/escuro', run: toggleTheme },
-    { label: collapsed ? 'Expandir menu lateral' : 'Minimizar menu lateral', hint: '[', run: toggleCollapsed },
-    { label: 'Ver todos os atalhos', hint: '?', run: () => ctx.showDialog(<HelpDialog />) },
+    ...(running ? [{ label: tr('Parar relógio: {title}', { title: running.h.title }), hint: 'o', run: ctx.clockOut }] : []),
+    { label: tr('Desfazer'), hint: 'Ctrl+Z', run: () => store.undo() },
+    { label: tr('Refazer'), hint: 'Ctrl+Y', run: () => store.redo() },
+    { label: tr('Alternar tema claro/escuro'), run: toggleTheme },
+    ...LANGS.filter(([l]) => l !== lang).map(([l, name]) => ({ label: `${tr('Língua')}: ${name}`, run: () => rememberLang(l) })),
+    { label: collapsed ? tr('Expandir menu lateral') : tr('Minimizar menu lateral'), hint: '[', run: toggleCollapsed },
+    { label: tr('Ver todos os atalhos'), hint: '?', run: () => ctx.showDialog(<HelpDialog />) },
   ]
 
   useEffect(() => {
@@ -205,37 +216,37 @@ export default function App() {
         <aside className="sidebar">
           <div className="brand">
             <span className="logo">✱</span> <span className="label">Org Notes</span>
-            <button className="icon-btn collapse-btn" onClick={toggleCollapsed} title={`${collapsed ? 'Expandir' : 'Minimizar'} menu ([)`} aria-label={collapsed ? 'Expandir menu' : 'Minimizar menu'}>
+            <button className="icon-btn collapse-btn" onClick={toggleCollapsed} title={`${collapsed ? tr('Expandir menu') : tr('Minimizar menu')} ([)`} aria-label={collapsed ? tr('Expandir menu') : tr('Minimizar menu')}>
               {collapsed ? <PanelLeftOpen size={16} /> : <PanelLeftClose size={16} />}
             </button>
           </div>
           <nav>
-            <button title="Agenda (a)" className={nav.view === 'agenda' && nav.tab !== 'search' ? 'active' : ''} onClick={() => (setNav({ view: 'agenda' }), setSidebar(false))}>
-              <CalendarDays size={16} /> <span className="label">Agenda</span> <kbd>a</kbd>
+            <button title={`${tr('Agenda')} (a)`} className={nav.view === 'agenda' && nav.tab !== 'search' ? 'active' : ''} onClick={() => (setNav({ view: 'agenda' }), setSidebar(false))}>
+              <CalendarDays size={16} /> <span className="label">{tr('Agenda')}</span> <kbd>a</kbd>
             </button>
-            <button title="Procurar (/)" className={nav.view === 'agenda' && nav.tab === 'search' ? 'active' : ''} onClick={() => (setNav({ view: 'agenda', tab: 'search' }), setSidebar(false))}>
-              <Search size={16} /> <span className="label">Procurar</span> <kbd>/</kbd>
+            <button title={`${tr('Procurar')} (/)`} className={nav.view === 'agenda' && nav.tab === 'search' ? 'active' : ''} onClick={() => (setNav({ view: 'agenda', tab: 'search' }), setSidebar(false))}>
+              <Search size={16} /> <span className="label">{tr('Procurar')}</span> <kbd>/</kbd>
             </button>
-            <button title="Comandos (Ctrl+K)" onClick={() => (ctx.showDialog(<CommandPalette commands={commands()} />), setSidebar(false))}>
-              <CommandIcon size={16} /> <span className="label">Comandos</span> <kbd>Ctrl+K</kbd>
+            <button title={`${tr('Comandos')} (Ctrl+K)`} onClick={() => (ctx.showDialog(<CommandPalette commands={commands()} />), setSidebar(false))}>
+              <CommandIcon size={16} /> <span className="label">{tr('Comandos')}</span> <kbd>Ctrl+K</kbd>
             </button>
           </nav>
           <div className="files-head">
-            <span className="label">Ficheiros</span>
+            <span className="label">{tr('Ficheiros')}</span>
             <span className="files-actions">
-              <button className="icon-btn" onClick={newFolder} title="Nova pasta (também em Ctrl+K)" aria-label="Nova pasta"><FolderPlus size={16} /></button>
-              <button className="icon-btn" onClick={() => newFile()} title="Novo ficheiro (também em Ctrl+K)" aria-label="Novo ficheiro"><FilePlus size={16} /></button>
+              <button className="icon-btn" onClick={newFolder} title={tr('Nova pasta (também em Ctrl+K)')} aria-label={tr('Nova pasta')}><FolderPlus size={16} /></button>
+              <button className="icon-btn" onClick={() => newFile()} title={tr('Novo ficheiro (também em Ctrl+K)')} aria-label={tr('Novo ficheiro')}><FilePlus size={16} /></button>
             </span>
           </div>
           <FileTree store={store} active={nav.view === 'doc' ? nav.path : undefined} onOpen={ctx.open} onNewFile={newFile} />
           <div className="sidebar-foot">
             <SaveIndicator state={store.saveState} />
-            <button className="help-btn" title="Todos os atalhos" onClick={() => ctx.showDialog(<HelpDialog />)}><HelpCircle size={15} /> <kbd>?</kbd></button>
-            <button className="icon-btn" title="Conta e notificações" aria-label="Conta e notificações" onClick={() => ctx.showDialog(<AccountDialog />)}><Bell size={16} /></button>
+            <button className="help-btn" title={tr('Todos os atalhos')} onClick={() => ctx.showDialog(<HelpDialog />)}><HelpCircle size={15} /> <kbd>?</kbd></button>
+            <button className="icon-btn" title={tr('Conta e notificações')} aria-label={tr('Conta e notificações')} onClick={() => ctx.showDialog(<AccountDialog />)}><Bell size={16} /></button>
             <button
               className="icon-btn"
-              title="Tema"
-              aria-label="Tema"
+              title={tr('Tema')}
+              aria-label={tr('Tema')}
               onClick={toggleTheme}
             >
               <Sun size={16} className="sun" /><Moon size={16} className="moon" />
@@ -251,15 +262,15 @@ export default function App() {
           <div className="content-wrap">
           <div className="content">
             {!store.loaded ? (
-              <div className="empty"><Loader2 className="spin" /> A carregar…</div>
+              <div className="empty"><Loader2 className="spin" /> {tr('A carregar…')}</div>
             ) : nav.view === 'agenda' ? (
               <AgendaView key={nav.tab ?? 'week'} initialTab={nav.tab} />
             ) : (
               <DocView key={nav.path} path={nav.path} focus={nav.focus} onRemoved={() => setNav({ view: 'agenda' })} />
             )}
           </div>
-          <button className="fab" onClick={() => ctx.showDialog(<CaptureDialog path={nav.view === 'doc' ? nav.path : undefined} />)} title="Capturar (c)" aria-label="Capturar">
-            <Pencil size={20} /> <span className="fab-label">Capturar</span> <kbd>c</kbd>
+          <button className="fab" onClick={() => ctx.showDialog(<CaptureDialog path={nav.view === 'doc' ? nav.path : undefined} />)} title={`${tr('Capturar')} (c)`} aria-label={tr('Capturar')}>
+            <Pencil size={20} /> <span className="fab-label">{tr('Capturar')}</span> <kbd>c</kbd>
           </button>
           </div>
           {store.loaded && !dialog && <ShortcutBar view={nav.view} />}
@@ -271,9 +282,9 @@ export default function App() {
 }
 
 function SaveIndicator({ state }: { state: string }) {
-  if (state === 'saving') return <span className="save saving"><Loader2 size={14} className="spin" /> <span>A guardar</span></span>
-  if (state === 'error') return <span className="save error"><TriangleAlert size={14} /> <span>Erro ao guardar</span></span>
-  return <span className="save"><Check size={14} /> <span>Guardado</span></span>
+  if (state === 'saving') return <span className="save saving"><Loader2 size={14} className="spin" /> <span>{tr('A guardar')}</span></span>
+  if (state === 'error') return <span className="save error"><TriangleAlert size={14} /> <span>{tr('Erro ao guardar')}</span></span>
+  return <span className="save"><Check size={14} /> <span>{tr('Guardado')}</span></span>
 }
 
 function ClockBar({ r, onOpen, onStop }: { r: RunningClock; onOpen: () => void; onStop: () => void }) {
@@ -288,7 +299,7 @@ function ClockBar({ r, onOpen, onStop }: { r: RunningClock; onOpen: () => void; 
       <span className="pulse" />
       <button className="link" onClick={onOpen}><Inline text={r.h.title} /></button>
       <span className="elapsed">{formatDuration(minutes)}</span>
-      <button className="icon-btn" onClick={onStop} title="Parar relógio" aria-label="Parar relógio"><Square size={15} /></button>
+      <button className="icon-btn" onClick={onStop} title={tr('Parar relógio')} aria-label={tr('Parar relógio')}><Square size={15} /></button>
     </div>
   )
 }
