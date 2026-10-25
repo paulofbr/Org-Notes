@@ -3,7 +3,7 @@ import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { useApp } from '../context'
 import { agenda, clockReport, compileMatch, entries, textMatch, type AgendaItem, type Entry } from '../org/agenda'
 import { allTags, outlinePath } from '../org/parser'
-import { setKeyword } from '../org/edit'
+import { nextKeyword, setKeyword } from '../org/edit'
 import { useKeys, moveFocus } from '../shortcuts'
 import { KeywordDialog } from './Dialogs'
 import { addDays, dateKey, formatDuration, toDate } from '../org/timestamp'
@@ -96,6 +96,8 @@ function AgendaRow({ e, item, extra }: { e: Entry; item?: AgendaItem; extra?: st
         const stop = () => (ev.preventDefault(), ev.stopPropagation())
         if (ev.key === 'Enter') (stop(), app.open(path, h.line))
         else if (ev.key === 't') (stop(), pickKeyword())
+        else if (ev.shiftKey && (ev.key === 'ArrowRight' || ev.key === 'ArrowLeft'))
+          (stop(), app.edit(path, (t) => setKeyword(t, h.line, nextKeyword(doc, h.keyword, ev.key === 'ArrowRight' ? 1 : -1))))
         else if (ev.key === 'ArrowDown' || ev.key === 'j') (stop(), moveFocus(1, ev.currentTarget))
         else if (ev.key === 'ArrowUp' || ev.key === 'k') (stop(), moveFocus(-1, ev.currentTarget))
         else if (ev.key === 'Escape') (stop(), ev.currentTarget.blur())

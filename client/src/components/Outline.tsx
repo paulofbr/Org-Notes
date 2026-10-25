@@ -1,18 +1,22 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
 import {
   AlarmClock, Archive, ArrowDown, ArrowLeft, ArrowRight, ArrowUp, CalendarClock, ChevronRight, CornerDownRight, Focus,
-  CheckCircle2, MoreHorizontal, Pencil, Play, Plus, Repeat, Settings2, Square, Tag, Trash2,
+  CheckCircle2, Link2, MoreHorizontal, NotebookText, Pencil, Play, Plus, Repeat, Settings2, Square, Tag, Trash2,
 } from 'lucide-react'
 import { useApp } from '../context'
 import { sectionBlocks, type Headline, type OrgDoc } from '../org/parser'
 import * as E from '../org/edit'
 import { compileMatch, textMatch } from '../org/agenda'
+import { imageSrc } from '../org/links'
+import { propertyOptions } from '../org/capture'
+import { LinkDialog } from './LinkDialog'
 import { dateKey, daysBetween, formatDuration, warningDays, type Timestamp } from '../org/timestamp'
 import { Blocks, Drawer } from './Blocks'
 import { Inline, formatDate } from './Inline'
 import { OrgTextarea } from './OrgTextarea'
-import { DateDialog, KeywordDialog, PropertyDialog, TagsDialog } from './Dialogs'
+import { DateDialog, DescriptionDialog, KeywordDialog, NewEntryDialog, PropertyDialog, TagsDialog } from './Dialogs'
 import { moveFocus } from '../shortcuts'
+import { useAiReview } from './AiReview'
 
 export type Fold = 'folded' | 'children' | 'subtree'
 export type Visibility = 'overview' | 'contents' | 'showall'
@@ -103,7 +107,9 @@ export function Outline({ path, doc, state, setState, filter, narrow, setNarrow,
   }, [filter, doc, path])
 
   const focusLater = (h: Headline) => (pendingFocus.current = { title: h.title, line: h.line })
-  const ops: NodeOps = { path, doc, foldOf, cycle, edit, editing, setEditing, matcher, setNarrow, narrowed: !!narrow, focusLater }
+  // Properties with a fixed set of values (`#+PROPERTY: KEY_ALL`) show on each headline, like tags.
+  const shownProps = useMemo(() => new Set(Object.keys(propertyOptions(doc.lines.join('\n')))), [doc])
+  const ops: NodeOps = { path, doc, foldOf, cycle, edit, editing, setEditing, matcher, setNarrow, narrowed: !!narrow, focusLater, shownProps }
   const narrowed = narrow ? doc.all.find((h) => h.key === narrow) : undefined
   const tops = narrowed ? [narrowed] : doc.headlines
 
@@ -126,7 +132,17 @@ export function Outline({ path, doc, state, setState, filter, narrow, setNarrow,
       )}
       {tops.map((h) => <Node key={h.key} h={h} ops={ops} />)}
       {!matcher && (
-        <button className="add-heading" onClick={() => edit((t) => E.insertHeadline(t, narrowed?.line, narrowed ? 'child' : 'sibling', 'Novo título'))}>
+        <button
+          className="add-heading"
+          onClick={() => {
+            const last = narrowed ?? doc.headlines[doc.headlines.length - 1]
+            app.showDialog(
+              <NewEntryDialog path={path} keywords={doc.todo.todo} initialKeyword={last?.keyword && doc.todo.todo[0]} onSubmit={({ title, ...rest }) =>
+                edit((t) => E.insertHeadline(t, narrowed?.line, narrowed ? 'child' : 'sibling', title, rest))
+              } />,
+            )
+          }}
+        >
           <Plus size={16} /> Novo título <kbd>Ctrl+Enter</kbd>
         </button>
       )}
@@ -145,14 +161,16 @@ interface NodeOps {
   matcher?: Set<string>
   setNarrow: (key?: string) => void
   narrowed: boolean
+  shownProps: Set<string>
   focusLater: (h: Headline) => void
 }
 
 function Preamble({ path, doc, editing, setEditing }: { path: string; doc: OrgDoc; editing: boolean; setEditing: (v: 'preamble' | null) => void }) {
   const app = useApp()
-  const blocks = useMemo(() => sectionBlocks(doc), [doc])
+  // Capture templates are edited from the file menu, not shown as content.
+  const blocks = useMemo(() => sectionBlocks(doc).filter((b) => !(b.type === 'block' && b.name === 'capture')), [doc])
   if (editing)
-    return <EntryEditor initial={doc.lines.slice(0, doc.preambleEnd).join('\n')} onDone={(text) => {
+    return <EntryEditor path={path} initial={doc.lines.slice(0, doc.preambleEnd).join('\n')} onDone={(text) => {
       setEditing(null)
       if (text !== undefined) app.edit(path, (t) => E.replaceLines(t, 0, doc.preambleEnd, text))
     }} />
@@ -160,7 +178,7 @@ function Preamble({ path, doc, editing, setEditing }: { path: string; doc: OrgDo
   return (
     <div className="preamble" onDoubleClick={() => setEditing('preamble')}>
       {meta.length > 0 && <div className="meta">{meta.map((k) => <span key={k}>{doc.keywords[k]}</span>)}</div>}
-      <Blocks blocks={blocks} opts={{ onCheckbox: (l) => app.edit(path, (t) => E.toggleCheckbox(t, l)), onLink: (t) => app.openLink(t, path) }} />
+      <Blocks blocks={blocks} opts={{ onCheckbox: (l) => app.edit(path, (t) => E.toggleCheckbox(t, l)), onLink: (t) => app.openLink(t, path), imageUrl: (t) => imageSrc(path, t) }} />
     </div>
   )
 }
@@ -174,6 +192,7 @@ function Node({ h, ops }: { h: Headline; ops: NodeOps }) {
       <HeadlineRow h={h} ops={ops} fold={fold} />
       {ops.editing === h.line ? (
         <EntryEditor
+          path={ops.path}
           initial={ops.doc.lines.slice(h.line, h.contentEnd).join('\n')}
           onDone={(text) => {
             ops.setEditing(null)
@@ -199,15 +218,26 @@ function HeadlineRow({ h, ops, fold }: { h: Headline; ops: NodeOps; fold: Fold }
   const running = app.running?.path === path && app.running.h.line === h.line
   const clocked = h.clocks.reduce((s, c) => s + c.minutes, 0)
   const hasBody = h.contentEnd - h.line > 1 || h.children.length > 0
+  const description = E.descriptionOf(doc, h)
+
+  // New entries start as tasks when added next to (or under) a task.
+  const newEntry = (mode: 'child' | 'sibling') =>
+    app.showDialog(
+      <NewEntryDialog path={path} keywords={doc.todo.todo} initialKeyword={h.keyword && doc.todo.todo[0]} onSubmit={({ title, ...rest }) =>
+        edit((t) => E.insertHeadline(t, h.line, mode, title, rest), { ...h, title, line: h.end })
+      } />,
+    )
 
   const actions = {
     schedule: () => app.showDialog(<DateDialog title="Agendar (SCHEDULED)" initial={h.planning.scheduled} onSubmit={(ts) => edit((t) => E.setPlanning(t, h.line, 'scheduled', ts), h)} />),
     deadline: () => app.showDialog(<DateDialog title="Prazo (DEADLINE)" initial={h.planning.deadline} onSubmit={(ts) => edit((t) => E.setPlanning(t, h.line, 'deadline', ts), h)} />),
     tags: () => app.showDialog(<TagsDialog initial={h.tags} onSubmit={(tags) => edit((t) => E.setTags(t, h.line, tags), h)} />),
+    link: () => app.showDialog(<LinkDialog path={path} onClose={app.closeDialog} onInsert={(link) => edit((t) => E.setDescription(t, h.line, [description, link].filter(Boolean).join('\n')), h)} />),
+    description: () => app.showDialog(<DescriptionDialog path={path} title={h.title} initial={description} onSubmit={(v) => edit((t) => E.setDescription(t, h.line, v), h)} />),
     props: () => app.showDialog(<PropertyDialog properties={h.properties} onSubmit={(k, v) => edit((t) => E.setProperty(t, h.line, k, v), h)} />),
     clock: () => (running ? app.clockOut() : app.clockIn(path, h.line)),
-    child: () => edit((t) => E.insertHeadline(t, h.line, 'child', 'Novo título'), { ...h, title: 'Novo título', line: h.end }),
-    sibling: () => edit((t) => E.insertHeadline(t, h.line, 'sibling', 'Novo título'), { ...h, title: 'Novo título', line: h.end }),
+    child: () => newEntry('child'),
+    sibling: () => newEntry('sibling'),
     remove: () => confirm(`Apagar «${h.title}» e todo o seu conteúdo?`) && edit((t) => E.deleteSubtree(t, h.line)),
     move: (d: 1 | -1) => edit((t) => E.moveSubtree(t, h.line, d), h),
     level: (d: 1 | -1) => edit((t) => E.shiftLevel(t, h.line, d), h),
@@ -243,6 +273,8 @@ function HeadlineRow({ h, ops, fold }: { h: Headline; ops: NodeOps; fold: Fold }
     else if (k === 'd') (handled(), actions.deadline())
     else if (k === 'q') (handled(), actions.tags())
     else if (k === 'p') (handled(), actions.props())
+    else if (k === 'e') (handled(), actions.description())
+    else if (k === 'l') (handled(), actions.link())
     else if (k === 'i') (handled(), app.clockIn(path, h.line))
     else if (k === 'o') (handled(), app.clockOut())
     else if (k === 'w') (handled(), app.refile(path, h.line))
@@ -251,7 +283,7 @@ function HeadlineRow({ h, ops, fold }: { h: Headline; ops: NodeOps; fold: Fold }
     else if (k === 'Delete') (handled(), actions.remove())
   }
 
-  const linkOpts = { onLink: (t: string) => app.openLink(t, path) }
+  const linkOpts = { onLink: (t: string) => app.openLink(t, path), imageUrl: (t: string) => imageSrc(path, t) }
 
   return (
     <div className={`hl-row ${h.done ? 'done' : ''} ${running ? 'running' : ''}`} tabIndex={0} data-line={h.line} onKeyDown={onKey}>
@@ -295,7 +327,11 @@ function HeadlineRow({ h, ops, fold }: { h: Headline; ops: NodeOps; fold: Fold }
           </span>
         )}
         <span className="hl-meta">
+          {description && fold !== 'subtree' && (
+            <button className="badge desc-badge" title={`Tem descrição: ${description.split('\n')[0]} (e)`} onClick={actions.description} tabIndex={-1}><NotebookText size={13} /></button>
+          )}
           {h.properties.Effort && <span className="badge" title="Esforço estimado">≈ {h.properties.Effort}</span>}
+          {Object.entries(h.properties).map(([k, v]) => v && ops.shownProps.has(k.toUpperCase()) && <span key={k} className="badge" title={k}>{v}</span>)}
           {clocked > 0 && <span className="badge" title="Tempo registado">⏱ {formatDuration(clocked)}</span>}
           {h.tags.map((t) => <span key={t} className="tag">{t}</span>)}
         </span>
@@ -308,6 +344,8 @@ function HeadlineRow({ h, ops, fold }: { h: Headline; ops: NodeOps; fold: Fold }
           <Menu>
             <MenuItem icon={<Pencil size={15} />} label="Editar texto" hint="Enter" onClick={() => ops.setEditing(h.line)} />
             <MenuItem icon={<Pencil size={15} />} label="Editar título" hint="F2" onClick={() => setTitleEdit(h.title)} />
+            <MenuItem icon={<NotebookText size={15} />} label={description ? 'Editar descrição' : 'Adicionar descrição'} hint="e" onClick={actions.description} />
+            <MenuItem icon={<Link2 size={15} />} label="Adicionar link ou imagem" hint="l" onClick={actions.link} />
             <MenuItem icon={<CheckCircle2 size={15} />} label="Mudar estado" hint="t" onClick={actions.pickKeyword} />
             <MenuItem icon={<Plus size={15} />} label="Novo título irmão" hint="Ctrl+Enter" onClick={actions.sibling} />
             <MenuItem icon={<Settings2 size={15} />} label="Propriedades" hint="p" onClick={actions.props} />
@@ -352,18 +390,45 @@ function Body({ h, ops }: { h: Headline; ops: NodeOps }) {
   const blocks = useMemo(() => sectionBlocks(ops.doc, h), [ops.doc, h])
   const props = Object.entries(h.properties)
   const logbook = h.logbookRange && ops.doc.lines.slice(h.logbookRange[0] + 1, h.logbookRange[1]).join('\n')
+  const [editingDesc, setEditingDesc] = useState(false)
   if (!blocks.length && !props.length && !logbook) return null
   return (
-    <div className="body" onDoubleClick={(e) => (e.target as HTMLElement).closest('a,button,input,select') || ops.setEditing(h.line)}>
-      {props.length > 0 && <Drawer name={`Propriedades (${props.length})`} content={props.map(([k, v]) => `${k}: ${v}`).join('\n')} />}
+    <div
+      className="body"
+      onDoubleClick={(e) => {
+        const t = e.target as HTMLElement
+        if (editingDesc || t.closest('a,button,input,select')) return
+        // A drawer opens the whole entry; the description text opens just the description.
+        if (t.closest('.drawer')) ops.setEditing(h.line)
+        else setEditingDesc(true)
+      }}
+    >
+      {props.length > 0 && (
+        <div className="drawer props">
+          {props.map(([k, v]) => <div key={k}><span className="muted">{k.charAt(0) + k.slice(1).toLowerCase()}:</span> {v}</div>)}
+        </div>
+      )}
       {logbook && <Drawer name="Registo (LOGBOOK)" content={logbook} />}
-      <Blocks blocks={blocks} opts={{ onCheckbox: (l) => ops.edit((t) => E.toggleCheckbox(t, l)), onLink: (t) => app.openLink(t, ops.path) }} />
+      {editingDesc ? (
+        <EntryEditor
+          path={ops.path}
+          initial={E.descriptionOf(ops.doc, h)}
+          onDone={(text) => {
+            setEditingDesc(false)
+            ops.focusLater(h)
+            if (text !== undefined) ops.edit((t) => E.setDescription(t, h.line, text), h)
+          }}
+        />
+      ) : (
+        <Blocks blocks={blocks} opts={{ onCheckbox: (l) => ops.edit((t) => E.toggleCheckbox(t, l)), onLink: (t) => app.openLink(t, ops.path), imageUrl: (t) => imageSrc(ops.path, t) }} />
+      )}
     </div>
   )
 }
 
-function EntryEditor({ initial, onDone }: { initial: string; onDone: (text?: string) => void }) {
+function EntryEditor({ path, initial, onDone }: { path: string; initial: string; onDone: (text?: string) => void }) {
   const [text, setText] = useState(initial)
+  const ai = useAiReview({ text }, (f) => setText(f.text))
   const done = useRef(false)
   const finish = (v?: string) => {
     if (done.current) return
@@ -377,14 +442,22 @@ function EntryEditor({ initial, onDone }: { initial: string; onDone: (text?: str
         autoGrow
         value={text}
         onChange={setText}
-        onBlur={() => finish(text)}
+        path={path}
+        tools
+        rich
+        // Opening the link dialog, or a file picker (the window loses focus), is not leaving the editor.
+        onBlur={(e) => (e.relatedTarget as HTMLElement | null)?.closest('.modal') || !document.hasFocus() || finish(text)}
         onKeyDown={(e) => {
           e.stopPropagation()
           if (e.key === 'Escape') (e.preventDefault(), finish(undefined))
           if ((e.key === 'Enter' && (e.ctrlKey || e.metaKey)) || (e.key === 's' && (e.ctrlKey || e.metaKey))) (e.preventDefault(), finish(text))
         }}
       />
-      <div className="hint">Ctrl+Enter para guardar · Esc para cancelar · Tab alinha tabelas · Alt+Enter novo item</div>
+      {ai.panel}
+      <div className="editor-foot">
+        <div className="hint">Ctrl+Enter para guardar · Esc para cancelar · Ctrl+L link ou imagem · Tab alinha tabelas · Alt+Enter novo item</div>
+        {ai.button}
+      </div>
     </div>
   )
 }

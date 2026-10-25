@@ -1,10 +1,13 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
-import { Code2, Download, FileText, ListTree, Pencil, Printer, Search, Trash2, Layers } from 'lucide-react'
+import { Code2, Download, Inbox, FileText, ListTree, Pencil, Printer, Search, Trash2, Layers } from 'lucide-react'
 import { useApp, type AppCtx } from '../context'
 import { isTyping } from '../shortcuts'
 import { Outline, Menu, MenuItem, type OutlineState, type Visibility } from './Outline'
 import { OrgTextarea } from './OrgTextarea'
 import { PromptDialog } from './Dialogs'
+import { hideTemplates } from '../org/capture'
+import { TemplateDialog } from './Capture'
+import { FileIcon, IconDialog } from './FileIcon'
 
 const states = new Map<string, OutlineState>()
 const VIS_ORDER: Visibility[] = ['overview', 'contents', 'showall']
@@ -19,6 +22,8 @@ export function fileActions(app: AppCtx, path: string, onRemoved: () => void): {
     { label: 'Exportar HTML', icon: <Download size={15} />, run: () => import('../export').then((x) => x.download(path.replace(/\.org$/, '.html').split('/').pop()!, x.exportHtml(doc, title), 'text/html')) },
     { label: 'Descarregar .org', icon: <FileText size={15} />, run: () => import('../export').then((x) => x.download(path.split('/').pop()!, store.get(path) ?? '', 'text/plain')) },
     { label: 'Imprimir / PDF', icon: <Printer size={15} />, run: () => window.print() },
+    { label: 'Template de captura', icon: <Inbox size={15} />, run: () => app.showDialog(<TemplateDialog path={path} />) },
+    { label: 'Mudar ícone do ficheiro', icon: <FileIcon path={path} icon={doc?.keywords.ICON} />, run: () => app.showDialog(<IconDialog path={path} />) },
     {
       label: 'Mudar nome do ficheiro',
       icon: <Pencil size={15} />,
@@ -51,6 +56,8 @@ export function DocView({ path, focus, onRemoved }: { path: string; focus?: { li
   const setState = (s: OutlineState) => (states.set(path, s), force((n) => n + 1))
   const cycleVisibility = () => setState({ visibility: VIS_ORDER[(VIS_ORDER.indexOf(state.visibility) + 1) % 3], folds: new Map() })
   const toggleMode = () => setMode(mode === 'outline' ? 'source' : 'outline')
+  // Capture templates are edited in their own dialog, so the text mode leaves them out.
+  const source = hideTemplates(store.files[path] ?? '')
 
   useEffect(() => {
     if (mode === 'source') sourceRef.current?.querySelector('textarea')?.focus()
@@ -74,7 +81,10 @@ export function DocView({ path, focus, onRemoved }: { path: string; focus?: { li
     <div className="docview">
       <header className="doc-header">
         <div className="doc-title">
-          <h1>{title}</h1>
+          <h1>
+            <button className="doc-icon" title="Mudar ícone" onClick={() => app.showDialog(<IconDialog path={path} />)}><FileIcon path={path} icon={doc.keywords.ICON} size={26} /></button>
+            {title}
+          </h1>
           <span className="muted">{path}</span>
         </div>
         <div className="toolbar">
@@ -112,8 +122,9 @@ export function DocView({ path, focus, onRemoved }: { path: string; focus?: { li
         <div ref={sourceRef}>
           <OrgTextarea
             className="source"
-            value={store.files[path]}
-            onChange={(t) => store.update(path, t)}
+            value={source.text}
+            path={path}
+            onChange={(t) => store.update(path, source.restore(t))}
             onKeyDown={(e) => e.key === 'Escape' && (e.preventDefault(), setMode('outline'))}
           />
         </div>

@@ -46,6 +46,44 @@ public class OrgStore(string root)
         return true;
     }
 
+    /// <summary>All folders, including empty ones; hidden ones (like `.icons`) are left out.</summary>
+    public IEnumerable<string> Folders() =>
+        Directory.Exists(_root)
+            ? Directory.EnumerateDirectories(_root, "*", SearchOption.AllDirectories)
+                .Select(d => Path.GetRelativePath(_root, d).Replace('\\', '/'))
+                .Where(d => !d.Split('/').Any(s => s.StartsWith('.')) && !IsImagesFolder(d))
+                .Order(StringComparer.OrdinalIgnoreCase)
+            : [];
+
+    /// <summary>The folder for a note's images, next to it: `projetos/plano.org` → `projetos/plano_images`.</summary>
+    public string? ImagesFolder(string orgPath) => Resolve(orgPath) is null ? null : orgPath[..^4] + "_images";
+
+    /// <summary>A note's images folder belongs with the note, so it is not listed as a folder of its own.</summary>
+    private bool IsImagesFolder(string folder) =>
+        folder.EndsWith("_images", StringComparison.Ordinal) && File.Exists(Path.Combine(_root, folder[..^7] + ".org"));
+
+    public bool CreateFolder(string path)
+    {
+        if (ResolveFolder(path) is not { } full) return false;
+        Directory.CreateDirectory(full);
+        return true;
+    }
+
+    /// <summary>Deletes a folder only when no file is left in it, so no notes can be lost this way.</summary>
+    public bool DeleteFolder(string path)
+    {
+        if (ResolveFolder(path) is not { } full || !Directory.Exists(full) || Directory.EnumerateFiles(full, "*", SearchOption.AllDirectories).Any()) return false;
+        Directory.Delete(full, true);
+        return true;
+    }
+
+    private string? ResolveFolder(string path)
+    {
+        if (string.IsNullOrWhiteSpace(path) || path.Split('/', '\\').Any(s => s.StartsWith('.') || s.Trim() == "")) return null;
+        var full = Path.GetFullPath(Path.Combine(_root, path));
+        return full.StartsWith(_root + Path.DirectorySeparatorChar, StringComparison.Ordinal) ? full : null;
+    }
+
     private OrgFileInfo Info(string full)
     {
         var fi = new FileInfo(full);

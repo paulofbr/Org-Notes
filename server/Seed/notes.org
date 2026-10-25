@@ -1,0 +1,7 @@
+#+TITLE: Notas
+#+BEGIN_CAPTURE n Nota
+,* %{title}
+%U
+%{body}
+#+END_CAPTURE
+

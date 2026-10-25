@@ -1,37 +1,282 @@
+using Anthropic.Exceptions;
+using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.HttpOverrides;
+using Microsoft.AspNetCore.RateLimiting;
+using System.Security.Claims;
+using System.Security.Cryptography;
+using System.Text.Json;
+using System.Text.RegularExpressions;
+using System.Threading.RateLimiting;
 using OrgNotes.Server;
 
 var builder = WebApplication.CreateBuilder(args);
-var app = builder.Build();
+// Machine-local secrets (API keys), kept out of git.
+builder.Configuration.AddJsonFile("appsettings.Local.json", optional: true);
+// Re-added so environment variables still override the local file.
+builder.Configuration.AddEnvironmentVariables();
 
 var root = Path.GetFullPath(builder.Configuration["OrgDirectory"] ?? "data", builder.Environment.ContentRootPath);
-var store = new OrgStore(root);
-store.SeedIfEmpty(Path.Combine(AppContext.BaseDirectory, "Seed"));
-app.Logger.LogInformation("Org directory: {Root}", root);
+// Email and password always; Google and Microsoft sign-in too when their ClientId and ClientSecret are set.
+var google = builder.Configuration.GetSection("Auth:Google");
+var microsoft = builder.Configuration.GetSection("Auth:Microsoft");
+var allowed = builder.Configuration.GetSection("Auth:AllowedEmails").Get<string[]>() ?? [];
+
+builder.Services.AddSingleton(new Users(root, Path.Combine(AppContext.BaseDirectory, "Seed")));
+builder.Services.AddHttpClient();
+builder.Services.AddSingleton<AiAssistant>();
+builder.Services.AddSingleton<Notifier>();
+builder.Services.AddHostedService(sp => sp.GetRequiredService<Notifier>());
+var auth = builder.Services
+    .AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
+    .AddCookie(o =>
+    {
+        o.LoginPath = "/login";
+        o.ExpireTimeSpan = TimeSpan.FromDays(30);
+        o.SlidingExpiration = true;
+    });
+List<string> providers = [];
+if (!string.IsNullOrEmpty(google["ClientId"]) && !string.IsNullOrEmpty(google["ClientSecret"]))
+{
+    providers.Add("Google");
+    auth.AddGoogle(o =>
+    {
+        o.ClientId = google["ClientId"]!;
+        o.ClientSecret = google["ClientSecret"]!;
+    });
+}
+if (!string.IsNullOrEmpty(microsoft["ClientId"]) && !string.IsNullOrEmpty(microsoft["ClientSecret"]))
+{
+    // The default "common" endpoints accept both work/school (Microsoft 365) and personal accounts.
+    providers.Add("Microsoft");
+    auth.AddMicrosoftAccount(o =>
+    {
+        o.ClientId = microsoft["ClientId"]!;
+        o.ClientSecret = microsoft["ClientSecret"]!;
+    });
+}
+// Slows down password guessing: 10 login attempts per minute per IP.
+builder.Services.AddRateLimiter(o =>
+{
+    o.RejectionStatusCode = 429;
+    o.AddPolicy("login", ctx => RateLimitPartition.GetFixedWindowLimiter(ctx.Connection.RemoteIpAddress?.ToString() ?? "",
+        _ => new FixedWindowRateLimiterOptions { PermitLimit = 10, Window = TimeSpan.FromMinutes(1) }));
+});
+
+var app = builder.Build();
+app.Logger.LogInformation("Org directory: {Root} (login: password{Providers})", root, string.Concat(providers.Select(p => ", " + p)));
+if (allowed.Length == 0) app.Logger.LogWarning("Auth:AllowedEmails is empty: nobody can sign in");
+
+// Behind a reverse proxy (Caddy, tailscale serve) so the sign-in redirect URLs use https.
+app.UseForwardedHeaders(new ForwardedHeadersOptions { ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto | ForwardedHeaders.XForwardedHost });
+
+app.UseAuthentication();
+app.UseRateLimiter();
+app.Use(async (ctx, next) =>
+{
+    if (ctx.Request.Path.StartsWithSegments("/login") || ctx.Request.Path == "/logout")
+    {
+        await next();
+        return;
+    }
+    // The capture app authenticates with the user's personal token instead of the session cookie.
+    if (ctx.User.Identity?.IsAuthenticated != true && ctx.Request.Headers.Authorization.ToString() is var bearer
+        && bearer.StartsWith("Bearer ") && ctx.RequestServices.GetRequiredService<Users>().KeyForToken(bearer[7..]) is { } tokenUser)
+        ctx.User = new ClaimsPrincipal(new ClaimsIdentity([new Claim(ClaimTypes.Email, tokenUser)], "token"));
+    if (ctx.User.Identity?.IsAuthenticated != true)
+    {
+        // fetch() cannot follow a redirect to the login page, so the API answers 401 and the page reloads into it.
+        if (ctx.Request.Path.StartsWithSegments("/api")) ctx.Response.StatusCode = 401;
+        else await ctx.ChallengeAsync(new AuthenticationProperties { RedirectUri = ctx.Request.Path + ctx.Request.QueryString });
+        return;
+    }
+    var email = ctx.User.FindFirstValue(ClaimTypes.Email) ?? "";
+    if (!allowed.Any(a => Users.KeyOfEmail(a) == Users.KeyOfEmail(email)))
+    {
+        ctx.Response.StatusCode = 403;
+        await ctx.Response.WriteAsync($"Sem acesso: {email} não está autorizado. Sair: /logout");
+        return;
+    }
+    await next();
+});
+Login.Map(app, allowed, [.. providers]);
 
 app.UseDefaultFiles();
-app.UseStaticFiles();
+// index.html must be revalidated so a new build shows up on reload; hashed assets can stay cached.
+var staticOptions = new StaticFileOptions
+{
+    OnPrepareResponse = c =>
+    {
+        if (c.File.Name == "index.html") c.Context.Response.Headers.CacheControl = "no-cache";
+    },
+};
+app.UseStaticFiles(staticOptions);
 
 var files = app.MapGroup("/api/files");
 
-files.MapGet("/", () => store.List());
+files.MapGet("/", (HttpContext ctx, Users users) => users.For(ctx.User).List());
 
-files.MapGet("/{*path}", (string path) =>
-    store.Read(path) is { } text ? Results.Text(text, "text/plain; charset=utf-8") : Results.NotFound());
+files.MapGet("/{*path}", (string path, HttpContext ctx, Users users) =>
+    users.For(ctx.User).Read(path) is { } text ? Results.Text(text, "text/plain; charset=utf-8") : Results.NotFound());
 
-files.MapPut("/{*path}", async (string path, HttpRequest request) =>
+files.MapPut("/{*path}", async (string path, HttpContext ctx, Users users) =>
 {
-    using var reader = new StreamReader(request.Body);
+    using var reader = new StreamReader(ctx.Request.Body);
     var text = await reader.ReadToEndAsync();
-    return store.Write(path, text) is { } info ? Results.Ok(info) : Results.BadRequest("Invalid path");
+    return users.For(ctx.User).Write(path, text) is { } info ? Results.Ok(info) : Results.BadRequest("Invalid path");
 });
 
-files.MapDelete("/{*path}", (string path) => store.Delete(path) ? Results.NoContent() : Results.NotFound());
+files.MapDelete("/{*path}", (string path, HttpContext ctx, Users users) => users.For(ctx.User).Delete(path) ? Results.NoContent() : Results.NotFound());
 
-app.MapPost("/api/rename", (RenameRequest req) =>
-    store.Rename(req.From, req.To) ? Results.NoContent() : Results.BadRequest("Cannot rename"));
+app.MapGet("/api/folders", (HttpContext ctx, Users users) => users.For(ctx.User).Folders());
 
-app.MapFallbackToFile("index.html");
+app.MapPost("/api/folders", (FolderRequest req, HttpContext ctx, Users users) =>
+    users.For(ctx.User).CreateFolder(req.Path) ? Results.NoContent() : Results.BadRequest("Nome de pasta inválido"));
+
+app.MapDelete("/api/folders/{*path}", (string path, HttpContext ctx, Users users) =>
+    users.For(ctx.User).DeleteFolder(path) ? Results.NoContent() : Results.BadRequest("Só se pode apagar uma pasta vazia"));
+
+app.MapPost("/api/rename", (RenameRequest req, HttpContext ctx, Users users) =>
+    users.For(ctx.User).Rename(req.From, req.To) ? Results.NoContent() : Results.BadRequest("Cannot rename"));
+
+app.MapGet("/api/me", (HttpContext ctx, Users users, Notifier notifier, AiAssistant ai) =>
+{
+    var s = users.Settings(users.Key(ctx.User));
+    return new { email = ctx.User.FindFirstValue(ClaimTypes.Email), ai = ai.Enabled, token = users.Token(users.Key(ctx.User)), ntfy = new { server = notifier.NtfyServer, topic = s.NtfyTopic, enabled = s.Notify } };
+});
+
+app.MapPut("/api/me/notify", (NotifyRequest req, HttpContext ctx, Users users) =>
+{
+    var key = users.Key(ctx.User);
+    users.Save(key, users.Settings(key) with { Notify = req.Enabled });
+    return Results.NoContent();
+});
+
+app.MapPost("/api/me/token", (HttpContext ctx, Users users) => new { token = users.NewToken(users.Key(ctx.User)) });
+
+// File icons: small PNGs (the client resizes uploads), named by their content hash.
+app.MapPost("/api/icons", async (HttpContext ctx, Users users) =>
+{
+    using var buffer = new MemoryStream();
+    await ctx.Request.Body.CopyToAsync(buffer);
+    var png = buffer.ToArray();
+    if (png.Length > 256 * 1024 || !png.AsSpan().StartsWith((byte[])[0x89, (byte)'P', (byte)'N', (byte)'G'])) return Results.BadRequest("O ícone tem de ser um PNG até 256 KB");
+    var dir = users.IconsDir(users.Key(ctx.User));
+    Directory.CreateDirectory(dir);
+    var name = Convert.ToHexStringLower(SHA256.HashData(png))[..16] + ".png";
+    await File.WriteAllBytesAsync(Path.Combine(dir, name), png);
+    return Results.Ok(new { name });
+});
+
+app.MapGet("/api/icons/{name}", (string name, HttpContext ctx, Users users) =>
+    IconName().IsMatch(name) && Path.Combine(users.IconsDir(users.Key(ctx.User)), name) is var file && File.Exists(file)
+        ? Results.File(file, "image/png")
+        : Results.NotFound());
+
+// Images for notes, saved next to the note in `<note>_images/` (named by content hash) and linked as [[file:<note>_images/<name>]].
+var imageTypes = new Dictionary<string, string> { [".png"] = "image/png", [".jpg"] = "image/jpeg", [".jpeg"] = "image/jpeg", [".gif"] = "image/gif", [".webp"] = "image/webp" };
+
+app.MapPost("/api/images", async (string file, HttpContext ctx, Users users) =>
+{
+    if (users.For(ctx.User).ImagesFolder(file) is not { } folder) return Results.BadRequest("Ficheiro inválido");
+    using var buffer = new MemoryStream();
+    await ctx.Request.Body.CopyToAsync(buffer);
+    var data = buffer.ToArray();
+    // The extension comes from the content, never from the client.
+    string? ext = data switch
+    {
+        [0x89, (byte)'P', (byte)'N', (byte)'G', ..] => ".png",
+        [0xFF, 0xD8, 0xFF, ..] => ".jpg",
+        [(byte)'G', (byte)'I', (byte)'F', ..] => ".gif",
+        [(byte)'R', (byte)'I', (byte)'F', (byte)'F', _, _, _, _, (byte)'W', (byte)'E', (byte)'B', (byte)'P', ..] => ".webp",
+        _ => null,
+    };
+    if (ext == null || data.Length > 10 * 1024 * 1024) return Results.BadRequest("A imagem tem de ser PNG, JPEG, GIF ou WebP, até 10 MB");
+    var dir = Path.Combine(users.Root(users.Key(ctx.User)), folder);
+    Directory.CreateDirectory(dir);
+    var name = Convert.ToHexStringLower(SHA256.HashData(data))[..16] + ext;
+    await File.WriteAllBytesAsync(Path.Combine(dir, name), data);
+    return Results.Ok(new { path = $"{folder}/{name}" });
+});
+
+// Images linked from notes, by their path in the user's folder.
+app.MapGet("/api/raw/{*path}", (string path, HttpContext ctx, Users users) =>
+{
+    var root = Path.GetFullPath(users.Root(users.Key(ctx.User)));
+    var full = Path.GetFullPath(Path.Combine(root, path));
+    return full.StartsWith(root + Path.DirectorySeparatorChar, StringComparison.Ordinal) && File.Exists(full)
+        && imageTypes.TryGetValue(Path.GetExtension(full).ToLowerInvariant(), out var type)
+        ? Results.File(full, type)
+        : Results.NotFound();
+});
+
+app.MapGet("/api/capture/templates", (HttpContext ctx, Users users) =>
+{
+    var store = users.For(ctx.User);
+    return store.List().SelectMany(f =>
+    {
+        var text = store.Read(f.Path) ?? "";
+        var options = OrgCapture.PropertyOptions(text);
+        return OrgCapture.TemplatesIn(f.Path, text).Select(t => new
+        {
+            t.Key, t.Name, t.File, t.Datetree, t.UsesWhen, t.Props,
+            Options = t.Props.Where(options.ContainsKey).ToDictionary(p => p, p => options[p]),
+        });
+    });
+});
+
+app.MapPost("/api/capture", (CaptureRequest req, HttpContext ctx, Users users) =>
+{
+    var store = users.For(ctx.User);
+    var text = store.Read(req.File) ?? "";
+    if (OrgCapture.TemplatesIn(req.File, text).FirstOrDefault(t => t.Key == req.Key) is not { } tpl) return Results.NotFound("Template não encontrado");
+    if (string.IsNullOrWhiteSpace(req.Title)) return Results.BadRequest("Falta o título");
+    // The client's local time, so %U and the datetree follow the user's clock rather than the server's.
+    var now = req.Now ?? DateTime.Now;
+    var entry = OrgCapture.Expand(tpl, req.Title.Trim(), req.Body ?? "", req.Date, req.Time, now, req.Props);
+    store.Write(req.File, OrgCapture.CaptureInto(text, entry, tpl.Datetree, now));
+    return Results.Ok(new { file = req.File });
+});
+
+app.MapPost("/api/ai/improve", async (ImproveRequest req, AiAssistant ai, ILogger<AiAssistant> log, CancellationToken ct) =>
+{
+    if (!ai.Enabled) return Results.NotFound("IA não configurada");
+    try { return Results.Ok(await ai.Improve(req.Fields, req.Mode ?? "develop", ct)); }
+    catch (Exception e) when (AiAssistant.IsRateLimit(e)) { return Results.Problem("Demasiados pedidos à IA; tenta daqui a pouco.", statusCode: 429); }
+    catch (Exception e) when (e is AnthropicException or HttpRequestException or JsonException or KeyNotFoundException)
+    {
+        log.LogWarning(e, "AI request failed");
+        return Results.Problem($"A IA falhou: {AiAssistant.ProviderMessage(e)}", statusCode: 502);
+    }
+    catch (InvalidOperationException e) { return Results.Problem(e.Message, statusCode: 502); }
+});
+
+app.MapPost("/api/ai/template", async (TemplateRequest req, AiAssistant ai, ILogger<AiAssistant> log, CancellationToken ct) =>
+{
+    if (!ai.Enabled) return Results.NotFound("IA não configurada");
+    if (string.IsNullOrWhiteSpace(req.Description)) return Results.BadRequest("Falta a descrição");
+    try { return Results.Ok(await ai.Template(req.Description, ct)); }
+    catch (Exception e) when (AiAssistant.IsRateLimit(e)) { return Results.Problem("Demasiados pedidos à IA; tenta daqui a pouco.", statusCode: 429); }
+    catch (Exception e) when (e is AnthropicException or HttpRequestException or JsonException or KeyNotFoundException)
+    {
+        log.LogWarning(e, "AI request failed");
+        return Results.Problem($"A IA falhou: {AiAssistant.ProviderMessage(e)}", statusCode: 502);
+    }
+    catch (InvalidOperationException e) { return Results.Problem(e.Message, statusCode: 502); }
+});
+
+app.MapFallbackToFile("index.html", staticOptions);
 
 app.Run();
 
 record RenameRequest(string From, string To);
+record FolderRequest(string Path);
+
+partial class Program
+{
+    [GeneratedRegex(@"^[0-9a-f]{16}\.png$")] private static partial Regex IconName();
+}
+record NotifyRequest(bool Enabled);
+record ImproveRequest(Dictionary<string, string> Fields, string? Mode);
+record TemplateRequest(string Description);
+record CaptureRequest(string File, string Key, string Title, string? Body, DateOnly? Date, TimeOnly? Time, DateTime? Now, Dictionary<string, string>? Props);

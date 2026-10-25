@@ -1,0 +1,9 @@
+#+TITLE: Tarefas
+#+TODO: TODO NEXT WAITING | DONE CANCELLED
+#+BEGIN_CAPTURE t Tarefa
+,* TODO %{title}
+SCHEDULED: %{when}
+%U
+%{body}
+#+END_CAPTURE
+

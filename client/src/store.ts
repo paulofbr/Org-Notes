@@ -7,6 +7,7 @@ export type SaveState = 'saved' | 'saving' | 'error'
 /** Loads every .org file, keeps them in memory, autosaves edits and keeps an undo history. */
 export function useOrgStore() {
   const [files, setFiles] = useState<Record<string, string>>({})
+  const [folders, setFolders] = useState<string[]>([])
   const [loaded, setLoaded] = useState(false)
   const [saveState, setSaveState] = useState<SaveState>('saved')
   const timers = useRef(new Map<string, number>())
@@ -16,8 +17,9 @@ export function useOrgStore() {
   const cache = useRef(new Map<string, { text: string; doc: OrgDoc }>())
 
   const loadAll = useCallback(async () => {
-    const list = await api.list()
+    const [list, dirs] = await Promise.all([api.list(), api.folders()])
     const texts = await Promise.all(list.map((f) => api.read(f.path)))
+    setFolders(dirs)
     setFiles((prev) => {
       const next: Record<string, string> = {}
       list.forEach((f, i) => (next[f.path] = timers.current.has(f.path) ? prev[f.path] : texts[i]))
@@ -103,6 +105,16 @@ export function useOrgStore() {
     setFiles(latest.current)
   }, [])
 
+  const createFolder = useCallback(async (path: string) => {
+    await api.createFolder(path)
+    setFolders(await api.folders())
+  }, [])
+
+  const removeFolder = useCallback(async (path: string) => {
+    await api.removeFolder(path)
+    setFolders(await api.folders())
+  }, [])
+
   const docs = useMemo(() => {
     const out: Record<string, OrgDoc> = {}
     for (const [path, text] of Object.entries(files)) {
@@ -113,7 +125,7 @@ export function useOrgStore() {
     return out
   }, [files])
 
-  return { files, docs, loaded, saveState, update, apply, get, remove, rename, undo: () => travel('undo'), redo: () => travel('redo') }
+  return { files, folders, docs, loaded, saveState, update, apply, get, remove, rename, createFolder, removeFolder, undo: () => travel('undo'), redo: () => travel('redo') }
 }
 
 export type OrgStore = ReturnType<typeof useOrgStore>

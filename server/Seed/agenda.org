@@ -1,0 +1,7 @@
+#+TITLE: Agenda
+#+BEGIN_CAPTURE e Evento
+,* %{title}
+%{when}
+%{body}
+#+END_CAPTURE
+

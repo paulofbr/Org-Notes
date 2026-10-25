@@ -1,0 +1,11 @@
+#+TITLE: Contactos
+#+BEGIN_CAPTURE c Contacto
+,* %{title}
+:PROPERTIES:
+:EMAIL:
+:PHONE:
+:COMPANY:
+:END:
+%{body}
+#+END_CAPTURE
+

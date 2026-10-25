@@ -4,3 +4,5 @@ obj/
 server/wwwroot/
 server/data/
 *.user
+server/appsettings.Local.json
+dist/

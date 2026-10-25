@@ -1,4 +1,4 @@
-import { parseOrg, serializeHeadline, refreshCookies, outlinePath, type Headline, type OrgDoc } from './parser'
+import { HEADLINE_RE, parseOrg, serializeHeadline, refreshCookies, outlinePath, type Headline, type OrgDoc } from './parser'
 import { formatTimestamp, nowStamp, shiftRepeater, dateKey, formatDuration, parseTimestamp, wallMinutes, type Timestamp } from './timestamp'
 
 // All edits take the file text plus the headline's line and return new text.
@@ -148,16 +148,19 @@ export function clockOut(text: string, clockLine: number, now = new Date()) {
 
 // ---------- Structure ----------
 
-export function insertHeadline(text: string, afterLine: number | undefined, mode: 'sibling' | 'child', title = '') {
+export function insertHeadline(
+  text: string,
+  afterLine: number | undefined,
+  mode: 'sibling' | 'child',
+  title = '',
+  { keyword, description = '' }: { keyword?: string; description?: string } = {},
+) {
   return withLines(text, (lines, doc) => {
-    if (afterLine === undefined) {
-      if (lines.length && lines[lines.length - 1] === '') lines.splice(lines.length - 1, 0, `* ${title}`)
-      else lines.push(`* ${title}`)
-      return
-    }
-    const h = at(doc, afterLine)
-    const level = mode === 'child' ? h.level + 1 : h.level
-    lines.splice(h.end, 0, serializeHeadline({ level, title, tags: [] }))
+    const level = afterLine === undefined ? 1 : mode === 'child' ? at(doc, afterLine).level + 1 : at(doc, afterLine).level
+    const entry = [serializeHeadline({ level, keyword, title, tags: [] }), ...bodyLines(description)]
+    if (afterLine !== undefined) lines.splice(at(doc, afterLine).end, 0, ...entry)
+    else if (lines.length && lines[lines.length - 1] === '') lines.splice(lines.length - 1, 0, ...entry)
+    else lines.push(...entry)
   })
 }
 
@@ -223,8 +226,9 @@ export function refile(
   return same ? { src: out } : { src: refreshCookies(srcLines.join('\n')), dst: out }
 }
 
-export function archiveName(path: string) {
-  return path.replace(/\.org$/i, '') + '_archive.org'
+/** All files archive into one `archive.org`. */
+export function archiveName() {
+  return 'archive.org'
 }
 
 /** Moves a subtree to the archive file, recording where it came from. */
@@ -255,6 +259,42 @@ export function replaceLines(text: string, start: number, end: number, replaceme
   const lines = text.split('\n')
   lines.splice(start, end - start, ...replacement.split('\n'))
   return refreshCookies(lines.join('\n'))
+}
+
+/** A headline's description: its own text after planning, properties and logbook, up to the first child. */
+export function descriptionOf(doc: OrgDoc, h: Headline) {
+  return doc.lines.slice(h.bodyStart, h.contentEnd).join('\n').replace(/\s+$/, '')
+}
+
+/** A description as body lines; a line starting with stars would become a headline, so it gets a leading space. */
+function bodyLines(description: string) {
+  const text = description.replace(/\s+$/, '')
+  return text ? text.split('\n').map((l) => (HEADLINE_RE.test(l) ? ` ${l}` : l)) : []
+}
+
+/** Replaces a headline's description, keeping the blank lines that separated it from what follows. */
+export function setDescription(text: string, line: number, description: string) {
+  const doc = parseOrg(text)
+  const h = at(doc, line)
+  const old = doc.lines.slice(h.bodyStart, h.contentEnd)
+  let blanks = 0
+  while (blanks < old.length && old[old.length - 1 - blanks] === '') blanks++
+  const body = bodyLines(description)
+  const lines = [...doc.lines]
+  lines.splice(h.bodyStart, old.length, ...body, ...Array(blanks).fill(''))
+  return refreshCookies(lines.join('\n'))
+}
+/** Sets (or, without a value, removes) a file keyword like `#+ICON:` in the preamble, after `#+TITLE:` when there is one. */
+export function setFileKeyword(text: string, key: string, value?: string) {
+  const lines = text.split('\n')
+  const end = lines.findIndex((l) => HEADLINE_RE.test(l))
+  const preamble = end < 0 ? lines.length : end
+  const re = new RegExp(`^\\s*#\\+${key}:`, 'i')
+  const i = lines.slice(0, preamble).findIndex((l) => re.test(l))
+  const line = value ? [`#+${key}: ${value}`] : []
+  if (i >= 0) lines.splice(i, 1, ...line)
+  else lines.splice(lines.slice(0, preamble).findIndex((l) => /^\s*#\+title:/i.test(l)) + 1, 0, ...line)
+  return lines.join('\n')
 }
 
 // ---------- Tables ----------

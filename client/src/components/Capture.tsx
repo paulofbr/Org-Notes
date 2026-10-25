@@ -1,27 +1,41 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useApp } from '../context'
-import { TEMPLATES, captureInto } from '../org/capture'
+import { allTemplates, captureInto, emptyProps, expand, propertyOptions, saveDrafts, templatesIn, usesWhen, type CaptureTemplate, type TemplateDraft } from '../org/capture'
 import { Modal } from './Dialogs'
 import { OrgTextarea } from './OrgTextarea'
+import { aiEnabled, useAiReview } from './AiReview'
+import { api } from '../api'
 
-export function CaptureDialog() {
+/** Captures into a template's file; with `path` (the open page), that page's template is chosen first. */
+export function CaptureDialog({ path }: { path?: string }) {
   const { store, closeDialog } = useApp()
-  const [tpl, setTpl] = useState(TEMPLATES[0])
+  const templates = useMemo(() => allTemplates(store.files), [store.files])
+  const [tpl, setTpl] = useState<CaptureTemplate | undefined>(() => templates.find((t) => t.file === path) ?? templates[0])
   const [title, setTitle] = useState('')
   const [body, setBody] = useState('')
   const [date, setDate] = useState('')
   const [time, setTime] = useState('')
+  const [props, setProps] = useState<Record<string, string>>({})
   const titleRef = useRef<HTMLInputElement>(null)
-  const pickerRef = useRef<HTMLDivElement>(null)
+  const pickerRef = useRef<HTMLSelectElement>(null)
   useEffect(() => pickerRef.current?.focus(), [])
-  const choose = (t: (typeof TEMPLATES)[number]) => (setTpl(t), titleRef.current?.focus())
+  const choose = (t: CaptureTemplate) => (setTpl(t), titleRef.current?.focus())
+  const ai = useAiReview({ title, body }, (f) => (setTitle(f.title), setBody(f.body)), { title: 'Título', body: 'Descrição' })
 
   const save = () => {
-    if (!title.trim()) return
-    const entry = tpl.build(title.trim(), body, date || undefined, time)
-    store.update(tpl.file, captureInto(store.files[tpl.file] ?? '', entry, !!tpl.datetree))
+    if (!title.trim() || !tpl) return
+    const entry = expand(tpl, { title: title.trim(), body, date: date || undefined, time, props })
+    store.update(tpl.file, captureInto(store.files[tpl.file] ?? '', entry, tpl.datetree))
     closeDialog()
   }
+
+  if (!tpl)
+    return (
+      <Modal title="Capturar" onClose={closeDialog}>
+        <p>Nenhum ficheiro tem um template de captura. Abre um ficheiro e usa <b>Template de captura</b> no menu do ficheiro.</p>
+        <div className="actions"><button className="primary" onClick={closeDialog}>OK</button></div>
+      </Modal>
+    )
 
   return (
     <Modal title="Capturar" onClose={closeDialog}>
@@ -29,34 +43,224 @@ export function CaptureDialog() {
         onSubmit={(e) => (e.preventDefault(), save())}
         onKeyDown={(e) => e.key === 'Enter' && (e.ctrlKey || e.metaKey) && (e.preventDefault(), save())}
       >
-        <div
-          className="chips template-picker"
-          tabIndex={-1}
+        <select
+          className="template-picker"
           ref={pickerRef}
+          value={templates.indexOf(tpl)}
+          onChange={(e) => setTpl(templates[+e.target.value])}
           onKeyDown={(e) => {
-            const t = TEMPLATES.find((x) => x.key === e.key)
+            // A template's key picks it directly (instead of the select's type-ahead).
+            const t = templates.find((x) => x.key === e.key)
             if (t) (e.preventDefault(), choose(t))
             else if (e.key === 'Enter') (e.preventDefault(), titleRef.current?.focus())
           }}
         >
-          {TEMPLATES.map((t) => (
-            <button type="button" key={t.key} tabIndex={-1} className={`tag ${t === tpl ? 'active' : ''}`} onClick={() => choose(t)}>
-              <kbd>{t.key}</kbd> {t.name} <span className="muted">→ {t.file}</span>
-            </button>
+          {templates.map((t, i) => (
+            <option key={t.file + t.key} value={i}>{t.key} · {t.name} → {t.file}</option>
           ))}
-        </div>
-        <div className="hint">Escolhe o modelo com a tecla indicada (ou <kbd>Enter</kbd> para {tpl.name}) e escreve o título.</div>
+        </select>
+        <div className="hint">Escolhe o ficheiro na lista (<kbd>↑</kbd> <kbd>↓</kbd>) ou pela tecla do template; <kbd>Enter</kbd> passa ao título.</div>
         <input ref={titleRef} placeholder="Título" value={title} onChange={(e) => setTitle(e.target.value)} />
-        {tpl.withDate && (
+        {emptyProps(tpl).map((k) => {
+          const options = propertyOptions(store.files[tpl.file] ?? '')[k.toUpperCase()]
+          return (
+            <label key={k}>
+              {k.charAt(0) + k.slice(1).toLowerCase()}
+              <input value={props[k] ?? ''} list={options && `opts-${k}`} onChange={(e) => setProps({ ...props, [k]: e.target.value })} />
+              {options && <datalist id={`opts-${k}`}>{options.map((o) => <option key={o} value={o} />)}</datalist>}
+            </label>
+          )
+        })}
+        {usesWhen(tpl) && (
           <div className="row">
             <label>Data<input type="date" value={date} onChange={(e) => setDate(e.target.value)} /></label>
             <label>Hora<input type="time" value={time} onChange={(e) => setTime(e.target.value)} /></label>
           </div>
         )}
-        <OrgTextarea className="capture-body" placeholder="Notas (opcional, sintaxe org)" value={body} onChange={setBody} rows={4} />
+        <OrgTextarea className="capture-body" placeholder="Descrição (opcional): notas, links e imagens…" value={body} onChange={setBody} rows={4} path={tpl.file} tools rich />
+        {ai.panel}
         <div className="actions">
+          {ai.button}
           <button type="button" onClick={closeDialog}>Cancelar</button>
           <button className="primary" disabled={!title.trim()}>Guardar <kbd>Ctrl+Enter</kbd></button>
+        </div>
+      </form>
+    </Modal>
+  )
+}
+
+type Draft = TemplateDraft
+
+const DEFAULT_BODY = '* %{title}\n%U\n%{body}'
+
+const PRESETS: { name: string; body: string; datetree?: boolean }[] = [
+  { name: 'Tarefa', body: '* TODO %{title}\nSCHEDULED: %{when}\n%U\n%{body}' },
+  { name: 'Evento', body: '* %{title}\n%{when}\n%{body}' },
+  { name: 'Nota', body: DEFAULT_BODY },
+  { name: 'Contacto', body: '* %{title}\n:PROPERTIES:\n:EMAIL:\n:PHONE:\n:COMPANY:\n:END:\n%{body}' },
+  { name: 'Diário', body: '**** %{time} %{title}\n%{body}', datetree: true },
+]
+
+// [label, text, title, whole line?]
+const SNIPPETS: [string, string, string, boolean?][] = [
+  ['Título', '%{title}', 'O título escrito na captura'],
+  ['Notas', '%{body}', 'As notas escritas na captura'],
+  ['Data escolhida', '%{when}', 'Data/hora escolhida na captura; a linha é omitida se ficar vazia'],
+  ['Hora atual', '%{time}', 'Hora da captura (HH:MM)'],
+  ['Agora', '%U', 'Timestamp inativo do momento da captura'],
+  ['Agora (ativo)', '%T', 'Timestamp ativo do momento da captura (aparece na agenda)'],
+  ['TODO', '* TODO %{title}', 'Título com estado TODO', true],
+  ['SCHEDULED', 'SCHEDULED: %{when}', 'Agendar para a data escolhida', true],
+  ['DEADLINE', 'DEADLINE: %{when}', 'Prazo na data escolhida', true],
+  ['Etiqueta', ' :etiqueta:', 'Etiqueta no fim do título'],
+  ['Propriedades', ':PROPERTIES:\n:CHAVE: valor\n:END:', 'Gaveta de propriedades', true],
+]
+
+function TemplateFields({ t, onChange, onRemove }: { t: Draft; onChange: (patch: Partial<Draft>) => void; onRemove?: () => void }) {
+  const boxRef = useRef<HTMLDivElement>(null)
+  const insert = (text: string, line?: boolean) => {
+    const el = boxRef.current?.querySelector('textarea')
+    const pos = el ? el.selectionStart : t.body.length
+    const before = t.body.slice(0, pos)
+    const lead = line && before && !before.endsWith('\n') ? '\n' : ''
+    const trail = line && t.body[pos] !== undefined && t.body[pos] !== '\n' ? '\n' : ''
+    const cursor = pos + lead.length + text.length
+    onChange({ body: before + lead + text + trail + t.body.slice(pos) })
+    requestAnimationFrame(() => el && (el.focus(), (el.selectionStart = el.selectionEnd = cursor)))
+  }
+  const [ai, setAi] = useState(false)
+  useEffect(() => void aiEnabled().then(setAi), [])
+  const [describe, setDescribe] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+  const generate = () => {
+    if (!describe.trim() || busy) return
+    setBusy(true)
+    setError('')
+    api.aiTemplate(describe).then(
+      (r) => onChange({ name: r.name, datetree: r.datetree, body: r.body, options: Object.fromEntries(r.options.map((o) => [o.property, o.values])) }),
+      (e) => setError(String(e.message ?? e)),
+    ).finally(() => setBusy(false))
+  }
+  return (
+    <fieldset className="template-edit">
+      <div className="row">
+        <label>Tecla<input maxLength={1} value={t.key} onChange={(e) => onChange({ key: e.target.value })} /></label>
+        <label>Nome<input value={t.name} onChange={(e) => onChange({ name: e.target.value })} /></label>
+        <label className="inline"><input type="checkbox" checked={t.datetree} onChange={(e) => onChange({ datetree: e.target.checked })} /> Datetree (ano/mês/dia)</label>
+        {onRemove && <button type="button" className="danger" onClick={onRemove}>Remover</button>}
+      </div>
+      {ai && (
+        <div className="row">
+          <label>
+            Descreve o template e a IA cria-o
+            <input
+              value={describe}
+              placeholder="ex: contacto com email, telefone e empresa (Acme, Globex)"
+              onChange={(e) => setDescribe(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), generate())}
+            />
+          </label>
+          <button type="button" onClick={generate} disabled={busy || !describe.trim()}>{busy ? 'A criar…' : 'Criar com IA'}</button>
+        </div>
+      )}
+      {error && <p className="hint">{error}</p>}
+      <div className="chips">
+        <span className="muted">Modelos:</span>
+        {PRESETS.map((p) => (
+          <button type="button" key={p.name} className="tag" title="Substitui o corpo do template" onClick={() => onChange({ body: p.body, datetree: !!p.datetree, name: t.name || p.name })}>
+            {p.name}
+          </button>
+        ))}
+      </div>
+      <div className="chips">
+        <span className="muted">Inserir:</span>
+        {SNIPPETS.map(([label, text, title, line]) => (
+          <button type="button" key={label} className="tag" title={title} onMouseDown={(e) => e.preventDefault()} onClick={() => insert(text, line)}>
+            {label}
+          </button>
+        ))}
+      </div>
+      <div ref={boxRef}>
+        <OrgTextarea className="template-body" value={t.body} onChange={(body) => onChange({ body })} rows={6} />
+      </div>
+      {t.options && Object.keys(t.options).length > 0 && (
+        <p className="hint">
+          Opções ({Object.entries(t.options).map(([k, v]) => `${k}: ${v.join(', ')}`).join(' · ')}), guardadas no ficheiro como <code>#+PROPERTY: …_ALL</code>.
+        </p>
+      )}
+    </fieldset>
+  )
+}
+
+function PlaceholderHelp() {
+  return (
+    <p className="hint">
+      <code>%{'{title}'}</code> título · <code>%{'{body}'}</code> notas · <code>%{'{when}'}</code> data/hora escolhida (a linha é omitida se ficar vazia) ·{' '}
+      <code>%{'{time}'}</code> hora atual · <code>%U</code> / <code>%T</code> agora (inativo / ativo). Com datetree, usa títulos de nível 4 (<code>****</code>).
+    </p>
+  )
+}
+
+/** The first letter of `name`, or else of the alphabet, that no template in `used` takes. */
+const freeKey = (name: string, used: Set<string>) => [...name.toLowerCase(), ...'abcdefghijklmnopqrstuvwxyz'].find((c) => /[a-z0-9]/.test(c) && !used.has(c)) ?? ''
+
+/** Edits the capture templates stored in one file's preamble. */
+export function TemplateDialog({ path }: { path: string }) {
+  const { store, closeDialog, edit } = useApp()
+  const [list, setList] = useState<Draft[]>(() => templatesIn(path, store.get(path) ?? ''))
+  const change = (i: number, patch: Partial<Draft>) => setList((l) => l.map((t, j) => (j === i ? { ...t, ...patch } : t)))
+  // A template without a key gets a free one, as in the new file dialog, rather than being dropped on save.
+  const shown = useMemo(() => {
+    const used = new Set([...allTemplates(store.files).filter((t) => t.file !== path), ...list].map((t) => t.key))
+    return list.map((t) => {
+      if (t.key.trim()) return t
+      const key = freeKey(t.name, used)
+      used.add(key)
+      return { ...t, key }
+    })
+  }, [list, store.files, path])
+  const save = () => (edit(path, (text) => saveDrafts(text, shown.filter((t) => t.key.trim()))), closeDialog())
+  return (
+    <Modal title={`Template de captura · ${path}`} onClose={closeDialog} wide>
+      {shown.map((t, i) => (
+        <TemplateFields key={i} t={t} onChange={(patch) => change(i, patch)} onRemove={() => setList(list.filter((_, j) => j !== i))} />
+      ))}
+      <PlaceholderHelp />
+      <div className="actions">
+        <button type="button" onClick={() => setList([...list, { key: '', name: '', datetree: false, body: DEFAULT_BODY }])}>Adicionar template</button>
+        <button type="button" onClick={closeDialog}>Cancelar</button>
+        <button className="primary" onClick={save}>Guardar</button>
+      </div>
+    </Modal>
+  )
+}
+
+/** Asks for a new file's name and, optionally, the capture template it starts with. */
+export function NewFileDialog({ dir, onSubmit }: { dir?: string; onSubmit: (path: string, template?: Draft) => void }) {
+  const { store, closeDialog } = useApp()
+  const [name, setName] = useState(dir ? `${dir}/` : '')
+  const [withTemplate, setWithTemplate] = useState(false)
+  const used = useMemo(() => new Set(allTemplates(store.files).map((t) => t.key)), [store.files])
+  const base = name.trim().replace(/\.org$/, '').split('/').pop() ?? ''
+  // Suggest the first letter of the name that no other template uses.
+  const [tpl, setTpl] = useState<Draft>({ key: '', name: '', datetree: false, body: DEFAULT_BODY })
+  const shown = { ...tpl, key: tpl.key || freeKey(base, used), name: tpl.name || base }
+  return (
+    <Modal title="Novo ficheiro" onClose={closeDialog} wide={withTemplate}>
+      <form onSubmit={(e) => (e.preventDefault(), name.trim() && (closeDialog(), onSubmit(name.trim(), withTemplate && shown.key ? shown : undefined)))}>
+        <label>Nome (ex: projetos/casa.org)<input autoFocus value={name} onChange={(e) => setName(e.target.value)} /></label>
+        <label className="inline"><input type="checkbox" checked={withTemplate} onChange={(e) => setWithTemplate(e.target.checked)} /> Definir template de captura</label>
+        {withTemplate && (
+          <>
+            {used.has(shown.key) && <p className="hint">A tecla «{shown.key}» já é usada por outro template.</p>}
+            <TemplateFields t={shown} onChange={(patch) => setTpl({ ...shown, ...patch })} />
+            <PlaceholderHelp />
+          </>
+        )}
+        <div className="actions">
+          <button type="button" onClick={closeDialog}>Cancelar</button>
+          <button className="primary" disabled={!name.trim()}>Criar</button>
         </div>
       </form>
     </Modal>

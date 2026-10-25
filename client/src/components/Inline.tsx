@@ -3,6 +3,8 @@ import { TIMESTAMP_RE, parseTimestamp, toDate } from '../org/timestamp'
 
 export interface InlineOptions {
   onLink?: (target: string) => void
+  /** URL of a local image link such as `file:.images/x.png`; without it only web images are shown. */
+  imageUrl?: (target: string) => string
 }
 
 const PATTERNS: [string, RegExp][] = [
@@ -61,6 +63,7 @@ function renderToken(kind: string, m: RegExpExecArray, opts: InlineOptions, key:
     case 'link': {
       const [, target, desc] = m
       if (IMAGE.test(target) && !desc && /^https?:/.test(target)) return <img key={key} src={target} alt="" className="org-img" />
+      if (IMAGE.test(target) && !desc && /^(file:|\.{0,2}\/|[^:]*$)/.test(target) && opts.imageUrl) return <img key={key} src={opts.imageUrl(target)} alt="" className="org-img" />
       const external = /^(https?|mailto):/.test(target)
       return (
         <a

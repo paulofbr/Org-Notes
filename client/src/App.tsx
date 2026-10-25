@@ -1,12 +1,15 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { Pencil, PanelLeftClose, PanelLeftOpen, CalendarDays, Check, Command as CommandIcon, FilePlus, FileText, HelpCircle, Inbox, Loader2, Menu as MenuIcon, Moon, Search, Square, Sun, TriangleAlert } from 'lucide-react'
+import { FolderPlus, Bell, Pencil, PanelLeftClose, PanelLeftOpen, CalendarDays, Check, Command as CommandIcon, FilePlus, HelpCircle, Loader2, Menu as MenuIcon, Moon, Search, Square, Sun, TriangleAlert } from 'lucide-react'
 import { useOrgStore } from './store'
 import { Ctx, type AppCtx, type RunningClock } from './context'
 import * as E from './org/edit'
 import { formatDuration, nowStamp, parseTimestamp, wallMinutes } from './org/timestamp'
 import { AgendaView } from './components/Agenda'
-import { CaptureDialog } from './components/Capture'
-import { CommandPalette, HelpDialog, PromptDialog, RefileDialog, type Command } from './components/Dialogs'
+import { CaptureDialog, NewFileDialog } from './components/Capture'
+import { saveDrafts } from './org/capture'
+import { resolvePath } from './org/links'
+import { FileTree } from './components/FileTree'
+import { AccountDialog, CommandPalette, HelpDialog, NewFolderDialog, RefileDialog, type Command } from './components/Dialogs'
 import { DocView, fileActions } from './components/DocView'
 import { ShortcutBar } from './components/ShortcutBar'
 import { isTyping, moveFocus } from './shortcuts'
@@ -78,8 +81,8 @@ export default function App() {
     openLink: (target, from) => {
       const m = /^(?:file:)?([^:]*?\.org)?(?:::)?(\*.*|#.*)?$/.exec(target)
       if (!m || (!m[1] && !m[2])) return void window.open(target, '_blank')
-      const dir = from.includes('/') ? from.slice(0, from.lastIndexOf('/') + 1) : ''
-      const path = m[1] ? (store.files[dir + m[1]] !== undefined ? dir + m[1] : m[1]) : from
+      // Relative to the linking file (as Emacs writes them), else from the root.
+      const path = m[1] ? (store.files[resolvePath(from, m[1])] !== undefined ? resolvePath(from, m[1]) : m[1]) : from
       const doc = store.docs[path]
       if (!doc) return void alert(`Ficheiro não encontrado: ${path}`)
       const search = m[2]
@@ -100,7 +103,7 @@ export default function App() {
     },
     clockOut: () => running && ctx.edit(running.path, (t) => E.clockOut(t, running.clock.line)),
     archive: (path, line) => {
-      const target = E.archiveName(path)
+      const target = E.archiveName()
       try {
         const res = E.archive(store.get(path), line, path, store.get(target) ?? '')
         store.update(path, res.src)
@@ -130,8 +133,10 @@ export default function App() {
     ...Object.keys(store.files).sort().map((p) => ({ label: `Abrir ${p}`, run: () => ctx.open(p) })),
     { label: 'Agenda', hint: 'a', run: () => setNav({ view: 'agenda' }) },
     { label: 'Procurar', hint: '/', run: () => setNav({ view: 'agenda', tab: 'search' }) },
-    { label: 'Capturar', hint: 'c', run: () => ctx.showDialog(<CaptureDialog />) },
-    { label: 'Novo ficheiro', run: newFile },
+    { label: 'Capturar', hint: 'c', run: () => ctx.showDialog(<CaptureDialog path={nav.view === 'doc' ? nav.path : undefined} />) },
+    { label: 'Novo ficheiro', run: () => newFile() },
+    { label: 'Nova pasta', run: newFolder },
+    { label: 'Conta e notificações', run: () => ctx.showDialog(<AccountDialog />) },
     ...(nav.view === 'doc' ? fileActions(ctx, nav.path, () => setNav({ view: 'agenda' })).map((a) => ({ label: a.label, run: a.run })) : []),
     ...(running ? [{ label: `Parar relógio: ${running.h.title}`, hint: 'o', run: ctx.clockOut }] : []),
     { label: 'Desfazer', hint: 'Ctrl+Z', run: () => store.undo() },
@@ -156,7 +161,7 @@ export default function App() {
         return
       }
       if (typing || e.ctrlKey || e.metaKey || e.altKey || dialog || e.defaultPrevented) return
-      if (e.key === 'c') (e.preventDefault(), ctx.showDialog(<CaptureDialog />))
+      if (e.key === 'c') (e.preventDefault(), ctx.showDialog(<CaptureDialog path={nav.view === 'doc' ? nav.path : undefined} />))
       else if ((e.key === 'ArrowDown' || e.key === 'j') && e.target === document.body) (e.preventDefault(), moveFocus(1))
       else if (e.key === 'a') setNav({ view: 'agenda' })
       else if (e.key === '/') (e.preventDefault(), setNav({ view: 'agenda', tab: 'search' }))
@@ -167,19 +172,32 @@ export default function App() {
     return () => window.removeEventListener('keydown', onKey)
   })
 
-  function newFile() {
+  const newFileText = (path: string) => `#+TITLE: ${path.replace(/\.org$/, '').split('/').pop()}\n\n* `
+
+  function newFile(dir?: string) {
     ctx.showDialog(
-      <PromptDialog title="Novo ficheiro" label="Nome (ex: projetos/casa.org)" onSubmit={(v) => {
-        const path = (v.trim().endsWith('.org') ? v.trim() : `${v.trim()}.org`).replace(/^\/+/, '')
-        if (!v.trim()) return
-        if (store.files[path] === undefined) store.update(path, `#+TITLE: ${path.replace(/\.org$/, '').split('/').pop()}\n\n* `)
+      <NewFileDialog dir={dir} onSubmit={(name, template) => {
+        const path = (name.endsWith('.org') ? name : `${name}.org`).replace(/^\/+/, '')
+        if (store.files[path] === undefined) {
+          const text = newFileText(path)
+          store.update(path, template ? saveDrafts(text, [template]) : text)
+        }
         ctx.open(path)
       }} />,
     )
   }
 
-  const files = Object.keys(store.files).sort()
-  const openCount = (p: string) => store.docs[p].all.filter((h) => h.keyword && !h.done).length
+  function newFolder() {
+    ctx.showDialog(
+      <NewFolderDialog onSubmit={(name, files) => {
+        const path = name.trim().replace(/^\/+|\/+$/g, '')
+        if (!path) return
+        store.createFolder(path).then(() => {
+          for (const f of files.map((f) => `${path}/${f}.org`)) if (store.files[f] === undefined) store.update(f, newFileText(f))
+        }).catch((e) => alert(e.message))
+      }} />,
+    )
+  }
 
   return (
     <Ctx.Provider value={ctx}>
@@ -204,22 +222,16 @@ export default function App() {
           </nav>
           <div className="files-head">
             <span className="label">Ficheiros</span>
-            <button className="icon-btn" onClick={newFile} title="Novo ficheiro (também em Ctrl+K)" aria-label="Novo ficheiro"><FilePlus size={16} /></button>
+            <span className="files-actions">
+              <button className="icon-btn" onClick={newFolder} title="Nova pasta (também em Ctrl+K)" aria-label="Nova pasta"><FolderPlus size={16} /></button>
+              <button className="icon-btn" onClick={() => newFile()} title="Novo ficheiro (também em Ctrl+K)" aria-label="Novo ficheiro"><FilePlus size={16} /></button>
+            </span>
           </div>
-          <ul className="files">
-            {files.map((p) => (
-              <li key={p}>
-                <button title={p} className={nav.view === 'doc' && nav.path === p ? 'active' : ''} onClick={() => ctx.open(p)}>
-                  {p === 'inbox.org' ? <Inbox size={15} /> : <FileText size={15} />}
-                  <span className="name">{p.replace(/\.org$/, '')}</span>
-                  {openCount(p) > 0 && <span className="count">{openCount(p)}</span>}
-                </button>
-              </li>
-            ))}
-          </ul>
+          <FileTree store={store} active={nav.view === 'doc' ? nav.path : undefined} onOpen={ctx.open} onNewFile={newFile} />
           <div className="sidebar-foot">
             <SaveIndicator state={store.saveState} />
             <button className="help-btn" title="Todos os atalhos" onClick={() => ctx.showDialog(<HelpDialog />)}><HelpCircle size={15} /> <kbd>?</kbd></button>
+            <button className="icon-btn" title="Conta e notificações" aria-label="Conta e notificações" onClick={() => ctx.showDialog(<AccountDialog />)}><Bell size={16} /></button>
             <button
               className="icon-btn"
               title="Tema"
@@ -246,7 +258,7 @@ export default function App() {
               <DocView key={nav.path} path={nav.path} focus={nav.focus} onRemoved={() => setNav({ view: 'agenda' })} />
             )}
           </div>
-          <button className="fab" onClick={() => ctx.showDialog(<CaptureDialog />)} title="Capturar (c)" aria-label="Capturar">
+          <button className="fab" onClick={() => ctx.showDialog(<CaptureDialog path={nav.view === 'doc' ? nav.path : undefined} />)} title="Capturar (c)" aria-label="Capturar">
             <Pencil size={20} /> <span className="fab-label">Capturar</span> <kbd>c</kbd>
           </button>
           </div>

@@ -1,9 +1,11 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useApp } from '../context'
 import { dateKey, type Timestamp } from '../org/timestamp'
 import { outlinePath } from '../org/parser'
 import { refile } from '../org/edit'
 import { SHORTCUTS } from '../shortcuts'
+import { api, type Me } from '../api'
+import { OrgTextarea } from './OrgTextarea'
 
 export function Modal({ title, children, onClose, wide }: { title: string; children: ReactNode; onClose?: () => void; wide?: boolean }) {
   const { closeDialog } = useApp()
@@ -25,6 +27,80 @@ export function Modal({ title, children, onClose, wide }: { title: string; child
   )
 }
 
+/** Edits a task's description (its text, without title, dates or properties). Ctrl+Enter saves. */
+export function DescriptionDialog({ path, title, initial, onSubmit }: { path: string; title: string; initial: string; onSubmit: (v: string) => void }) {
+  const { closeDialog } = useApp()
+  const [value, setValue] = useState(initial)
+  const save = () => (closeDialog(), value !== initial && onSubmit(value))
+  return (
+    <Modal title={`Descrição · ${title}`} onClose={closeDialog} wide>
+      <OrgTextarea
+        className="description"
+        autoFocus
+        autoGrow
+        value={value}
+        onChange={setValue}
+        path={path}
+        tools
+        rich
+        placeholder="Notas, listas, tabelas, links e imagens…"
+        onKeyDown={(e) => e.key === 'Enter' && (e.ctrlKey || e.metaKey) && (e.preventDefault(), save())}
+      />
+      <div className="actions">
+        <span className="hint"><kbd>Ctrl+Enter</kbd> guardar · <kbd>Esc</kbd> cancelar</span>
+        <button type="button" onClick={closeDialog}>Cancelar</button>
+        <button className="primary" onClick={save}>Guardar</button>
+      </div>
+    </Modal>
+  )
+}
+
+/** Creates a headline with its state and description in one go. Enter in the title or Ctrl+Enter saves. */
+export function NewEntryDialog({ path, keywords, initialKeyword, onSubmit }: {
+  path: string
+  keywords: string[]
+  initialKeyword?: string
+  onSubmit: (entry: { title: string; keyword?: string; description: string }) => void
+}) {
+  const { closeDialog } = useApp()
+  const [title, setTitle] = useState('')
+  const [keyword, setKeyword] = useState(initialKeyword ?? '')
+  const [description, setDescription] = useState('')
+  const save = () => title.trim() && (closeDialog(), onSubmit({ title: title.trim(), keyword: keyword || undefined, description }))
+  return (
+    <Modal title="Novo título" onClose={closeDialog} wide>
+      <form onSubmit={(e) => (e.preventDefault(), save())} onKeyDown={(e) => e.key === 'Enter' && (e.ctrlKey || e.metaKey) && (e.preventDefault(), save())}>
+        <div className="row">
+          <label className="keyword-pick">Estado
+            <select value={keyword} onChange={(e) => setKeyword(e.target.value)}>
+              <option value="">— (nota)</option>
+              {keywords.map((k) => <option key={k} value={k}>{k}</option>)}
+            </select>
+          </label>
+          <label>Título<input autoFocus value={title} onChange={(e) => setTitle(e.target.value)} /></label>
+        </div>
+        {/* Not a <label>: a click in it would be forwarded to its first button (Link externo). */}
+        <div className="field">Descrição (opcional)
+          <OrgTextarea
+            className="description"
+            value={description}
+            onChange={setDescription}
+            path={path}
+            tools
+            rich
+            placeholder="Notas, listas, links e imagens…"
+          />
+        </div>
+        <div className="actions">
+          <span className="hint"><kbd>Enter</kbd> no título ou <kbd>Ctrl+Enter</kbd> guarda</span>
+          <button type="button" onClick={closeDialog}>Cancelar</button>
+          <button className="primary" disabled={!title.trim()}>Criar</button>
+        </div>
+      </form>
+    </Modal>
+  )
+}
+
 export function PromptDialog({ title, label, initial = '', onSubmit }: { title: string; label: string; initial?: string; onSubmit: (v: string) => void }) {
   const { closeDialog } = useApp()
   const [value, setValue] = useState(initial)
@@ -35,6 +111,25 @@ export function PromptDialog({ title, label, initial = '', onSubmit }: { title: 
         <div className="actions">
           <button type="button" onClick={closeDialog}>Cancelar</button>
           <button className="primary">OK</button>
+        </div>
+      </form>
+    </Modal>
+  )
+}
+
+export function NewFolderDialog({ onSubmit }: { onSubmit: (name: string, files: string[]) => void }) {
+  const { closeDialog } = useApp()
+  const [name, setName] = useState('')
+  const [files, setFiles] = useState('')
+  const list = files.split(',').map((f) => f.trim().replace(/\.org$/, '')).filter(Boolean)
+  return (
+    <Modal title="Nova pasta" onClose={closeDialog}>
+      <form onSubmit={(e) => (e.preventDefault(), name.trim() && (closeDialog(), onSubmit(name, list)))}>
+        <label>Nome (ex: projetos ou projetos/casa)<input autoFocus value={name} onChange={(e) => setName(e.target.value)} /></label>
+        <label>Ficheiros (opcional, separados por vírgulas, sem .org)<input value={files} placeholder="ex: tarefas, notas" onChange={(e) => setFiles(e.target.value)} /></label>
+        <div className="actions">
+          <button type="button" onClick={closeDialog}>Cancelar</button>
+          <button className="primary" disabled={!name.trim()}>Criar</button>
         </div>
       </form>
     </Modal>
@@ -221,18 +316,71 @@ export function RefileDialog({ path, line }: { path: string; line: number }) {
 
 export function HelpDialog() {
   const { closeDialog } = useApp()
+  const [q, setQ] = useState('')
+  const [sel, setSel] = useState(0)
+  const words = q.toLowerCase().split(/\s+/).filter(Boolean)
+  const all = Object.values(SHORTCUTS).flatMap(({ title, keys }) => keys.map(([key, label]) => ({ group: title, key, label })))
+  const shown = all.filter((s) => words.every((w) => `${s.group} ${s.key} ${s.label}`.toLowerCase().includes(w)))
   return (
-    <Modal title="Atalhos de teclado" onClose={closeDialog} wide>
-      <div className="help-grid">
-        {(Object.keys(SHORTCUTS) as (keyof typeof SHORTCUTS)[]).map((c) => (
-          <div key={c}>
-            <h4>{SHORTCUTS[c].title}</h4>
-            <table className="props">
-              <tbody>{SHORTCUTS[c].keys.map(([k, v]) => <tr key={k + v}><th><kbd>{k}</kbd></th><td>{v}</td></tr>)}</tbody>
-            </table>
-          </div>
+    <Modal title="Atalhos de teclado" wide>
+      <input
+        autoFocus
+        placeholder="Procurar atalho, tecla ou contexto…"
+        value={q}
+        onChange={(e) => (setQ(e.target.value), setSel(0))}
+        onKeyDown={(e) => {
+          if (e.key === 'ArrowDown') (e.preventDefault(), setSel(Math.min(sel + 1, shown.length - 1)))
+          if (e.key === 'ArrowUp') (e.preventDefault(), setSel(Math.max(sel - 1, 0)))
+          if (e.key === 'Enter') (e.preventDefault(), closeDialog())
+        }}
+      />
+      <ul className="pick-list">
+        {shown.map((s, i) => (
+          <Fragment key={s.group + s.key + s.label}>
+            {s.group !== shown[i - 1]?.group && <li className="pick-group">{s.group}</li>}
+            <li>
+              <button tabIndex={-1} className={i === sel ? 'active' : ''} onMouseEnter={() => setSel(i)} ref={(el) => { if (i === sel) el?.scrollIntoView({ block: 'nearest' }) }}>
+                <span>{s.label}</span><kbd>{s.key}</kbd>
+              </button>
+            </li>
+          </Fragment>
         ))}
-      </div>
+        {shown.length === 0 && <li className="hint">Nenhum atalho encontrado.</li>}
+      </ul>
+      <div className="hint"><kbd>↑ ↓</kbd> navegar · <kbd>Esc</kbd> fechar</div>
+    </Modal>
+  )
+}
+
+export function AccountDialog() {
+  const { closeDialog } = useApp()
+  const [me, setMe] = useState<Me>()
+  const [error, setError] = useState('')
+  useEffect(() => void api.me().then(setMe, (e) => setError(String(e))), [])
+  const toggle = (enabled: boolean) => me && api.setNotify(enabled).then(() => setMe({ ...me, ntfy: { ...me.ntfy, enabled } }), (e) => setError(String(e)))
+  const url = me && `${me.ntfy.server}/${me.ntfy.topic}`
+  return (
+    <Modal title="Conta e notificações" onClose={closeDialog}>
+      {error && <p className="hint">{error}</p>}
+      {me && <p>Sessão: <b>{me.email}</b> · <a href="/logout">Sair</a></p>}
+      {me && (
+        <>
+          <label className="inline"><input type="checkbox" checked={me.ntfy.enabled} onChange={(e) => toggle(e.target.checked)} /> Enviar lembretes da agenda pelo ntfy</label>
+          <p>Tópico: <a href={url} target="_blank" rel="noreferrer"><code>{url}</code></a></p>
+          <p className="hint">
+            Subscreve este tópico na app ntfy (Android/iOS) ou no PC com <code>ntfy subscribe {url}</code>. Recebes um aviso antes de cada item
+            com hora e um resumo diário, mesmo com o site fechado. Quem souber o tópico vê os títulos das tarefas: não o partilhes.
+          </p>
+          <h4>App de captura</h4>
+          <p>Servidor: <code>{location.origin}</code></p>
+          <p>
+            Token: <code>{me.token}</code>{' '}
+            <button type="button" onClick={() => navigator.clipboard.writeText(me.token)}>Copiar</button>{' '}
+            <button type="button" title="O token antigo deixa de funcionar" onClick={() => api.newToken().then((r) => setMe({ ...me, token: r.token }), (e) => setError(String(e)))}>Gerar novo</button>
+          </p>
+          <p className="hint">O token dá acesso às tuas notas: guarda-o só na app de captura e gera um novo se o perderes.</p>
+        </>
+      )}
       <div className="actions"><button className="primary" onClick={closeDialog}>OK</button></div>
     </Modal>
   )
@@ -251,6 +399,9 @@ export function keywordKeys(keywords: string[]): [string, string][] {
 export function KeywordDialog({ keywords, current, onSubmit }: { keywords: string[]; current?: string; onSubmit: (kw?: string) => void }) {
   const { closeDialog } = useApp()
   const keys = keywordKeys(keywords)
+  // Choices in display order; the last one (undefined) is "sem estado".
+  const choices: (string | undefined)[] = [...keywords, undefined]
+  const [sel, setSel] = useState(Math.max(0, choices.indexOf(current)))
   const pick = (kw?: string) => (closeDialog(), onSubmit(kw))
   const ref = useRef<HTMLDivElement>(null)
   useEffect(() => ref.current?.focus(), [])
@@ -261,16 +412,23 @@ export function KeywordDialog({ keywords, current, onSubmit }: { keywords: strin
         tabIndex={-1}
         ref={ref}
         onKeyDown={(e) => {
-          if (e.key === ' ') (e.preventDefault(), pick(undefined))
-          const hit = keys.find(([k]) => k === e.key.toLowerCase())
-          if (hit) (e.preventDefault(), pick(hit[1]))
+          if (e.key === 'ArrowDown' || e.key === 'ArrowUp') (e.preventDefault(), setSel((sel + (e.key === 'ArrowDown' ? 1 : -1) + choices.length) % choices.length))
+          else if (e.key === 'Enter') (e.preventDefault(), pick(choices[sel]))
+          else if (e.key === ' ') (e.preventDefault(), pick(undefined))
+          else {
+            const hit = keys.find(([k]) => k === e.key.toLowerCase())
+            if (hit) (e.preventDefault(), pick(hit[1]))
+          }
         }}
       >
-        {keys.map(([k, kw]) => (
-          <button key={kw} className={kw === current ? 'active' : ''} onClick={() => pick(kw)}><kbd>{k}</kbd> {kw}</button>
+        {choices.map((kw, i) => (
+          <button key={kw ?? ''} tabIndex={-1} className={i === sel ? 'active' : ''} onMouseEnter={() => setSel(i)} onClick={() => pick(kw)}>
+            {kw ? <><kbd>{keys[i][0]}</kbd> {kw}</> : <><kbd>Espaço</kbd> sem estado</>}
+            {kw === current && <span className="muted"> · atual</span>}
+          </button>
         ))}
-        <button onClick={() => pick(undefined)}><kbd>Espaço</kbd> sem estado</button>
       </div>
+      <div className="hint"><kbd>↑</kbd> <kbd>↓</kbd> escolher · <kbd>Enter</kbd> confirmar · ou a tecla do estado</div>
     </Modal>
   )
 }
@@ -285,8 +443,10 @@ export function CommandPalette({ commands }: { commands: Command[] }) {
   const { closeDialog } = useApp()
   const [q, setQ] = useState('')
   const [sel, setSel] = useState(0)
-  const words = q.toLowerCase().split(/\s+/).filter(Boolean)
-  const shown = commands.filter((c) => words.every((w) => c.label.toLowerCase().includes(w))).slice(0, 50)
+  // Case- and accent-insensitive, so "icone" finds "Ícone".
+  const fold = (s: string) => s.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase()
+  const words = fold(q).split(/\s+/).filter(Boolean)
+  const shown = commands.filter((c) => words.every((w) => fold(c.label).includes(w))).slice(0, 50)
   const run = (c?: Command) => c && (closeDialog(), c.run())
   return (
     <Modal title="Comandos" wide>
