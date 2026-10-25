@@ -1,129 +1,173 @@
 # Org Notes
 
-Org-mode na web: **React + TypeScript** (Vite) no frontend, **ASP.NET Core (.NET 10)** no backend.
-Os ficheiros são `.org` normais guardados numa pasta, por isso continuam compatíveis com o Emacs.
+Org-mode on the web: **React + TypeScript** (Vite) on the frontend, **ASP.NET Core (.NET 10)** on the backend.
+Files are plain `.org` files kept in a folder, so they stay compatible with Emacs. The interface is in Portuguese.
 
-## Correr
+![Outline of an org file with tasks, dates, tags, a checklist and a table](docs/images/outline.png)
+
+| Agenda | Dark theme |
+|---|---|
+| ![Week agenda with scheduled items, deadlines and events](docs/images/agenda.png) | ![The same file in the dark theme](docs/images/dark.png) |
+
+## Running
 
 ```bash
-# produção (um só processo)
-cd client && npm install && npm run build   # gera server/wwwroot
+# production (a single process)
+cd client && npm install && npm run build   # builds into server/wwwroot
 cd ../server && dotnet run                  # http://localhost:5080
 
-# desenvolvimento (hot reload)
+# development (hot reload)
 cd server && dotnet run
-cd client && npm run dev                    # http://localhost:5173 (proxy /api -> 5080)
+cd client && npm run dev                    # http://localhost:5173 (proxies /api to 5080)
 
-# testes do núcleo org
+# tests for the org core
 cd client && npm test
 ```
 
-A pasta dos ficheiros é configurada em `server/appsettings.json` → `OrgDirectory`
-(por omissão `server/data`; pode ser p.ex. `/home/eu/org`). Cada utilizador tem os seus ficheiros em `<OrgDirectory>/users/<email>/`;
-para cada novo utilizador são criados `todo.org`, `agenda.org`, `notes.org`, `contacts.org` e `archive.org`.
+The notes folder is set in `server/appsettings.json` → `OrgDirectory`
+(default `server/data`; it can be e.g. `/home/me/org`). Each user's files live in `<OrgDirectory>/users/<email>/`;
+every new user starts with `todo.org`, `agenda.org`, `notes.org`, `contacts.org` and `archive.org`.
 
-## Notificações da agenda
+## Windows installer
 
-O servidor avisa mesmo com o site fechado: N minutos antes de cada item com hora (`SCHEDULED`, `DEADLINE`,
-timestamps ativos, incluindo repetições), um resumo diário (hoje, atrasados, prazos próximos) e, à hora do resumo,
-um aviso por cada prazo (`DEADLINE`) a 7, 3, 1 e 0 dias (`DeadlineReminders`). Dois canais:
+`OrgNotes-win-x64.zip` (built into `dist/`, which is not in git) holds the server and the capture app, both built for
+Windows with .NET included, and an install script. Unzip it and double-click `install.cmd`. No admin rights are needed. The script:
 
-- **ntfy**: cada utilizador tem um tópico secreto, que vê e liga/desliga em *Conta e notificações* (sino no menu).
-  Recebe na app ntfy (Android/iOS) ou no PC com `ntfy subscribe <url>`. Desligado por omissão.
-- **Nativo** (`notify-send` no Linux, toast no Windows): mostra na máquina onde o servidor corre. Ligado por omissão
-  só no modo de um utilizador.
+- copies both apps to `%LOCALAPPDATA%\OrgNotes`;
+- keeps the notes in `Documents\Org Notes`, so reinstalling does not touch them;
+- starts the server and the capture app at sign-in;
+- adds *Start → Org Notes* and opens http://localhost:5080.
 
-Configuração em `appsettings.json` → `Notifications` (`MinutesBefore`, `DailySummaryAt`, `DeadlineReminders`, `NtfyServer`, `Native`, `Enabled`).
+The zip ships `server/appsettings.Local.json` (allowed emails and AI key), so keep it private.
 
-## App de captura (atalho global, sem browser)
+## Agenda notifications
 
-`capture/` é uma pequena app (.NET + Avalonia) que fica na bandeja e abre o formulário de captura com um atalho
-global: escolhe o template pela tecla, escreve o título, data/hora e notas, <kbd>Ctrl+Enter</kbd> guarda, <kbd>Esc</kbd> fecha.
-Usa os templates dos ficheiros e grava no servidor (`/api/capture`). Na primeira execução pede o servidor e o
-token pessoal (no site: sino → *Conta e notificações*). Definições em `~/.config/orgnotes/capture.json`
-ou `%APPDATA%\orgnotes\capture.json`.
+The server sends reminders even with the site closed: N minutes before each timed item (`SCHEDULED`, `DEADLINE`,
+active timestamps, repeats included), a daily summary (today, overdue, upcoming deadlines) and, at summary time,
+one reminder per deadline (`DEADLINE`) 7, 3, 1 and 0 days ahead (`DeadlineReminders`). Two channels:
+
+- **ntfy**: each user has a secret topic, shown and switched on or off in *Conta e notificações* (Account and
+  notifications, bell icon in the menu). Receive it in the ntfy app (Android/iOS) or on a PC with `ntfy subscribe <url>`.
+  Off by default.
+- **Native** (`notify-send` on Linux, a toast on Windows): shown on the machine the server runs on. On by default
+  only in single-user mode.
+
+Settings are in `appsettings.json` → `Notifications` (`MinutesBefore`, `DailySummaryAt`, `DeadlineReminders`, `NtfyServer`, `Native`, `Enabled`).
+
+## Capture templates
+
+Each file defines its own capture templates in its header (*Template de captura*, capture template, in the file menu). Empty properties
+in a template become fields in the capture form, and a `#+PROPERTY: <NAME>_ALL` line gives a field its suggested values:
+
+```org
+#+PROPERTY: COMPANY_ALL Acme Globex "Initech Ltd"
+#+BEGIN_CAPTURE c Contact
+,* %{title}
+:PROPERTIES:
+:EMAIL:
+:COMPANY:
+:END:
+%{body}
+#+END_CAPTURE
+```
+
+Properties with suggested values also show as badges next to each headline in the outline.
+With AI configured, the template editor can write a template from a plain description (*Criar com IA*, create with AI).
+
+| Capture form | Template editor |
+|---|---|
+| ![Capture form with a field for each template property](docs/images/capture.png) | ![Template editor with the AI description field](docs/images/template.png) |
+
+## Capture app (global shortcut, no browser)
+
+`capture/` is a small app (.NET + Avalonia) that sits in the tray and opens the capture form with a global
+shortcut: pick the template by its key, type the title, date/time, property fields and notes, <kbd>Ctrl+Enter</kbd> saves, <kbd>Esc</kbd> closes.
+It uses the files' templates and saves through the server (`/api/capture`). On first run it asks for the server and
+your personal token (on the site: bell → *Conta e notificações*). Settings are in `~/.config/orgnotes/capture.json`
+or `%APPDATA%\orgnotes\capture.json`.
 
 ```bash
 # Linux
 cd capture && dotnet publish -c Release -r linux-x64 --self-contained -o ~/.local/share/orgnotes-capture
-# Windows (pode ser compilado no Linux)
+# Windows (can be built on Linux)
 cd capture && dotnet publish -c Release -r win-x64 --self-contained -o publish-win
 ```
 
-- **Windows**: corre `OrgNotes.Capture.exe`; o atalho (por omissão <kbd>Win+Alt+C</kbd>) é registado pela app e
-  *Arrancar com o Windows* está nas Definições (ícone da bandeja → Definições).
-- **Linux (Hyprland/Omarchy)**: o Wayland não deixa apps registarem atalhos globais, por isso liga-se uma tecla a
-  `OrgNotes.Capture --show` (acorda a instância da bandeja) e arranca-se a app com a sessão:
+- **Windows**: run `OrgNotes.Capture.exe`; the app registers the shortcut (default <kbd>Win+Alt+C</kbd>), and
+  *Arrancar com o Windows* (start with Windows) is in the settings (tray icon → *Definições*).
+- **Linux (Hyprland/Omarchy)**: Wayland does not let apps register global shortcuts, so bind a key to
+  `OrgNotes.Capture --show` (it wakes the tray instance) and start the app with the session:
   ```lua
   -- ~/.config/hypr/bindings.lua
-  o.bind("SUPER + ALT + C", "Org Notes capture", "/home/<eu>/.local/share/orgnotes-capture/OrgNotes.Capture --show")
+  o.bind("SUPER + ALT + C", "Org Notes capture", "/home/<me>/.local/share/orgnotes-capture/OrgNotes.Capture --show")
   -- ~/.config/hypr/autostart.lua
-  o.launch_on_start("/home/<eu>/.local/share/orgnotes-capture/OrgNotes.Capture")
+  o.launch_on_start("/home/<me>/.local/share/orgnotes-capture/OrgNotes.Capture")
   ```
-  Corre via XWayland; a escala de cada monitor vem do `hyprctl` (ou fixa-se com `"Scale"` nas definições).
+  It runs through XWayland; each monitor's scale comes from `hyprctl` (or set a fixed `"Scale"` in the settings).
 
-## Revisão de texto por IA
+## AI text review
 
-Na captura (site e app) e no editor de secção, o botão ✨ abre os modos de IA: **Desenvolver** (<kbd>Alt+R</kbd>:
-corrige, clarifica, estrutura e desenvolve as ideias), **Corrigir** (<kbd>Alt+Shift+R</kbd>: só ortografia e gramática),
-**Resumir**, **Tom profissional** e **Extrair tarefas** (checkboxes). Nunca inventa nomes, datas ou números (usa
-`[definir]`). As sugestões aparecem palavra a palavra para aceitar ou descartar.
-O botão só aparece com a IA configurada em `Ai`.
-Põe as chaves em `server/appsettings.Local.json` (ignorado pelo git) ou em variáveis de ambiente (`Ai__ApiKey`, ...).
+In the capture form (site and app) and in the section editor, the ✨ button opens the AI modes: **Desenvolver**
+(develop, <kbd>Alt+R</kbd>: fixes, clarifies, structures and expands the ideas), **Corrigir** (fix, <kbd>Alt+Shift+R</kbd>:
+spelling and grammar only), **Resumir** (summarize), **Tom profissional** (professional tone) and **Extrair tarefas**
+(extract tasks as checkboxes). It never invents names, dates or numbers (it writes `[definir]` instead). Suggestions
+are shown word by word, to accept or discard.
+The button only appears when AI is configured under `Ai`.
+Put the keys in `server/appsettings.Local.json` (ignored by git) or in environment variables (`Ai__ApiKey`, ...).
 
-- **Claude** (API da Anthropic, paga à parte da subscrição): só `ApiKey` (ou `ANTHROPIC_API_KEY`); `Model` opcional
-  (por omissão `claude-opus-5-5`).
-- **Qualquer API compatível com OpenAI**: `BaseUrl`, `Model` e `ApiKey` (sem chave para o Ollama). `Model` aceita uma
-  lista (`"gemini-3.5-flash,gemini-3.5-flash-lite"`): se um modelo esgotar a quota grátis (429) passa ao seguinte. Por exemplo:
+- **Claude** (Anthropic API, billed separately from the subscription): just `ApiKey` (or `ANTHROPIC_API_KEY`); `Model` is optional
+  (default `claude-opus-5-5`).
+- **Any OpenAI-compatible API**: `BaseUrl`, `Model` and `ApiKey` (no key for Ollama). `Model` takes a
+  list (`"gemini-3.5-flash,gemini-3.5-flash-lite"`): when one model runs out of free quota (429) the next one is used. For example:
 
-| Fornecedor | `BaseUrl` |
+| Provider | `BaseUrl` |
 |---|---|
-| Google Gemini (plano grátis no AI Studio) | `https://generativelanguage.googleapis.com/v1beta/openai` |
+| Google Gemini (free tier in AI Studio) | `https://generativelanguage.googleapis.com/v1beta/openai` |
 | Groq | `https://api.groq.com/openai/v1` |
 | Mistral | `https://api.mistral.ai/v1` |
 | OpenRouter | `https://openrouter.ai/api/v1` |
 | Ollama (local) | `http://localhost:11434/v1` |
 
 ```json
-{ "Ai": { "BaseUrl": "https://generativelanguage.googleapis.com/v1beta/openai", "Model": "<modelo do AI Studio>", "ApiKey": "..." } }
+{ "Ai": { "BaseUrl": "https://generativelanguage.googleapis.com/v1beta/openai", "Model": "<AI Studio model>", "ApiKey": "..." } }
 ```
 
-O texto das notas é enviado ao fornecedor escolhido; nos planos grátis pode ser usado para treino (vê os termos).
+The text of your notes is sent to the chosen provider; free tiers may use it for training (check their terms).
 
 ## Login
 
-O site exige sempre login e só entram os emails em `Auth:AllowedEmails` (lista vazia: ninguém entra). Por omissão
-entra-se com email e password: na primeira vez, cada email autorizado escolhe a sua password em *Criar password*
-(quem souber um email autorizado que ainda não tenha password pode criá-la primeiro, por isso cria a tua logo).
-Ficheiros de versões antigas sem login (diretamente em `OrgDirectory`) passam para a pasta do primeiro utilizador.
+The site always requires a login, and only the emails in `Auth:AllowedEmails` get in (an empty list lets nobody in).
+By default you sign in with email and password: the first time, each allowed email picks its password in *Criar password*
+(create password). Anyone who knows an allowed email that has no password yet could set one first, so create yours right away.
+Files from older versions without login (directly in `OrgDirectory`) move to the first user's folder.
 
-Opcionalmente, botões *Entrar com Google* e *Entrar com Microsoft (Office)*, cada um ativo quando o seu `ClientId` e
-`ClientSecret` estão preenchidos. O email da conta tem de estar em `AllowedEmails`. A Google e a Microsoft só aceitam HTTPS num domínio
-(ou `http://localhost`).
+Optionally, *Entrar com Google* and *Entrar com Microsoft (Office)* (sign in with Google / Microsoft) buttons, each enabled when its `ClientId` and
+`ClientSecret` are set. The account's email must be in `AllowedEmails`. Google and Microsoft only accept HTTPS on a domain
+(or `http://localhost`).
 
 - **Google**: [Google Cloud Console](https://console.cloud.google.com/apis/credentials) → *Create credentials* → *OAuth client ID*
-  → *Web application*, com redirect URI `https://<o-teu-dominio>/signin-google`.
-- **Microsoft** (contas Microsoft 365 de trabalho/escola e pessoais Outlook/Hotmail): [Entra admin center](https://entra.microsoft.com)
+  → *Web application*, with redirect URI `https://<your-domain>/signin-google`.
+- **Microsoft** (Microsoft 365 work/school accounts and personal Outlook/Hotmail accounts): [Entra admin center](https://entra.microsoft.com)
   → *App registrations* → *New registration*, *Accounts in any organizational directory and personal Microsoft accounts*,
-  redirect URI (Web) `https://<o-teu-dominio>/signin-microsoft`; depois *Certificates & secrets* → *New client secret*.
+  redirect URI (Web) `https://<your-domain>/signin-microsoft`; then *Certificates & secrets* → *New client secret*.
 
-Passa os segredos por variáveis de ambiente ou em `server/appsettings.Local.json` (fora do git), não no `appsettings.json`:
-`Auth__AllowedEmails__0=eu@gmail.com`, `Auth__AllowedEmails__1=...`, `Auth__Google__ClientId`, `Auth__Google__ClientSecret`,
+Pass the secrets through environment variables or `server/appsettings.Local.json` (outside git), not `appsettings.json`:
+`Auth__AllowedEmails__0=me@gmail.com`, `Auth__AllowedEmails__1=...`, `Auth__Google__ClientId`, `Auth__Google__ClientSecret`,
 `Auth__Microsoft__ClientId`, `Auth__Microsoft__ClientSecret`.
 
-### Deploy numa VPS (Debian/Ubuntu)
+### Deploying on a VPS (Debian/Ubuntu)
 
-A Google só aceita HTTPS num domínio, por isso a app fica atrás do [Caddy](https://caddyserver.com) (certificado automático)
-e escuta só em `localhost:5080`.
+Google only accepts HTTPS on a domain, so the app sits behind [Caddy](https://caddyserver.com) (automatic certificate)
+and listens only on `localhost:5080`.
 
 ```bash
-# na tua máquina: compilar e copiar
+# on your machine: build and copy
 cd client && npm run build && cd ../server && dotnet publish -c Release -r linux-x64 --self-contained -o publish
 rsync -a publish/ root@vps:/opt/org-notes/
 
-# na VPS
+# on the VPS
 apt install caddy
-echo 'notas.exemplo.pt { reverse_proxy localhost:5080 }' > /etc/caddy/Caddyfile && systemctl reload caddy
+echo 'notes.example.com { reverse_proxy localhost:5080 }' > /etc/caddy/Caddyfile && systemctl reload caddy
 useradd -r -m -d /var/lib/org-notes org-notes
 cat > /etc/systemd/system/org-notes.service <<UNIT
 [Service]
@@ -133,7 +177,7 @@ ExecStart=/opt/org-notes/OrgNotes.Server
 Environment=OrgDirectory=/var/lib/org-notes
 Environment=Auth__Google__ClientId=...apps.googleusercontent.com
 Environment=Auth__Google__ClientSecret=...
-Environment=Auth__AllowedEmails__0=eu@gmail.com
+Environment=Auth__AllowedEmails__0=me@gmail.com
 Restart=always
 [Install]
 WantedBy=multi-user.target
@@ -141,12 +185,12 @@ UNIT
 systemctl enable --now org-notes
 ```
 
-### Correr localmente com arranque automático (um utilizador, notificações nativas)
+### Running locally with autostart (single user, native notifications)
 
-Define `Auth:AllowedEmails` com o teu email (p.ex. `Environment=Auth__AllowedEmails__0=eu@gmail.com` abaixo).
+Set `Auth:AllowedEmails` to your email (e.g. `Environment=Auth__AllowedEmails__0=me@gmail.com` below).
 
 ```bash
-# Linux (systemd, utilizador)
+# Linux (systemd, user service)
 cd client && npm run build && cd ../server && dotnet publish -c Release -o ~/.local/share/org-notes
 cat > ~/.config/systemd/user/org-notes.service <<UNIT
 [Service]
@@ -160,26 +204,27 @@ systemctl --user enable --now org-notes
 ```
 
 ```powershell
-# Windows: tarefa que arranca ao iniciar sessão (define OrgDirectory no appsettings.json publicado)
+# Windows: a task that starts at sign-in (set OrgDirectory in the published appsettings.json)
 cd server; dotnet publish -c Release -o $env:LOCALAPPDATA\OrgNotes
 $a = New-ScheduledTaskAction -Execute "$env:LOCALAPPDATA\OrgNotes\OrgNotes.Server.exe" -WorkingDirectory "$env:LOCALAPPDATA\OrgNotes"
 Register-ScheduledTask OrgNotes -Action $a -Trigger (New-ScheduledTaskTrigger -AtLogOn) -Settings (New-ScheduledTaskSettingsSet -ExecutionTimeLimit 0)
 ```
 
-## Funcionalidades
+## Features
 
-- **Estrutura**: títulos aninhados, dobrar por secção (Tab) e global (Shift+Tab, `#+STARTUP`), mover/promover subárvores, focar subárvore (narrow), filtro/sparse tree por texto ou etiquetas.
-- **Tarefas**: estados TODO configuráveis (`#+TODO: TODO NEXT | DONE`), prioridades, etiquetas (com herança e `#+FILETAGS`), `CLOSED` automático, repetidores (`+1w`, `++1w`, `.+1d`) com `LAST_REPEAT`, cookies `[n/m]` e `[%]`.
-- **Datas**: `SCHEDULED`, `DEADLINE` com aviso (`-3d`), timestamps ativos/inativos, intervalos de horas e de datas.
-- **Agenda**: dia/semana (atrasados, prazos próximos, repetições), lista global de tarefas, pesquisa de texto e por etiquetas/propriedades (sintaxe org: `a+b-c|TODO="NEXT"`, `Effort>1:00`, `/NEXT`).
-- **Relógio**: clock in/out no `:LOGBOOK:`, indicador do relógio ativo, relatório semanal de tempo.
-- **Captura**: cada ficheiro define os seus templates num bloco `#+BEGIN_CAPTURE <tecla> <nome> [:datetree]` no cabeçalho (editável em *Template de captura* no menu do ficheiro). Por omissão: tarefa → `todo.org`, evento → `agenda.org`, nota → `notes.org`, contacto → `contacts.org`. Placeholders: `%{title}`, `%{body}`, `%{when}`, `%{time}`, `%U`, `%T`.
-- **Refile** para qualquer título/ficheiro e **arquivo** em `archive.org` com propriedades `ARCHIVE_*`.
-- **Conteúdo**: ênfase, links (web, `file:`, `*Título`, `#custom-id`), imagens, listas (ordenadas, descrição, checkboxes clicáveis), tabelas (Tab alinha e salta de célula), blocos src/quote/example/verse/center, drawers, propriedades, notas de rodapé.
-- **Edição**: edição por secção (Enter), duplo-clique no título, modo texto completo, desfazer/refazer, autosave, recarrega alterações externas ao voltar à janela.
-- **Exportar**: HTML, `.org`, imprimir/PDF. Tema claro/escuro, layout para telemóvel. Atalhos: carregar em `?`.
+- **Structure**: nested headlines, folding per section (Tab) and globally (Shift+Tab, `#+STARTUP`), moving/promoting subtrees, narrowing to a subtree, filter/sparse tree by text or tags.
+- **Tasks**: configurable TODO states (`#+TODO: TODO NEXT | DONE`), priorities, tags (with inheritance and `#+FILETAGS`), automatic `CLOSED`, repeaters (`+1w`, `++1w`, `.+1d`) with `LAST_REPEAT`, `[n/m]` and `[%]` cookies.
+- **Dates**: `SCHEDULED`, `DEADLINE` with warning (`-3d`), active/inactive timestamps, time and date ranges.
+- **Agenda**: day/week (overdue, upcoming deadlines, repeats), global task list, text search and tag/property search (org syntax: `a+b-c|TODO="NEXT"`, `Effort>1:00`, `/NEXT`).
+- **Clock**: clock in/out in `:LOGBOOK:`, running-clock indicator, weekly time report.
+- **Capture**: each file defines its templates in a `#+BEGIN_CAPTURE <key> <name> [:datetree]` block in its header (editable in *Template de captura* in the file menu). Defaults: task → `todo.org`, event → `agenda.org`, note → `notes.org`, contact → `contacts.org`. Placeholders: `%{title}`, `%{body}`, `%{when}`, `%{time}`, `%U`, `%T`. Empty properties become form fields, with suggested values from `#+PROPERTY: <NAME>_ALL`.
+- **Refile** to any headline/file and **archive** to `archive.org` with `ARCHIVE_*` properties.
+- **Content**: emphasis, links (web, `file:`, `*Headline`, `#custom-id`), images, lists (ordered, description, clickable checkboxes), tables (Tab aligns and jumps between cells), src/quote/example/verse/center blocks, drawers, properties, footnotes.
+- **Editing**: per-section editing (Enter), double-click a headline's title or description to edit just that, full text mode, undo/redo, autosave, reloads external changes when the window regains focus.
+- **Files**: folders (optionally created with a set of files), file icons.
+- **Export**: HTML, `.org`, print/PDF. Light/dark theme, phone layout. Shortcuts: press `?`.
 
-## Não incluído
+## Not included
 
-Execução de código (Babel), fórmulas de tabela (`#+TBLFM`, mostradas mas não calculadas), LaTeX, column view, habits, anexos,
-exportação ODT/LaTeX.
+Code execution (Babel), table formulas (`#+TBLFM`, shown but not computed), LaTeX, column view, habits, attachments,
+ODT/LaTeX export.
