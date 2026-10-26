@@ -76,7 +76,7 @@ public static partial class OrgCapture
     }
 
     /// <summary>Fills a template: %{title}, %{body}, %{when} (line dropped when empty), %{time}, %U, %T, and empty properties from `props`.</summary>
-    public static List<string> Expand(CaptureTemplate t, string title, string body, DateOnly? date, TimeOnly? time, DateTime now, Dictionary<string, string>? props = null)
+    public static List<string> Expand(CaptureTemplate t, string title, string body, DateOnly? date, TimeOnly? time, DateTime now, Dictionary<string, string>? props = null, IEnumerable<string>? tags = null)
     {
         var when = date is { } d ? Stamp(true, d, time) : "";
         var bodyLines = body.Trim().Length > 0 ? body.TrimEnd().Split('\n') : [];
@@ -99,9 +99,40 @@ public static partial class OrgCapture
             out_.Add(l.Replace("%{title}", title).Replace("%{when}", when).Replace("%{time}", nowTime.ToString("HH:mm"))
                 .Replace("%U", Stamp(false, today, nowTime)).Replace("%T", Stamp(true, today, nowTime)).Replace("%{body}", body.Trim()));
         }
+        // The chosen tags go on the entry's headline (the first one), after any the template gives it.
+        var head = out_.FindIndex(l => HeadlineRe().IsMatch(l));
+        if (head >= 0 && tags != null) out_[head] = AddTags(out_[head], tags);
         // A template without %{body} still keeps what was written, at the end of the entry.
         if (!t.Body.Contains("%{body}")) out_.AddRange(bodyLines);
         return out_;
+    }
+
+    [GeneratedRegex(@"[ \t]+:((?:[\p{L}\p{N}_@#%]+:)+)[ \t]*$")] private static partial Regex HeadlineTagsRe();
+
+    /// <summary>A tag as org accepts it: letters, digits, _ @ # % (spaces become _). Same as the client's cleanTag.</summary>
+    public static string CleanTag(string tag) => Regex.Replace(Regex.Replace(tag.Trim(), @"\s+", "_"), @"[^\p{L}\p{N}_@#%]", "");
+
+    /// <summary>Adds tags to a headline line, after the ones it already has. Same as the client's addTags.</summary>
+    public static string AddTags(string line, IEnumerable<string> tags)
+    {
+        var add = tags.Select(CleanTag).Where(t => t != "").ToList();
+        if (add.Count == 0) return line;
+        var m = HeadlineTagsRe().Match(line);
+        var all = (m.Success ? m.Groups[1].Value.Split(':', StringSplitOptions.RemoveEmptyEntries) : []).Concat(add).Distinct();
+        return $"{(m.Success ? line[..m.Index] : line.TrimEnd())} :{string.Join(':', all)}:";
+    }
+
+    /// <summary>Every tag used on a headline or declared with #+TAGS in a file.</summary>
+    public static IEnumerable<string> Tags(string text)
+    {
+        foreach (var l in text.Split('\n'))
+        {
+            if (HeadlineRe().IsMatch(l) && HeadlineTagsRe().Match(l.TrimEnd('\r')) is { Success: true } m)
+                foreach (var t in m.Groups[1].Value.Split(':', StringSplitOptions.RemoveEmptyEntries)) yield return t;
+            else if (Regex.Match(l, @"^\s*#\+TAGS:\s*(.*)$", RegexOptions.IgnoreCase) is { Success: true } d)
+                foreach (var t in Regex.Split(d.Groups[1].Value, @"[\s{}]+").Where(t => t != "" && !t.StartsWith('(')))
+                    yield return Regex.Replace(t, @"\(.\)$", "");
+        }
     }
 
     private static string Stamp(bool active, DateOnly date, TimeOnly? time)

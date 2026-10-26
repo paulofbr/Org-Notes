@@ -165,6 +165,13 @@ app.MapDelete("/api/admin/logins/{email}", (string email, HttpContext ctx) =>
 
 bool IsAdmin(HttpContext ctx) => access.IsAdmin(ctx.User.FindFirstValue(ClaimTypes.Email) ?? "");
 
+// Every tag in use, for picking tags in the capture app.
+app.MapGet("/api/tags", (HttpContext ctx, Users users) =>
+{
+    var store = users.For(ctx.User);
+    return store.List().SelectMany(f => OrgCapture.Tags(store.Read(f.Path) ?? "")).Distinct().Order(StringComparer.CurrentCultureIgnoreCase);
+});
+
 // Every file and its headlines, for the capture app's internal links.
 app.MapGet("/api/link-targets", (HttpContext ctx, Users users) =>
 {
@@ -331,7 +338,7 @@ app.MapPost("/api/capture", (CaptureRequest req, HttpContext ctx, Users users) =
     if (string.IsNullOrWhiteSpace(req.Title)) return Results.BadRequest(Strings.Tr(ctx, "Falta o título"));
     // The client's local time, so %U and the datetree follow the user's clock rather than the server's.
     var now = req.Now ?? DateTime.Now;
-    var entry = OrgCapture.Expand(tpl, req.Title.Trim(), req.Body ?? "", req.Date, req.Time, now, req.Props);
+    var entry = OrgCapture.Expand(tpl, req.Title.Trim(), req.Body ?? "", req.Date, req.Time, now, req.Props, req.Tags);
     store.Write(req.File, OrgCapture.CaptureInto(text, entry, tpl.Datetree, now));
     return Results.Ok(new { file = req.File });
 });
@@ -396,4 +403,4 @@ record LangRequest(string Lang);
 record LoginRequest(string Email);
 record ExtractRequest(string Text, DateTime? Now);
 record MailRequest(string Host, int Port, string User, string? Password, string Folder, bool Enabled);
-record CaptureRequest(string File, string Key, string Title, string? Body, DateOnly? Date, TimeOnly? Time, DateTime? Now, Dictionary<string, string>? Props);
+record CaptureRequest(string File, string Key, string Title, string? Body, DateOnly? Date, TimeOnly? Time, DateTime? Now, Dictionary<string, string>? Props, string[]? Tags);

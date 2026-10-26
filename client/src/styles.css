@@ -347,6 +347,8 @@ label.inline input { width: auto; }
 .proposal { border: 1px solid var(--border); border-radius: 8px; padding: 0.6rem; margin: 0; display: flex; flex-direction: column; gap: 0.45rem; }
 .proposal.skipped { opacity: 0.5; }
 .proposal .row { align-items: flex-end; }
+.tag-picker { display: flex; flex-wrap: wrap; gap: 0.35rem; align-items: center; }
+.tag-picker input { width: 11rem; flex: none; padding: 0.25rem 0.5rem; }
 .proposal-head { display: flex; gap: 0.5rem; align-items: center; }
 .proposal-head select, .proposal-head input[type='checkbox'] { width: auto; flex: none; }
 .proposal-head .grow { flex: 1; min-width: 8rem; }

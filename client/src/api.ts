@@ -32,6 +32,7 @@ export interface ProposedItem {
   time: string
   body: string
   props: Record<string, string>
+  tags: string[]
 }
 
 /** A reminder to show between `from` and `until` (the user's wall-clock time). */

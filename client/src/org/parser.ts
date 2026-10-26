@@ -74,7 +74,8 @@ const PLANNING_ITEM_RE = /(SCHEDULED|DEADLINE|CLOSED):\s*([<[][^>\]]+[>\]](?:--[
 const DRAWER_START_RE = /^\s*:([\w-]+):\s*$/
 const DRAWER_END_RE = /^\s*:END:\s*$/i
 const CLOCK_RE = /^\s*CLOCK:\s*(\[[^\]]+\])(?:--(\[[^\]]+\]))?/
-const TAGS_RE = /(?:^|[ \t]+)(:(?:[\w@#%]+:)+)[ \t]*$/
+// Letters and digits of any language, as Emacs allows (e.g. :urgência:).
+const TAGS_RE = /(?:^|[ \t]+)(:(?:[\p{L}\p{N}_@#%]+:)+)[ \t]*$/u
 export const ITEM_RE = /^(\s*)([-+]|\d+[.)]|\*(?=\s))(?:\s+(.*))?$/
 const COOKIE_RE = /\[(\d*%|\d*\/\d*)\]/
 

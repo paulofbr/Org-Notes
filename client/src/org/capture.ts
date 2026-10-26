@@ -1,6 +1,7 @@
 import { HEADLINE_RE, parseOrg } from './parser'
 import { dateKey, formatTimestamp, nowStamp } from './timestamp'
 import { resolvePath } from './links'
+import { addTags } from './tags'
 
 /**
  * A capture template, stored in its target file's preamble as
@@ -173,7 +174,7 @@ export const saveDrafts = (text: string, drafts: TemplateDraft[]) =>
 const bodyLines = (body: string) => (body.trim() ? body.trimEnd().split('\n') : [])
 
 /** Fills a template: %{title}, %{body}, %{when} (chosen date; line dropped when empty), %{time}, %U, %T, and empty properties from `props`. */
-export function expand(t: CaptureTemplate, v: { title: string; body: string; date?: string; time?: string; props?: Record<string, string> }, now = new Date()): string[] {
+export function expand(t: CaptureTemplate, v: { title: string; body: string; date?: string; time?: string; props?: Record<string, string>; tags?: string[] }, now = new Date()): string[] {
   const when = v.date ? formatTimestamp({ active: true, date: v.date, time: v.time || undefined }) : ''
   const fill = (l: string) =>
     l
@@ -191,6 +192,9 @@ export function expand(t: CaptureTemplate, v: { title: string; body: string; dat
     if (value) return [`${prop[1]}:${prop[2]}: ${value}`]
     return [fill(l)]
   })
+  // The chosen tags go on the entry's headline (the first one), after any the template gives it.
+  const head = lines.findIndex((l) => HEADLINE_RE.test(l))
+  if (head >= 0 && v.tags?.length) lines[head] = addTags(lines[head], v.tags)
   // A template without %{body} still keeps what was written, at the end of the entry.
   return t.body.includes('%{body}') ? lines : [...lines, ...bodyLines(v.body)]
 }

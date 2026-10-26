@@ -1,7 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState, type FocusEvent, type KeyboardEvent } from 'react'
 import { createPortal } from 'react-dom'
 import { alignTable } from '../org/edit'
-import { Link2 } from 'lucide-react'
+import { ImagePlus, Link2 } from 'lucide-react'
 import { ITEM_RE } from '../org/parser'
 import { LinkDialog, uploadImageLink, type LinkTab } from './LinkDialog'
 import * as Rich from './richText'
@@ -35,6 +35,7 @@ export function OrgTextarea({ value, onChange, autoGrow, onKeyDown, path, tools,
   const ref = useRef<HTMLTextAreaElement>(null)
   const host = useRef<HTMLDivElement>(null)
   const pendingCursor = useRef<number | null>(null)
+  const imageInput = useRef<HTMLInputElement>(null)
   const [linking, setLinking] = useState<{ start: number; end: number; only?: LinkTab }>()
   // Uploads finish later, so they insert into the latest text, not the text from when they started.
   const latest = useRef({ value, onChange })
@@ -223,9 +224,18 @@ export function OrgTextarea({ value, onChange, autoGrow, onKeyDown, path, tools,
       )}
       {tools && path && (
         // mousedown would take the focus (and the cursor position) away from the text.
-        <div className="text-tools" onMouseDown={(e) => e.preventDefault()}>
+        <div className="text-tools" onMouseDown={(e) => e.target !== imageInput.current && e.preventDefault()}>
           <button type="button" title={tr('Link para um ficheiro ou título das notas')} onClick={() => setLinking({ ...selection(), only: 'internal' })}><Link2 size={14} /> {tr('Link interno')}</button>
+          <button type="button" title={tr('Inserir imagem')} onClick={() => imageInput.current?.click()}><ImagePlus size={14} /> {tr('Imagem')}</button>
           <span className="hint">{tr('Cola um endereço web para criar um link, ou cola / arrasta uma imagem.')}</span>
+          <input
+            ref={imageInput}
+            type="file"
+            accept="image/png,image/jpeg,image/gif,image/webp"
+            multiple
+            hidden
+            onChange={(e) => (uploadImages(e.target.files ?? undefined, selection().start), (e.target.value = ''))}
+          />
         </div>
       )}
       {/* In <body>, so its forms are never nested in a form around this editor. */}

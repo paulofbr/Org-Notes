@@ -7,6 +7,7 @@ import { SHORTCUTS } from '../shortcuts'
 import { api, type Login, type Me } from '../api'
 import { OrgTextarea } from './OrgTextarea'
 import { TitleInput } from './TitleInput'
+import { cleanTag, knownTags } from '../org/tags'
 import { MailDialog } from './MailInbox'
 import { LANGS, isLang, lang, rememberLang, tr, type Lang } from '../i18n'
 
@@ -202,16 +203,9 @@ export function TagsDialog({ initial, onSubmit }: { initial: string[]; onSubmit:
   const { closeDialog, store } = useApp()
   const [tags, setTags] = useState(initial)
   const [input, setInput] = useState('')
-  const known = useMemo(() => {
-    const set = new Set<string>()
-    for (const doc of Object.values(store.docs)) {
-      doc.all.forEach((h) => h.tags.forEach((t) => set.add(t)))
-      ;(doc.keywords.TAGS ?? '').split(/[\s{}]+/).forEach((t) => t && !t.startsWith('(') && set.add(t.replace(/\(.\)$/, '')))
-    }
-    return [...set].sort()
-  }, [store.docs])
+  const known = useMemo(() => knownTags(store.docs), [store.docs])
   const add = (t: string) => {
-    const clean = t.trim().replace(/[^\w@#%]/g, '')
+    const clean = cleanTag(t)
     if (clean && !tags.includes(clean)) setTags([...tags, clean])
     setInput('')
   }

@@ -5,6 +5,7 @@ import { api, type ProposedItem } from '../api'
 import { allTemplates, captureInto, emptyProps, expand, fieldOptions, usesWhen, type CaptureTemplate } from '../org/capture'
 import type { OrgStore } from '../store'
 import { Modal } from './Dialogs'
+import { TagPicker } from './TagPicker'
 import { tr } from '../i18n'
 
 type Row = ProposedItem & { keep: boolean }
@@ -16,7 +17,7 @@ export function saveProposals(store: OrgStore, items: ProposedItem[]) {
   for (const it of items) {
     const tpl = templates.find((t) => t.file === it.file && t.key === it.key)
     if (!tpl) continue
-    const entry = expand(tpl, { title: it.title, body: it.body, date: it.date || undefined, time: it.time, props: it.props })
+    const entry = expand(tpl, { title: it.title, body: it.body, date: it.date || undefined, time: it.time, props: it.props, tags: it.tags })
     texts[tpl.file] = captureInto(texts[tpl.file] ?? store.files[tpl.file] ?? '', entry, tpl.datetree)
   }
   for (const [file, text] of Object.entries(texts)) store.update(file, text)
@@ -79,6 +80,7 @@ export function ProposalReview({ items, onSave, onCancel, saveLabel, cancelLabel
                 })}
               </div>
             )}
+            <TagPicker value={r.tags ?? []} onChange={(tags) => change(i, { tags })} />
             <textarea rows={Math.min(4, Math.max(2, r.body.split('\n').length))} value={r.body} onChange={(e) => change(i, { body: e.target.value })} />
           </fieldset>
         )

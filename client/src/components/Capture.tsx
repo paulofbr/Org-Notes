@@ -5,6 +5,7 @@ import { Modal } from './Dialogs'
 import { OrgTextarea } from './OrgTextarea'
 import { TitleInput } from './TitleInput'
 import { AiExtractDialog } from './AiExtract'
+import { TagPicker } from './TagPicker'
 import { aiEnabled, useAiReview } from './AiReview'
 import { api } from '../api'
 import { tr } from '../i18n'
@@ -22,6 +23,7 @@ export function CaptureDialog({ path, onEntry }: { path?: string; onEntry?: (ent
   const [date, setDate] = useState('')
   const [time, setTime] = useState('')
   const [props, setProps] = useState<Record<string, string>>({})
+  const [tags, setTags] = useState<string[]>([])
   const titleRef = useRef<HTMLInputElement>(null)
   const pickerRef = useRef<HTMLSelectElement>(null)
   useEffect(() => pickerRef.current?.focus(), [])
@@ -30,7 +32,7 @@ export function CaptureDialog({ path, onEntry }: { path?: string; onEntry?: (ent
 
   const save = () => {
     if (!title.trim() || !tpl) return
-    const entry = expand(tpl, { title: title.trim(), body, date: date || undefined, time, props })
+    const entry = expand(tpl, { title: title.trim(), body, date: date || undefined, time, props, tags })
     if (onEntry) onEntry(entry, tpl)
     else store.update(tpl.file, captureInto(store.files[tpl.file] ?? '', entry, tpl.datetree))
     closeDialog()
@@ -78,6 +80,7 @@ export function CaptureDialog({ path, onEntry }: { path?: string; onEntry?: (ent
             </label>
           )
         })}
+        <TagPicker value={tags} onChange={setTags} />
         {usesWhen(tpl) && (
           <div className="row">
             <label>{tr('Data')}<input type="date" value={date} onChange={(e) => setDate(e.target.value)} /></label>

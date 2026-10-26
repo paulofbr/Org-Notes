@@ -26,6 +26,7 @@ public class ExtractWindow : Window
     private readonly StackPanel _items = new() { Spacing = 10 };
     private readonly ScrollViewer _review = new() { MaxHeight = 560, IsVisible = false };
     private List<Template> _templates = [];
+    private List<string> _knownTags = [];
     private readonly List<Row> _rows = [];
 
     /// <summary>One proposed item's controls; its fields are rebuilt when the template changes.</summary>
@@ -39,6 +40,7 @@ public class ExtractWindow : Window
         public required Grid When;
         public required StackPanel Fields;
         public required TextBox Body;
+        public required TagPicker Tags;
     }
 
     public ExtractWindow(Api api, string initialText = "")
@@ -90,6 +92,7 @@ public class ExtractWindow : Window
         try
         {
             _templates = await _api.Templates();
+            _knownTags = await _api.Tags();
             var items = await _api.Extract(_text.Text);
             _items.Children.Clear();
             _rows.Clear();
@@ -120,7 +123,10 @@ public class ExtractWindow : Window
             When = new Grid { ColumnDefinitions = new("*,Auto"), ColumnSpacing = 8 },
             Fields = new StackPanel { Spacing = 6 },
             Body = new TextBox { Text = it.Body, AcceptsReturn = true, TextWrapping = TextWrapping.Wrap, MinHeight = 50 },
+            Tags = new TagPicker(),
         };
+        row.Tags.SetKnown(_knownTags);
+        row.Tags.Tags = it.Tags ?? [];
         if (DateOnly.TryParse(it.Date, out var d)) row.Date.SelectedDate = d.ToDateTime(TimeOnly.MinValue);
         row.When.Children.Add(row.Date);
         Grid.SetColumn(row.Time, 1);
@@ -131,7 +137,7 @@ public class ExtractWindow : Window
         head.Children.Add(row.TemplateBox);
         Grid.SetColumn(row.Title, 2);
         head.Children.Add(row.Title);
-        var panel = new StackPanel { Spacing = 6, Children = { head, row.When, row.Fields, row.Body } };
+        var panel = new StackPanel { Spacing = 6, Children = { head, row.When, row.Fields, row.Tags, row.Body } };
         _items.Children.Add(new Border { BorderBrush = Brushes.Gray, BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(6), Padding = new Thickness(8), Child = panel });
         _rows.Add(row);
 
@@ -181,7 +187,7 @@ public class ExtractWindow : Window
                 DateOnly? date = t.UsesWhen && r.Date.SelectedDate is { } d ? DateOnly.FromDateTime(d) : null;
                 TimeOnly? time = date != null && TimeOnly.TryParse(r.Time.Text, out var tm) ? tm : null;
                 var props = r.Fields.Children.OfType<StackPanel>().ToDictionary(p => (string)p.Tag!, p => FieldText(p.Children[1]));
-                await _api.Capture(t, r.Title.Text!.Trim(), r.Body.Text ?? "", date, time, props);
+                await _api.Capture(t, r.Title.Text!.Trim(), r.Body.Text ?? "", date, time, props, r.Tags.Tags);
             }
             Close();
         }

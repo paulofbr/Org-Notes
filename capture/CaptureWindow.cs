@@ -21,6 +21,7 @@ public class CaptureWindow : Window
     private readonly TextBox _title = new() { PlaceholderText = L.Tr("Título") };
     // One box per empty property of the selected template, like the web dialog.
     private readonly StackPanel _props = new() { Spacing = 10 };
+    private readonly TagPicker _tags = new();
     private readonly CalendarDatePicker _date = new() { PlaceholderText = L.Tr("Data"), HorizontalAlignment = HorizontalAlignment.Stretch };
     private readonly TextBox _time = new() { PlaceholderText = L.Tr("Hora (HH:MM)"), Width = 130 };
     private readonly Grid _when = new() { ColumnDefinitions = new("*,Auto"), ColumnSpacing = 8 };
@@ -109,7 +110,17 @@ public class CaptureWindow : Window
         var internalLink = new Button { Content = L.Tr("Link interno") };
         ToolTip.SetTip(internalLink, L.Tr("Link para um ficheiro ou título das notas") + " (Ctrl+L)");
         internalLink.Click += async (_, _) => await OpenLink();
-        // Images come in by pasting or dropping them on the notes, as on the web.
+        // Images come in from a file picker, or by pasting or dropping them on the notes, as on the web.
+        var image = new Button { Content = L.Tr("Imagem") };
+        image.Click += async (_, _) =>
+        {
+            var picked = await StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
+            {
+                AllowMultiple = true,
+                FileTypeFilter = [new FilePickerFileType(L.Tr("Imagens")) { Patterns = ["*.png", "*.jpg", "*.jpeg", "*.gif", "*.webp"] }],
+            });
+            await InsertImages(picked);
+        };
         DragDrop.SetAllowDrop(_body, true);
         _body.AddHandler(DragDrop.DragOverEvent, (_, e) => e.DragEffects = e.DataTransfer.Contains(DataFormat.File) ? DragDropEffects.Copy : e.DragEffects, handledEventsToo: true);
         _body.AddHandler(DragDrop.DropEvent, async (_, e) =>
@@ -120,7 +131,7 @@ public class CaptureWindow : Window
         }, handledEventsToo: true);
         ToolTip.SetTip(_fromText, L.Tr("Criar tarefas, eventos e contactos a partir de um email ou outro texto"));
         _fromText.Click += (_, _) => { new ExtractWindow(_api, _body.Text ?? "") { Icon = Icon }.Show(); Hide(); };
-        var tools = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8, Children = { internalLink, _fromText, new TextBlock { Text = L.Tr("ou cola / arrasta uma imagem para as notas"), Opacity = 0.6, VerticalAlignment = VerticalAlignment.Center } } };
+        var tools = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8, Children = { internalLink, image, _fromText, new TextBlock { Text = L.Tr("ou cola / arrasta uma imagem para as notas"), Opacity = 0.6, VerticalAlignment = VerticalAlignment.Center } } };
         _when.Children.Add(_date);
         Grid.SetColumn(_time, 1);
         _when.Children.Add(_time);
@@ -157,6 +168,7 @@ public class CaptureWindow : Window
                 new TextBlock { Text = L.Tr("Escolhe o ficheiro na lista (↑ ↓) ou pela tecla do template; Enter passa ao título."), Opacity = 0.6, FontSize = 12 },
                 _title,
                 _props,
+                _tags,
                 _when,
                 _body,
                 tools,
@@ -182,6 +194,7 @@ public class CaptureWindow : Window
     public async void ShowForCapture()
     {
         _title.Text = _body.Text = _time.Text = "";
+        _tags.Tags = [];
         _date.SelectedDate = null;
         _aiPanel.IsVisible = false;
         _status.Text = L.Tr("A carregar templates…");
@@ -191,6 +204,7 @@ public class CaptureWindow : Window
         try
         {
             _list = await _api.Templates();
+            _tags.SetKnown(await _api.Tags());
             var me = await _api.Me();
             if (L.Langs.Contains(me.Lang) && me.Lang != L.Lang)
             {
@@ -451,7 +465,7 @@ public class CaptureWindow : Window
         try
         {
             var props = _props.Children.ToDictionary(c => (string)c.Tag!, c => (c as TextBox)?.Text ?? (c as AutoCompleteBox)?.Text ?? "");
-            await _api.Capture(t, _title.Text.Trim(), _body.Text ?? "", date, date is null ? null : time, props);
+            await _api.Capture(t, _title.Text.Trim(), _body.Text ?? "", date, date is null ? null : time, props, _tags.Tags);
             Hide();
         }
         catch (Exception e) when (e is HttpRequestException or TaskCanceledException)

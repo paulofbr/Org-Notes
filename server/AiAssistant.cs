@@ -121,8 +121,8 @@ public class AiAssistant(IConfiguration config, IHttpClientFactory http)
     private const string ExtractInstructions = """
         You turn free text the author received or wrote (often an email) into items for their org-mode notes.
         The input has `now` (the author's date, weekday and time), `language`, `templates` (the author's capture templates:
-        id, name, file, the org text it produces, whether it takes a date, and its fields with their allowed options)
-        and `text`.
+        id, name, file, the org text it produces, whether it takes a date, and its fields with their allowed options),
+        `tags` (the tags the author already uses) and `text`.
         For each thing worth keeping, create one item with the most fitting template: something to do (a task),
         a meeting, call or appointment (an event), a new person's details (a contact), a fact worth noting.
         Do not create items for greetings, signatures or small talk; if nothing is worth keeping, return no items.
@@ -134,21 +134,23 @@ public class AiAssistant(IConfiguration config, IHttpClientFactory http)
         - fields: only the template's own fields. For a field with options, use one option when the text clearly
           matches it (e.g. the client among the contacts, matching the company or the sender); otherwise leave it out.
           For other fields, the value from the text (e.g. a contact's email or phone).
+        - tags: from `tags` only, the few that clearly apply to this item (e.g. a project or topic named in the text);
+          often none. Never invent new tags.
         - body: a short summary in `language`, 1-3 lines of org-mode text (`-` lists, no Markdown, no headlines), with
           the details that matter for this item: who, what, where, amounts, links. Not the whole text.
         Never invent names, dates, numbers or facts that are not in the text.
         Answer with JSON only: {"items": [{"template": <id>, "title": <text>, "date": <text>, "time": <text>,
-        "body": <text>, "fields": [{"name": <text>, "value": <text>}]}]}.
+        "body": <text>, "tags": [<text>], "fields": [{"name": <text>, "value": <text>}]}]}.
         """;
 
     public record ExtractedField(string Name, string Value);
 
-    public record ExtractedRaw(string Template, string Title, string Date, string Time, string Body, ExtractedField[] Fields);
+    public record ExtractedRaw(string Template, string Title, string Date, string Time, string Body, string[] Tags, ExtractedField[] Fields);
 
     private record ExtractedList(ExtractedRaw[] Items);
 
     /// <summary>Asks the model for the items in <paramref name="text"/>; <paramref name="templates"/> is their JSON description.</summary>
-    public async Task<ExtractedRaw[]> Extract(string text, string now, string language, string templates, CancellationToken ct)
+    public async Task<ExtractedRaw[]> Extract(string text, string now, string language, string templates, string tags, CancellationToken ct)
     {
         var str = new { type = "string" };
         var schema = new
@@ -165,10 +167,11 @@ public class AiAssistant(IConfiguration config, IHttpClientFactory http)
                     {
                         type = "object",
                         additionalProperties = false,
-                        required = new[] { "template", "title", "date", "time", "body", "fields" },
+                        required = new[] { "template", "title", "date", "time", "body", "tags", "fields" },
                         properties = new
                         {
                             template = str, title = str, date = str, time = str, body = str,
+                            tags = new { type = "array", items = str },
                             fields = new
                             {
                                 type = "array",
@@ -179,7 +182,7 @@ public class AiAssistant(IConfiguration config, IHttpClientFactory http)
                 },
             },
         };
-        var input = new Dictionary<string, string> { ["now"] = now, ["language"] = language, ["templates"] = templates, ["text"] = text };
+        var input = new Dictionary<string, string> { ["now"] = now, ["language"] = language, ["templates"] = templates, ["tags"] = tags, ["text"] = text };
         var json = _baseUrl != null
             ? await OpenAiCompatible(input, schema, ExtractInstructions, ct)
             : await Claude(input, schema, ExtractInstructions, ct);

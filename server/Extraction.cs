@@ -4,7 +4,7 @@ using System.Text.Json;
 namespace OrgNotes.Server;
 
 /// <summary>An item proposed from free text, ready to be captured with its template.</summary>
-public record ProposedItem(string File, string Key, string Template, string Title, string Date, string Time, string Body, Dictionary<string, string> Props);
+public record ProposedItem(string File, string Key, string Template, string Title, string Date, string Time, string Body, Dictionary<string, string> Props, List<string> Tags);
 
 /// <summary>
 /// Turns free text (an email, notes) into items for the user's capture templates with the AI: builds the context from
@@ -38,7 +38,9 @@ public class Extraction(AiAssistant ai)
             fields = x.Template.Props.Select(p => new { name = p, options = x.Options.GetValueOrDefault(p) ?? [] }),
         }));
         var nowText = now.ToString("yyyy-MM-dd (dddd) HH:mm", CultureInfo.InvariantCulture);
-        var raw = await ai.Extract(text.Length > MaxText ? text[..MaxText] : text, nowText, LanguageNames.GetValueOrDefault(lang, "European Portuguese"), context, ct);
+        // The model only picks among the tags already in use, so the notes do not fill with near-duplicates.
+        var known = store.List().SelectMany(f => OrgCapture.Tags(store.Read(f.Path) ?? "")).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+        var raw = await ai.Extract(text.Length > MaxText ? text[..MaxText] : text, nowText, LanguageNames.GetValueOrDefault(lang, "European Portuguese"), context, JsonSerializer.Serialize(known), ct);
 
         // The model only proposes: unknown templates, foreign fields and malformed dates are dropped.
         var byId = templates.ToDictionary(x => x.Id, x => x.Template);
@@ -51,7 +53,8 @@ public class Extraction(AiAssistant ai)
             foreach (var f in r.Fields)
                 if (t.Props.FirstOrDefault(p => p.Equals(f.Name, StringComparison.OrdinalIgnoreCase)) is { } name && f.Value.Trim() is { Length: > 0 } value)
                     props[name] = value;
-            return new ProposedItem(t.File, t.Key, t.Name, r.Title.Trim(), date, time, r.Body.Trim(), props);
+            var tags = r.Tags.Select(x => known.FirstOrDefault(k => k.Equals(x.Trim(), StringComparison.OrdinalIgnoreCase))).OfType<string>().Distinct().ToList();
+            return new ProposedItem(t.File, t.Key, t.Name, r.Title.Trim(), date, time, r.Body.Trim(), props, tags);
         }).ToList();
     }
 }

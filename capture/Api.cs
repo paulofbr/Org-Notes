@@ -11,7 +11,7 @@ public record Improved(Dictionary<string, string> Fields, string[] Changes);
 public record Me(bool Ai, string? Lang, string? WindowsVersion);
 
 /// <summary>An item the server's AI proposes from free text, for one of the user's templates.</summary>
-public record ProposedItem(string File, string Key, string Template, string Title, string Date, string Time, string Body, Dictionary<string, string> Props);
+public record ProposedItem(string File, string Key, string Template, string Title, string Date, string Time, string Body, Dictionary<string, string> Props, List<string>? Tags);
 
 public record LinkTargets(string File, List<string> Headings);
 
@@ -66,10 +66,10 @@ public class Api(Config config)
         return await response.Content.ReadFromJsonAsync<Improved>(Json) ?? throw new HttpRequestException(L.Tr("Resposta vazia."));
     }
 
-    public async Task Capture(Template t, string title, string body, DateOnly? date, TimeOnly? time, Dictionary<string, string> props)
+    public async Task Capture(Template t, string title, string body, DateOnly? date, TimeOnly? time, Dictionary<string, string> props, List<string>? tags = null)
     {
         var request = Request(HttpMethod.Post, "/api/capture");
-        request.Content = JsonContent.Create(new { file = t.File, key = t.Key, title, body, date, time, props, now = DateTime.Now }, options: Json);
+        request.Content = JsonContent.Create(new { file = t.File, key = t.Key, title, body, date, time, props, tags, now = DateTime.Now }, options: Json);
         using var response = await Http.SendAsync(request);
         await Check(response);
     }
@@ -102,6 +102,14 @@ public class Api(Config config)
         }
         await Check(response);
         return await response.Content.ReadFromJsonAsync<List<ProposedItem>>(Json) ?? [];
+    }
+
+    /// <summary>Every tag in use, to offer when tagging.</summary>
+    public async Task<List<string>> Tags()
+    {
+        using var response = await Http.SendAsync(Request(HttpMethod.Get, "/api/tags"));
+        await Check(response);
+        return await response.Content.ReadFromJsonAsync<List<string>>(Json) ?? [];
     }
 
     /// <summary>Every file and its headlines, for internal links.</summary>

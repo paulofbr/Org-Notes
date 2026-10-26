@@ -6,6 +6,7 @@ import { agenda, compileMatch, entries } from './agenda'
 import { captureInto, emptyProps, expand, fieldOptions, hideTemplates, propertyOptions, setPropertyOptions, setTemplates, templatesIn } from './capture'
 import { parseTimestamp } from './timestamp'
 import { clientKey, clientValues, hasValue } from './clients'
+import { addTags, cleanTag } from './tags'
 
 const SAMPLE = `#+TODO: TODO NEXT | DONE
 #+FILETAGS: :f:
@@ -238,6 +239,22 @@ describe('capture', () => {
       '#+TITLE: C\n#+PROPERTY: COMPANY_ALL Acme "Initech Lda"\n#+PROPERTY: TIPO_ALL A\n#+BEGIN_CAPTURE k C\n,* %{title}\n#+END_CAPTURE\n\n* x',
     )
     expect(setPropertyOptions('#+TITLE: C\n\n* x', { A: ['1'] })).toBe('#+TITLE: C\n#+PROPERTY: A_ALL 1\n\n* x')
+  })
+})
+
+describe('tags', () => {
+  it('reads tags with letters of any language', () => {
+    expect(parseOrg('* TODO Rever :urgência:cliente:\n').all[0]).toMatchObject({ title: 'Rever', tags: ['urgência', 'cliente'] })
+  })
+  it('adds tags to a headline, after the ones it has', () => {
+    expect(addTags('* TODO Rever', ['urgência', ' a b '])).toBe('* TODO Rever :urgência:a_b:')
+    expect(addTags('** Nota   :web:', ['web', 'novo'])).toBe('** Nota :web:novo:')
+    expect(addTags('texto', ['x'])).toBe('texto')
+    expect(cleanTag('c/ espaços!')).toBe('c_espaços')
+  })
+  it('puts the chosen tags on the captured headline', () => {
+    const t = { key: 't', name: 'T', file: 't.org', datetree: false, body: '* TODO %{title}\n%{body}' }
+    expect(expand(t, { title: 'Ligar', body: '', tags: ['cliente'] })).toEqual(['* TODO Ligar :cliente:'])
   })
 })
 

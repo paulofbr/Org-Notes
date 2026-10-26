@@ -56,6 +56,8 @@ public static class L
         ["A passar a limpo, com letra bonita…"] = ("Making a fair copy, in neat handwriting…", "Je recopie au propre, avec une belle écriture…", "Pasando a limpio, con buena letra…"),
         ["Texto (opcional)"] = ("Text (optional)", "Texte (facultatif)", "Texto (opcional)"),
         ["Inserir"] = ("Insert", "Insérer", "Insertar"),
+        ["Imagem"] = ("Image", "Image", "Imagen"),
+        ["Imagens"] = ("Images", "Images", "Imágenes"),
         ["ou cola / arrasta uma imagem para as notas"] = ("or paste / drop an image on the notes", "ou colle / glisse une image dans les notes", "o pega / arrastra una imagen a las notas"),
         ["A carregar imagem…"] = ("Uploading image…", "Envoi de l'image…", "Subiendo imagen…"),
         ["Versão {0}"] = ("Version {0}", "Version {0}", "Versión {0}"),
@@ -80,6 +82,8 @@ public static class L
         ["Lembretes · Org Notes"] = ("Reminders · Org Notes", "Rappels · Org Notes", "Recordatorios · Org Notes"),
         ["Adiar 5 min"] = ("Snooze 5 min", "Reporter de 5 min", "Posponer 5 min"),
         ["Mostrar os lembretes numa janela por cima das outras"] = ("Show reminders in a window above the others", "Afficher les rappels dans une fenêtre au-dessus des autres", "Mostrar los recordatorios en una ventana encima de las demás"),
+        ["Etiquetas"] = ("Tags", "Étiquettes", "Etiquetas"),
+        ["Novas etiquetas (separadas por espaços)"] = ("New tags (separated by spaces)", "Nouvelles étiquettes (séparées par des espaces)", "Etiquetas nuevas (separadas por espacios)"),
         // AI review panel
         ["Sem sugestões: o texto parece estar bem."] = ("No suggestions: the text looks fine.", "Aucune suggestion : le texte semble correct.", "Sin sugerencias: el texto parece estar bien."),
         ["Descartar"] = ("Discard", "Ignorer", "Descartar"),
