@@ -180,7 +180,9 @@ The text of your notes is sent to the chosen provider; free tiers may use it for
 
 ## Login
 
-The site always requires a login, and only the emails in `Auth:AllowedEmails` get in (an empty list lets nobody in).
+The site always requires a login, and only allowed emails get in: the ones in `Auth:AllowedEmails` plus those the
+administrator adds on the site (*Conta e notificações* → *Gerir logins*, kept in `<OrgDirectory>/allowed.json`). The
+administrators are `Auth:Admins`, or else the first allowed email; only they see that page.
 By default you sign in with email and password: the first time, each allowed email picks its password in *Criar password*
 (create password). Anyone who knows an allowed email that has no password yet could set one first, so create yours right away.
 Files from older versions without login (directly in `OrgDirectory`) move to the first user's folder.

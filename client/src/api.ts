@@ -12,7 +12,16 @@ export interface Me {
   token: string
   ntfy: { server: string; topic: string; enabled: boolean }
   lang?: string
+  admin: boolean
   windowsInstaller: boolean
+}
+
+export interface Login {
+  email: string
+  /** From the server's configuration: cannot be removed on the site. */
+  fixed: boolean
+  admin: boolean
+  hasPassword: boolean
 }
 
 async function check(res: Response) {
@@ -50,6 +59,12 @@ export const api = {
   uploadIcon: async (png: Blob): Promise<{ name: string }> =>
     (await check(await fetch('/api/icons', { method: 'POST', body: png, headers: { 'Content-Type': 'image/png' } }))).json(),
   newToken: async (): Promise<{ token: string }> => (await check(await fetch('/api/me/token', { method: 'POST' }))).json(),
+  logins: async (): Promise<Login[]> => (await check(await fetch('/api/admin/logins'))).json(),
+  addLogin: async (email: string) => {
+    const res = await fetch('/api/admin/logins', { method: 'POST', body: JSON.stringify({ email }), headers: { 'Content-Type': 'application/json' } })
+    if (!res.ok) throw new Error((await res.text()).replace(/^"|"$/g, ''))
+  },
+  removeLogin: async (email: string) => check(await fetch(`/api/admin/logins/${encodeURIComponent(email)}`, { method: 'DELETE' })),
   setLang: async (lang: string) =>
     check(await fetch('/api/me/lang', { method: 'PUT', body: JSON.stringify({ lang }), headers: { 'Content-Type': 'application/json' } })),
   setNotify: async (enabled: boolean) =>

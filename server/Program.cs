@@ -21,6 +21,8 @@ var root = Path.GetFullPath(builder.Configuration["OrgDirectory"] ?? "data", bui
 var google = builder.Configuration.GetSection("Auth:Google");
 var microsoft = builder.Configuration.GetSection("Auth:Microsoft");
 var allowed = builder.Configuration.GetSection("Auth:AllowedEmails").Get<string[]>() ?? [];
+var access = new Access(root, allowed, builder.Configuration.GetSection("Auth:Admins").Get<string[]>() ?? []);
+builder.Services.AddSingleton(access);
 
 builder.Services.AddSingleton(new Users(root, Path.Combine(AppContext.BaseDirectory, "Seed")));
 var windowsInstaller = Path.Combine(AppContext.BaseDirectory, "downloads", "OrgNotes-client-win-x64.zip");
@@ -96,7 +98,7 @@ app.Use(async (ctx, next) =>
         return;
     }
     var email = ctx.User.FindFirstValue(ClaimTypes.Email) ?? "";
-    if (!allowed.Any(a => Users.KeyOfEmail(a) == Users.KeyOfEmail(email)))
+    if (!access.IsAllowed(email))
     {
         ctx.Response.StatusCode = 403;
         await ctx.Response.WriteAsync(Strings.Tr(ctx, "Sem acesso: {0} não está autorizado. Sair: /logout", email));
@@ -104,7 +106,7 @@ app.Use(async (ctx, next) =>
     }
     await next();
 });
-Login.Map(app, allowed, [.. providers]);
+Login.Map(app, access, [.. providers]);
 
 app.UseDefaultFiles();
 // index.html must be revalidated so a new build shows up on reload; hashed assets can stay cached.
@@ -144,6 +146,22 @@ app.MapDelete("/api/folders/{*path}", (string path, HttpContext ctx, Users users
 app.MapPost("/api/rename", (RenameRequest req, HttpContext ctx, Users users) =>
     users.For(ctx.User).Rename(req.From, req.To) ? Results.NoContent() : Results.BadRequest("Cannot rename"));
 
+// Who may sign in, for the administrator: the configured emails (fixed) and the ones added here.
+app.MapGet("/api/admin/logins", (HttpContext ctx, Users users) =>
+    !IsAdmin(ctx) ? Results.StatusCode(403) : Results.Ok(
+        access.Configured.Select(e => (Email: e, Fixed: true)).Concat(access.Added.Select(e => (Email: e, Fixed: false)))
+            .Select(l => new { email = l.Email, @fixed = l.Fixed, admin = access.IsAdmin(l.Email), hasPassword = users.HasPassword(Users.KeyOfEmail(l.Email)) })));
+
+app.MapPost("/api/admin/logins", (LoginRequest req, HttpContext ctx) =>
+    !IsAdmin(ctx) ? Results.StatusCode(403)
+    : access.Add(req.Email) ? Results.NoContent() : Results.BadRequest(Strings.Tr(ctx, "Email inválido ou já autorizado")));
+
+app.MapDelete("/api/admin/logins/{email}", (string email, HttpContext ctx) =>
+    !IsAdmin(ctx) ? Results.StatusCode(403)
+    : access.Remove(email) ? Results.NoContent() : Results.BadRequest(Strings.Tr(ctx, "Só se podem retirar os emails acrescentados aqui")));
+
+bool IsAdmin(HttpContext ctx) => access.IsAdmin(ctx.User.FindFirstValue(ClaimTypes.Email) ?? "");
+
 // The user's reminders for the day, for the capture app to show natively. `now` is the user's wall-clock time,
 // since the server may be in another time zone.
 app.MapGet("/api/reminders", (DateTime? now, HttpContext ctx, Users users, Notifier notifier) =>
@@ -152,7 +170,7 @@ app.MapGet("/api/reminders", (DateTime? now, HttpContext ctx, Users users, Notif
 app.MapGet("/api/me", (HttpContext ctx, Users users, Notifier notifier, AiAssistant ai) =>
 {
     var s = users.Settings(users.Key(ctx.User));
-    return new { email = ctx.User.FindFirstValue(ClaimTypes.Email), ai = ai.Enabled, token = users.Token(users.Key(ctx.User)), ntfy = new { server = notifier.NtfyServer, topic = s.NtfyTopic, enabled = s.Notify }, lang = s.Lang, windowsInstaller = File.Exists(windowsInstaller),
+    return new { email = ctx.User.FindFirstValue(ClaimTypes.Email), ai = ai.Enabled, token = users.Token(users.Key(ctx.User)), ntfy = new { server = notifier.NtfyServer, topic = s.NtfyTopic, enabled = s.Notify }, lang = s.Lang, admin = access.IsAdmin(ctx.User.FindFirstValue(ClaimTypes.Email) ?? ""), windowsInstaller = File.Exists(windowsInstaller),
         windowsVersion = File.Exists(windowsVersion) ? File.ReadAllText(windowsVersion).Trim() : null };
 });
 
@@ -304,4 +322,5 @@ record NotifyRequest(bool Enabled);
 record ImproveRequest(Dictionary<string, string> Fields, string? Mode);
 record TemplateRequest(string Description);
 record LangRequest(string Lang);
+record LoginRequest(string Email);
 record CaptureRequest(string File, string Key, string Title, string? Body, DateOnly? Date, TimeOnly? Time, DateTime? Now, Dictionary<string, string>? Props);

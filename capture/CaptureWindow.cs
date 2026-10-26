@@ -3,6 +3,7 @@ using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Layout;
 using Avalonia.Media;
+using Avalonia.Platform.Storage;
 
 namespace OrgNotes.Capture;
 
@@ -29,6 +30,12 @@ public class CaptureWindow : Window
         FontFamily = new FontFamily("monospace"),
     };
     private readonly TextBlock _status = new() { Opacity = 0.7, TextWrapping = TextWrapping.Wrap };
+    // Links and images, as the web editor's tools: a link goes where the cursor was in the title or the notes.
+    private readonly TextBox _linkUrl = new() { PlaceholderText = L.Tr("Endereço (https://…)") };
+    private readonly TextBox _linkText = new() { PlaceholderText = L.Tr("Texto (opcional)") };
+    private readonly Grid _linkPanel = new() { ColumnDefinitions = new("2*,*,Auto"), ColumnSpacing = 8, IsVisible = false };
+    private TextBox _linkTarget;
+    private (int Start, int End) _linkAt;
     private readonly Button _save = new() { Content = L.Tr("Guardar (Ctrl+Enter)"), IsDefault = false, Classes = { "accent" } };
     // Four-point sparkle, like the web's AI button.
     private readonly Button _ai = new()
@@ -73,6 +80,21 @@ public class CaptureWindow : Window
         Topmost = true;
         WindowStartupLocation = WindowStartupLocation.CenterScreen;
 
+        _linkTarget = _body;
+        _title.GotFocus += (_, _) => _linkTarget = _title;
+        _body.GotFocus += (_, _) => _linkTarget = _body;
+        var insertLink = new Button { Content = L.Tr("Inserir") };
+        insertLink.Click += (_, _) => InsertLink();
+        Grid.SetColumn(_linkText, 1);
+        Grid.SetColumn(insertLink, 2);
+        _linkPanel.Children.Add(_linkUrl);
+        _linkPanel.Children.Add(_linkText);
+        _linkPanel.Children.Add(insertLink);
+        var link = new Button { Content = L.Tr("Link (Ctrl+L)") };
+        link.Click += (_, _) => OpenLink();
+        var image = new Button { Content = L.Tr("Imagem") };
+        image.Click += async (_, _) => await AddImage();
+        var tools = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8, Children = { link, image } };
         _when.Children.Add(_date);
         Grid.SetColumn(_time, 1);
         _when.Children.Add(_time);
@@ -111,6 +133,8 @@ public class CaptureWindow : Window
                 _props,
                 _when,
                 _body,
+                tools,
+                _linkPanel,
                 _status,
                 _aiPanel,
                 actions,
@@ -163,6 +187,68 @@ public class CaptureWindow : Window
         }
     }
 
+    /// <summary>Opens the link panel for the title or notes box last used, keeping its selection as the link's text.</summary>
+    private void OpenLink()
+    {
+        var text = _linkTarget.Text ?? "";
+        var start = Math.Clamp(Math.Min(_linkTarget.SelectionStart, _linkTarget.SelectionEnd), 0, text.Length);
+        var end = Math.Clamp(Math.Max(_linkTarget.SelectionStart, _linkTarget.SelectionEnd), start, text.Length);
+        _linkAt = (start, end);
+        _linkUrl.Text = "";
+        _linkText.Text = text[start..end];
+        _linkPanel.IsVisible = true;
+        _linkUrl.Focus();
+    }
+
+    private void InsertLink()
+    {
+        var url = _linkUrl.Text?.Trim();
+        if (string.IsNullOrEmpty(url)) return;
+        var text = _linkText.Text?.Trim();
+        _linkPanel.IsVisible = false;
+        Insert(_linkTarget, string.IsNullOrEmpty(text) ? $"[[{url}]]" : $"[[{url}][{text}]]", _linkAt.Start, _linkAt.End);
+    }
+
+    private static void Insert(TextBox box, string value, int start, int end)
+    {
+        var text = box.Text ?? "";
+        start = Math.Clamp(start, 0, text.Length);
+        end = Math.Clamp(end, start, text.Length);
+        box.Text = text[..start] + value + text[end..];
+        box.Focus();
+        box.CaretIndex = start + value.Length;
+    }
+
+    /// <summary>Uploads a picked image next to the chosen file's notes and links it in the notes, as the web does.</summary>
+    private async Task AddImage()
+    {
+        if (_selected is not { } t) return;
+        var at = _body.CaretIndex;
+        var picked = await StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
+        {
+            AllowMultiple = false,
+            FileTypeFilter = [new FilePickerFileType(L.Tr("Imagens")) { Patterns = ["*.png", "*.jpg", "*.jpeg", "*.gif", "*.webp"] }],
+        });
+        if (picked.Count == 0) return;
+        _status.Text = L.Tr("A carregar imagem…");
+        try
+        {
+            await using var stream = await picked[0].OpenReadAsync();
+            using var buffer = new MemoryStream();
+            await stream.CopyToAsync(buffer);
+            var path = await _api.UploadImage(t.File, buffer.ToArray());
+            // Relative to the notes' file, as org (and the web) write file links.
+            var dir = Path.GetDirectoryName(t.File)?.Replace('\\', '/') ?? "";
+            var link = dir == "" ? path : Path.GetRelativePath(dir, path).Replace('\\', '/');
+            Insert(_body, $"[[file:{link}]]", at, at);
+            _status.Text = "";
+        }
+        catch (Exception e) when (e is HttpRequestException or TaskCanceledException or IOException)
+        {
+            _status.Text = e.Message;
+        }
+    }
+
     /// <summary>Closes the window for good, e.g. to rebuild it in another language.</summary>
     public void Discard()
     {
@@ -191,7 +277,15 @@ public class CaptureWindow : Window
         Template? hit = null;
         // While the list is open, Enter/Esc/arrows belong to it.
         if (_templates.IsDropDownOpen && e.Key is Key.Enter or Key.Escape or Key.Up or Key.Down) return;
-        if (e.Key == Key.Escape) Hide();
+        var inLinkPanel = FocusManager?.GetFocusedElement() is var f && (f == _linkUrl || f == _linkText);
+        if (e.Key == Key.Escape && _linkPanel.IsVisible)
+        {
+            _linkPanel.IsVisible = false;
+            _linkTarget.Focus();
+        }
+        else if (e.Key == Key.Enter && inLinkPanel && e.KeyModifiers == KeyModifiers.None) InsertLink();
+        else if (e.Key == Key.L && e.KeyModifiers == KeyModifiers.Control) OpenLink();
+        else if (e.Key == Key.Escape) Hide();
         else if (e.Key == Key.R && e.KeyModifiers == KeyModifiers.Alt) await Review("develop");
         else if (e.Key == Key.R && e.KeyModifiers == (KeyModifiers.Alt | KeyModifiers.Shift)) await Review("fix");
         else if (e.Key == Key.Enter && e.KeyModifiers.HasFlag(KeyModifiers.Control)) await Save();

@@ -112,7 +112,7 @@ public class Users(string root, string seedDir)
     private void AdoptRootFiles(string key)
     {
         if (Exists(key) || All().Any() || !Directory.Exists(root)) return;
-        var entries = Directory.EnumerateFileSystemEntries(root).Where(e => Path.GetFileName(e) != "users").ToList();
+        var entries = Directory.EnumerateFileSystemEntries(root).Where(e => Path.GetFileName(e) is not ("users" or Access.FileName)).ToList();
         if (entries.Count == 0) return;
         Directory.CreateDirectory(Dir(key));
         foreach (var e in entries)

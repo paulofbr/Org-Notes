@@ -11,9 +11,9 @@ namespace OrgNotes.Server;
 /// </summary>
 public static class Login
 {
-    public static void Map(WebApplication app, string[] allowed, string[] providers)
+    public static void Map(WebApplication app, Access access, string[] providers)
     {
-        bool IsAllowed(string email) => allowed.Any(a => Users.KeyOfEmail(a) == Users.KeyOfEmail(email));
+        bool IsAllowed(string email) => access.IsAllowed(email);
 
         // ?lang= picks the page's language (kept in a cookie) before the user has a setting of their own.
         app.MapGet("/login", (string? returnUrl, string? lang, HttpContext ctx) =>

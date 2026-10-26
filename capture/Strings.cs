@@ -54,6 +54,13 @@ public static class L
         ["A convencer o corretor ortográfico a trabalhar ao domingo…"] = ("Talking the spellchecker into working on Sunday…", "Je convaincs le correcteur de travailler le dimanche…", "Convenciendo al corrector de trabajar el domingo…"),
         ["A procurar o «ç» que caiu atrás do sofá…"] = ("Looking for the apostrophe that fell behind the sofa…", "Je cherche le « ç » tombé derrière le canapé…", "Buscando la «ñ» que se cayó detrás del sofá…"),
         ["A passar a limpo, com letra bonita…"] = ("Making a fair copy, in neat handwriting…", "Je recopie au propre, avec une belle écriture…", "Pasando a limpio, con buena letra…"),
+        ["Endereço (https://…)"] = ("Address (https://…)", "Adresse (https://…)", "Dirección (https://…)"),
+        ["Texto (opcional)"] = ("Text (optional)", "Texte (facultatif)", "Texto (opcional)"),
+        ["Inserir"] = ("Insert", "Insérer", "Insertar"),
+        ["Link (Ctrl+L)"] = ("Link (Ctrl+L)", "Lien (Ctrl+L)", "Enlace (Ctrl+L)"),
+        ["Imagem"] = ("Image", "Image", "Imagen"),
+        ["Imagens"] = ("Images", "Images", "Imágenes"),
+        ["A carregar imagem…"] = ("Uploading image…", "Envoi de l'image…", "Subiendo imagen…"),
         // AI review panel
         ["Sem sugestões: o texto parece estar bem."] = ("No suggestions: the text looks fine.", "Aucune suggestion : le texte semble correct.", "Sin sugerencias: el texto parece estar bien."),
         ["Descartar"] = ("Discard", "Ignorer", "Descartar"),

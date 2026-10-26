@@ -38,6 +38,8 @@ public static class Strings
         ["O pedido foi recusado pelo modelo."] = ("The model refused the request.", "Le modèle a refusé la requête.", "El modelo rechazó la petición."),
         ["Resposta vazia do modelo."] = ("Empty answer from the model.", "Réponse vide du modèle.", "Respuesta vacía del modelo."),
         ["Falta configurar Ai:Model."] = ("Ai:Model is not configured.", "Ai:Model n'est pas configuré.", "Falta configurar Ai:Model."),
+        ["Email inválido ou já autorizado"] = ("Invalid email, or already allowed", "E-mail non valide ou déjà autorisé", "Email no válido o ya autorizado"),
+        ["Só se podem retirar os emails acrescentados aqui"] = ("Only the emails added here can be removed", "Seuls les e-mails ajoutés ici peuvent être retirés", "Solo se pueden quitar los emails añadidos aquí"),
         // Notifications
         ["em {0} min"] = ("in {0} min", "dans {0} min", "en {0} min"),
         ["agora"] = ("now", "maintenant", "ahora"),

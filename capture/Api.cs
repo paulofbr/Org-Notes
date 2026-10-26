@@ -69,6 +69,18 @@ public class Api(Config config)
         await Check(response);
     }
 
+    /// <summary>Uploads an image next to <paramref name="file"/>'s notes; returns its path from the notes' root.</summary>
+    public async Task<string> UploadImage(string file, byte[] image)
+    {
+        var request = Request(HttpMethod.Post, $"/api/images?file={Uri.EscapeDataString(file)}");
+        request.Content = new ByteArrayContent(image);
+        request.Content.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
+        using var response = await Http.SendAsync(request);
+        await Check(response);
+        using var doc = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        return doc.RootElement.GetProperty("path").GetString() ?? throw new HttpRequestException(L.Tr("Resposta vazia."));
+    }
+
     /// <summary>Saves the server's Windows installer to <paramref name="path"/>.</summary>
     public async Task DownloadInstaller(string path)
     {

@@ -167,6 +167,7 @@ main { display: flex; flex-direction: column; min-width: 0; overflow: hidden; }
 .empty { color: var(--muted); padding: 1.5rem 0; text-align: center; display: flex; gap: 0.5rem; justify-content: center; align-items: center; }
 
 .clockbar { display: flex; align-items: center; gap: 0.6rem; background: var(--accent-soft); border-radius: 99px; padding: 0.2rem 0.4rem 0.2rem 0.9rem; margin-left: auto; max-width: 100%; }
+button.link { background: none; border: none; padding: 0; color: var(--accent); font: inherit; cursor: pointer; }
 .clockbar .link { background: none; border: none; padding: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .clockbar .elapsed { font-family: var(--mono); font-weight: 600; color: var(--accent); }
 .pulse { width: 8px; height: 8px; border-radius: 50%; background: var(--danger); animation: pulse 1.5s infinite; flex: none; }

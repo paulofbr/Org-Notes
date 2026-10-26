@@ -4,7 +4,7 @@ import { dateKey, type Timestamp } from '../org/timestamp'
 import { outlinePath } from '../org/parser'
 import { refile } from '../org/edit'
 import { SHORTCUTS } from '../shortcuts'
-import { api, type Me } from '../api'
+import { api, type Login, type Me } from '../api'
 import { OrgTextarea } from './OrgTextarea'
 import { TitleInput } from './TitleInput'
 import { LANGS, isLang, lang, rememberLang, tr, type Lang } from '../i18n'
@@ -354,8 +354,49 @@ export function HelpDialog() {
   )
 }
 
-export function AccountDialog() {
+/** The administrator's list of who may sign in: add an email, or remove one added here. */
+export function LoginsDialog() {
   const { closeDialog } = useApp()
+  const [logins, setLogins] = useState<Login[]>()
+  const [email, setEmail] = useState('')
+  const [error, setError] = useState('')
+  const load = () => api.logins().then(setLogins, (e) => setError(String(e.message ?? e)))
+  useEffect(() => void load(), [])
+  const run = (p: Promise<unknown>) => (setError(''), p.then(load, (e) => setError(String(e.message ?? e))))
+  return (
+    <Modal title={tr('Logins')} onClose={closeDialog}>
+      <p className="hint">{tr('Só os emails desta lista podem entrar. Cada pessoa escolhe a sua password na primeira vez, em «Criar password».')}</p>
+      {error && <p className="hint">{error}</p>}
+      <table className="props">
+        <tbody>
+          {logins?.map((l) => (
+            <tr key={l.email}>
+              <th>{l.email}{l.admin && <span className="muted"> · {tr('administrador')}</span>}</th>
+              <td className="muted">{l.hasPassword ? tr('já entrou') : tr('ainda sem password')}</td>
+              <td>
+                {l.fixed ? (
+                  <span className="muted" title={tr('Definido na configuração do servidor')}>{tr('configuração')}</span>
+                ) : (
+                  <button type="button" className="danger" onClick={() => confirm(tr('Retirar o acesso a {email}?', { email: l.email })) && run(api.removeLogin(l.email))}>{tr('Retirar')}</button>
+                )}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <form onSubmit={(e) => (e.preventDefault(), email.trim() && run(api.addLogin(email.trim()).then(() => setEmail(''))))}>
+        <div className="row">
+          <label>{tr('Novo email')}<input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="email@example.com" /></label>
+          <button className="primary" disabled={!email.trim()}>{tr('Acrescentar')}</button>
+        </div>
+      </form>
+      <div className="actions"><button type="button" onClick={closeDialog}>{tr('Fechar')}</button></div>
+    </Modal>
+  )
+}
+
+export function AccountDialog() {
+  const { closeDialog, showDialog } = useApp()
   const [me, setMe] = useState<Me>()
   const [error, setError] = useState('')
   useEffect(() => void api.me().then(setMe, (e) => setError(String(e))), [])
@@ -366,7 +407,12 @@ export function AccountDialog() {
   return (
     <Modal title={tr('Conta e notificações')} onClose={closeDialog}>
       {error && <p className="hint">{error}</p>}
-      {me && <p>{tr('Sessão')}: <b>{me.email}</b> · <a href="/logout">{tr('Sair')}</a></p>}
+      {me && (
+        <p>
+          {tr('Sessão')}: <b>{me.email}</b> · <a href="/logout">{tr('Sair')}</a>
+          {me.admin && <> · <button type="button" className="link" onClick={() => showDialog(<LoginsDialog />)}>{tr('Gerir logins')}</button></>}
+        </p>
+      )}
       {me && (
         <label>
           {tr('Língua')}
