@@ -19,6 +19,7 @@ import { moveFocus } from '../shortcuts'
 import { useAiReview } from './AiReview'
 import { TitleInput } from './TitleInput'
 import { CaptureDialog } from './Capture'
+import { useClientMatch } from './ClientFilter'
 import { tr } from '../i18n'
 
 const hasTemplates = (path: string, doc: OrgDoc) => templatesIn(path, doc.lines.join('\n')).length > 0
@@ -95,9 +96,10 @@ export function Outline({ path, doc, state, setState, filter, narrow, setNarrow,
     app.edit(path, fn)
   }
 
+  const clientMatch = useClientMatch()
   const matcher = useMemo(() => {
     const q = filter.trim()
-    if (!q) return undefined
+    if (!q && !clientMatch) return undefined
     let match: ((e: { path: string; doc: OrgDoc; h: Headline }) => boolean) | undefined
     try {
       match = compileMatch(q)
@@ -106,10 +108,10 @@ export function Outline({ path, doc, state, setState, filter, narrow, setNarrow,
     }
     const visible = new Set<string>()
     for (const h of doc.all)
-      if (textMatch({ path, doc, h }, q) || match?.({ path, doc, h }))
+      if ((!clientMatch || clientMatch(h)) && (!q || textMatch({ path, doc, h }, q) || match?.({ path, doc, h })))
         for (let p: Headline | undefined = h; p; p = p.parent) visible.add(p.key)
     return visible
-  }, [filter, doc, path])
+  }, [filter, doc, path, clientMatch])
 
   const focusLater = (h: Headline) => (pendingFocus.current = { title: h.title, line: h.line })
   // Properties with a set of values (`#+PROPERTY: KEY_ALL` or `KEY_FROM`) show on each headline, like tags.

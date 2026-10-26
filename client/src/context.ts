@@ -21,6 +21,9 @@ export interface AppCtx {
   refile: (path: string, line: number) => void
   showDialog: (node: ReactNode) => void
   closeDialog: () => void
+  /** The client the notes and the agenda are filtered by ('' for all). */
+  client: string
+  setClient: (client: string) => void
 }
 
 export const Ctx = createContext<AppCtx>(null!)

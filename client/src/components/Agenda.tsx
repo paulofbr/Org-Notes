@@ -9,6 +9,7 @@ import { KeywordDialog } from './Dialogs'
 import { addDays, dateKey, formatDuration, toDate } from '../org/timestamp'
 import { Inline, formatDate } from './Inline'
 import { tr } from '../i18n'
+import { ClientFilter, useClientMatch } from './ClientFilter'
 
 type Tab = 'day' | 'week' | 'todo' | 'search' | 'clock'
 
@@ -28,6 +29,7 @@ export function AgendaView({ initialTab = 'week' }: { initialTab?: Tab }) {
         {TABS.map(([t, label]) => (
           <button key={t} role="tab" className={tab === t ? 'active' : ''} onClick={() => setTab(t)}>{label} <kbd>{TABS.findIndex((x) => x[0] === t) + 1}</kbd></button>
         ))}
+        <ClientFilter />
       </div>
       {(tab === 'day' || tab === 'week') && <Calendar span={tab === 'day' ? 1 : 7} />}
       {tab === 'todo' && <TodoList />}
@@ -48,7 +50,11 @@ function Calendar({ span }: { span: number }) {
   const [anchor, setAnchor] = useState(today)
   const from = anchor
   const to = addDays(from, span - 1)
-  const days = useMemo(() => agenda(store.docs, from, to, today), [store.docs, from, to, today])
+  const clientMatch = useClientMatch()
+  const days = useMemo(() => {
+    const all = agenda(store.docs, from, to, today)
+    return clientMatch ? new Map([...all].map(([day, items]) => [day, items.filter((it) => clientMatch(it.h))])) : all
+  }, [store.docs, from, to, today, clientMatch])
   useKeys({ b: () => setAnchor(addDays(anchor, -span)), f: () => setAnchor(addDays(anchor, span)), '.': () => setAnchor(today) })
   return (
     <>
@@ -128,7 +134,11 @@ function AgendaRow({ e, item, extra }: { e: Entry; item?: AgendaItem; extra?: st
 function TodoList() {
   const { store } = useApp()
   const [kw, setKw] = useState<string>('')
-  const all = useMemo(() => entries(store.docs).filter((e) => e.h.keyword && !e.h.done && !e.path.endsWith('_archive.org')), [store.docs])
+  const clientMatch = useClientMatch()
+  const all = useMemo(
+    () => entries(store.docs).filter((e) => e.h.keyword && !e.h.done && !e.path.endsWith('_archive.org') && (!clientMatch || clientMatch(e.h))),
+    [store.docs, clientMatch],
+  )
   const keywords = [...new Set(all.map((e) => e.h.keyword!))]
   const shown = all
     .filter((e) => !kw || e.h.keyword === kw)
@@ -152,16 +162,18 @@ function Search() {
   const [mode, setMode] = useState<'text' | 'match'>('text')
   const [q, setQ] = useState('')
   const [todoOnly, setTodoOnly] = useState(false)
+  const clientMatch = useClientMatch()
   const results = useMemo(() => {
-    if (!q.trim()) return []
+    // With a client chosen and nothing typed, everything of that client.
+    if (!q.trim() && !clientMatch) return []
     let test: (e: Entry) => boolean
     try {
-      test = mode === 'text' ? (e) => textMatch(e, q) : compileMatch(q)
+      test = !q.trim() ? () => true : mode === 'text' ? (e) => textMatch(e, q) : compileMatch(q)
     } catch {
       return []
     }
-    return entries(store.docs).filter((e) => (!todoOnly || (e.h.keyword && !e.h.done)) && test(e))
-  }, [store.docs, q, mode, todoOnly])
+    return entries(store.docs).filter((e) => (!todoOnly || (e.h.keyword && !e.h.done)) && (!clientMatch || clientMatch(e.h)) && test(e))
+  }, [store.docs, q, mode, todoOnly, clientMatch])
   return (
     <>
       <div className="search-bar">
@@ -193,7 +205,7 @@ function Search() {
           <div className="crumb">{[e.path, ...outlinePath(e.h)].join(' › ')}</div>
         </div>
       ))}
-      {q && !results.length && <div className="empty">{tr('Sem resultados')}</div>}
+      {(q || clientMatch) && !results.length && <div className="empty">{tr('Sem resultados')}</div>}
     </>
   )
 }
@@ -204,7 +216,8 @@ function ClockReport() {
   const [anchor, setAnchor] = useState(today)
   const from = weekStart(anchor)
   const to = addDays(from, 6)
-  const rows = useMemo(() => clockReport(store.docs, from, to), [store.docs, from, to])
+  const clientMatch = useClientMatch()
+  const rows = useMemo(() => clockReport(store.docs, from, to).filter((r) => !clientMatch || clientMatch(r.h)), [store.docs, from, to, clientMatch])
   const total = rows.reduce((s, r) => s + r.minutes, 0)
   useKeys({ b: () => setAnchor(addDays(anchor, -7)), f: () => setAnchor(addDays(anchor, 7)), '.': () => setAnchor(today) })
   return (

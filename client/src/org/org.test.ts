@@ -5,6 +5,7 @@ import { insertEntry, setKeyword, toggleCheckbox, clockIn, clockOut, moveSubtree
 import { agenda, compileMatch, entries } from './agenda'
 import { captureInto, emptyProps, expand, fieldOptions, hideTemplates, propertyOptions, setPropertyOptions, setTemplates, templatesIn } from './capture'
 import { parseTimestamp } from './timestamp'
+import { clientKey, clientValues, hasValue } from './clients'
 
 const SAMPLE = `#+TODO: TODO NEXT | DONE
 #+FILETAGS: :f:
@@ -237,6 +238,22 @@ describe('capture', () => {
       '#+TITLE: C\n#+PROPERTY: COMPANY_ALL Acme "Initech Lda"\n#+PROPERTY: TIPO_ALL A\n#+BEGIN_CAPTURE k C\n,* %{title}\n#+END_CAPTURE\n\n* x',
     )
     expect(setPropertyOptions('#+TITLE: C\n\n* x', { A: ['1'] })).toBe('#+TITLE: C\n#+PROPERTY: A_ALL 1\n\n* x')
+  })
+})
+
+describe('client filter', () => {
+  const files = {
+    'contacts.org': '* Acme\n* Globex\n',
+    'todo.org': '#+PROPERTY: CLIENTE_FROM contacts.org\n* Projeto\n:PROPERTIES:\n:CLIENTE: Acme\n:END:\n** TODO Tarefa herdada\n** TODO Outra\n:PROPERTIES:\n:CLIENTE: Initech\n:END:\n* TODO Solta\n',
+  }
+  const docs = Object.fromEntries(Object.entries(files).map(([f, t]) => [f, parseOrg(t)]))
+  it('finds the property and every value, offered or used', () => {
+    expect(clientKey(files)).toBe('CLIENTE')
+    expect(clientValues('CLIENTE', files, docs)).toEqual(['Acme', 'Globex', 'Initech'])
+  })
+  it('matches a headline by its own value or the nearest one above it', () => {
+    const [projeto, herdada, outra, solta] = docs['todo.org'].all
+    expect([projeto, herdada, outra, solta].map((h) => hasValue(h, 'CLIENTE', 'Acme'))).toEqual([true, true, false, false])
   })
 })
 

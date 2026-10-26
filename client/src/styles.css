@@ -347,6 +347,11 @@ table.props th { width: 40%; background: none; }
 .tabs { display: flex; gap: 0.25rem; border-bottom: 1px solid var(--border); margin-bottom: 1rem; overflow-x: auto; }
 .tabs button { background: none; border: none; border-bottom: 2px solid transparent; border-radius: 0; padding: 0.6rem 0.9rem; color: var(--muted); font-weight: 500; }
 .tabs button.active { color: var(--accent); border-bottom-color: var(--accent); }
+.tabs .client-filter { margin-left: auto; align-self: center; }
+.client-filter { display: inline-flex; align-items: center; gap: 0.35rem; color: var(--muted); }
+.client-filter select { width: auto; max-width: 14rem; }
+.client-filter.active { color: var(--accent); }
+.client-filter.active select { border-color: var(--accent); }
 .range-nav { display: flex; align-items: center; gap: 0.3rem; margin-bottom: 1rem; flex-wrap: wrap; }
 .range-label { margin-left: 0.5rem; font-weight: 600; text-transform: capitalize; }
 .day { margin-bottom: 1.25rem; }
