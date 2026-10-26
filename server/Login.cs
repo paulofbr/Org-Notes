@@ -71,6 +71,8 @@ public static class Login
             <html lang="{{lang}}">
             <head>
             <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+            <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+            <link rel="apple-touch-icon" href="/apple-touch-icon.png">
             <title>{{T("Entrar")}} · Org Notes</title>
             <style>
               :root { color-scheme: light dark; --bg: #f6f6f4; --card: #fff; --fg: #222; --muted: #666; --line: #ddd; --accent: #3b6ea8; }

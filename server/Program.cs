@@ -77,7 +77,9 @@ app.UseAuthentication();
 app.UseRateLimiter();
 app.Use(async (ctx, next) =>
 {
-    if (ctx.Request.Path.StartsWithSegments("/login") || ctx.Request.Path == "/logout")
+    // The login page and its icons are open to everyone.
+    if (ctx.Request.Path.StartsWithSegments("/login") || ctx.Request.Path == "/logout"
+        || ctx.Request.Path == "/favicon.svg" || ctx.Request.Path == "/apple-touch-icon.png")
     {
         await next();
         return;
