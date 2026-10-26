@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useApp } from '../context'
-import { allTemplates, captureInto, emptyProps, expand, propertyOptions, saveDrafts, templatesIn, usesWhen, type CaptureTemplate, type TemplateDraft } from '../org/capture'
+import { allTemplates, captureInto, emptyProps, expand, fieldOptions, saveDrafts, templatesIn, usesWhen, type CaptureTemplate, type TemplateDraft } from '../org/capture'
 import { Modal } from './Dialogs'
 import { OrgTextarea } from './OrgTextarea'
 import { TitleInput } from './TitleInput'
@@ -68,7 +68,7 @@ export function CaptureDialog({ path, onEntry }: { path?: string; onEntry?: (ent
         <div className="hint">{tr('Escolhe o ficheiro na lista')} (<kbd>↑</kbd> <kbd>↓</kbd>) {tr('ou pela tecla do template;')} <kbd>Enter</kbd> {tr('passa ao título.')}</div>
         <TitleInput inputRef={titleRef} path={tpl.file} linkButton placeholder={tr('Título')} value={title} onChange={setTitle} />
         {emptyProps(tpl).map((k) => {
-          const options = propertyOptions(store.files[tpl.file] ?? '')[k.toUpperCase()]
+          const options = fieldOptions(tpl.file, store.files)[k.toUpperCase()]
           return (
             <label key={k}>
               {k.charAt(0) + k.slice(1).toLowerCase()}

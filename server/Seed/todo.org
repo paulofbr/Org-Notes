@@ -1,8 +1,12 @@
 #+TITLE: Tarefas
 #+TODO: TODO NEXT WAITING | DONE CANCELLED
+#+PROPERTY: CLIENTE_FROM contacts.org
 #+BEGIN_CAPTURE t Tarefa
 ,* TODO %{title}
 SCHEDULED: %{when}
+:PROPERTIES:
+:CLIENTE:
+:END:
 %U
 %{body}
 #+END_CAPTURE

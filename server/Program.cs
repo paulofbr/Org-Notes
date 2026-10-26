@@ -235,7 +235,7 @@ app.MapGet("/api/capture/templates", (HttpContext ctx, Users users) =>
     return store.List().SelectMany(f =>
     {
         var text = store.Read(f.Path) ?? "";
-        var options = OrgCapture.PropertyOptions(text);
+        var options = OrgCapture.FieldOptions(f.Path, text, store.Read);
         return OrgCapture.TemplatesIn(f.Path, text).Select(t => new
         {
             t.Key, t.Name, t.File, t.Datetree, t.UsesWhen, t.Props,

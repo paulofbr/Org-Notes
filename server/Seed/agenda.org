@@ -1,6 +1,10 @@
 #+TITLE: Agenda
+#+PROPERTY: CLIENTE_FROM contacts.org
 #+BEGIN_CAPTURE e Evento
 ,* %{title}
+:PROPERTIES:
+:CLIENTE:
+:END:
 %{when}
 %{body}
 #+END_CAPTURE

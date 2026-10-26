@@ -3,7 +3,7 @@ import { parseOrg, sectionBlocks } from './parser'
 import { imageSrc, orgLink, relativePath, resolvePath } from './links'
 import { insertEntry, setKeyword, toggleCheckbox, clockIn, clockOut, moveSubtree, shiftLevel, refile, archive, alignTable, setPlanning, setProperty, setFileKeyword, setDescription, descriptionOf, insertHeadline } from './edit'
 import { agenda, compileMatch, entries } from './agenda'
-import { captureInto, emptyProps, expand, hideTemplates, propertyOptions, setPropertyOptions, setTemplates, templatesIn } from './capture'
+import { captureInto, emptyProps, expand, fieldOptions, hideTemplates, propertyOptions, setPropertyOptions, setTemplates, templatesIn } from './capture'
 import { parseTimestamp } from './timestamp'
 
 const SAMPLE = `#+TODO: TODO NEXT | DONE
@@ -219,6 +219,16 @@ describe('capture', () => {
   it('reads property options from the preamble only', () => {
     const text = '#+PROPERTY: company_ALL Acme "Initech Lda" Globex\n#+property: ESTADO_ALL Ativo\n* x\n#+PROPERTY: OUTRO_ALL a\n'
     expect(propertyOptions(text)).toEqual({ COMPANY: ['Acme', 'Initech Lda', 'Globex'], ESTADO: ['Ativo'] })
+  })
+
+  it('offers the headlines of a _FROM file, found relative to the file or from the root', () => {
+    const files = {
+      'work/todo.org': '#+PROPERTY: CLIENTE_FROM ../contacts.org\n#+PROPERTY: TIPO_ALL A B\n* x',
+      'agenda.org': '#+PROPERTY: cliente_FROM contacts.org\n* y',
+      'contacts.org': '#+TITLE: C\n* Maria Silva :vip:\n:PROPERTIES:\n:EMAIL: m@x.pt\n:END:\n** Nota\n* John Smith\n',
+    }
+    expect(fieldOptions('work/todo.org', files)).toEqual({ TIPO: ['A', 'B'], CLIENTE: ['Maria Silva', 'John Smith'] })
+    expect(fieldOptions('agenda.org', files)).toEqual({ CLIENTE: ['Maria Silva', 'John Smith'] })
   })
 
   it('writes property options before the capture blocks, replacing an existing line', () => {

@@ -21,6 +21,8 @@ public static partial class OrgCapture
     [GeneratedRegex(@"^(\s*):([^\s:]+):\s*$")] internal static partial Regex EmptyPropRe();
 
     [GeneratedRegex(@"^\s*#\+property:\s+(\S+)_ALL\s+(.*)$", RegexOptions.IgnoreCase)] private static partial Regex PropertyAllRe();
+    [GeneratedRegex(@"^\s*#\+property:\s+(\S+)_FROM\s+(\S+)\s*$", RegexOptions.IgnoreCase)] private static partial Regex PropertyFromRe();
+    [GeneratedRegex(@"^\*[ \t]+(.*?)(?:[ \t]+:[\w@#%:]+:)?[ \t]*$")] private static partial Regex TopHeadlineRe();
 
     private static readonly string[] DayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
@@ -50,6 +52,25 @@ public static partial class OrgCapture
             if (HeadlineRe().IsMatch(l)) break;
             if (PropertyAllRe().Match(l) is { Success: true } m)
                 out_[m.Groups[1].Value] = Regex.Matches(m.Groups[2].Value, "\"([^\"]*)\"|(\\S+)").Select(v => v.Groups[1].Success ? v.Groups[1].Value : v.Groups[2].Value).ToList();
+        }
+        return out_;
+    }
+
+    /// <summary>
+    /// The values to offer for each property of `file`: its `_ALL` lists, and the top-level headlines of its `_FROM` files
+    /// (e.g. the contacts), found relative to it like links, else from the root. Same rules as the client's fieldOptions.
+    /// </summary>
+    public static Dictionary<string, List<string>> FieldOptions(string file, string text, Func<string, string?> read)
+    {
+        var out_ = PropertyOptions(text);
+        foreach (var l in text.Split('\n'))
+        {
+            if (HeadlineRe().IsMatch(l)) break;
+            if (PropertyFromRe().Match(l) is not { Success: true } m) continue;
+            var src = m.Groups[2].Value;
+            var relative = Path.GetRelativePath("/", Path.GetFullPath(Path.Combine("/", Path.GetDirectoryName(file) ?? "", src))).Replace('\\', '/');
+            if ((read(relative) ?? read(src)) is { } other)
+                out_[m.Groups[1].Value] = other.Split('\n').Select(h => TopHeadlineRe().Match(h.TrimEnd('\r'))).Where(h => h.Success).Select(h => h.Groups[1].Value).ToList();
         }
         return out_;
     }

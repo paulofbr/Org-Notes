@@ -1,5 +1,6 @@
 import { HEADLINE_RE, parseOrg } from './parser'
 import { dateKey, formatTimestamp, nowStamp } from './timestamp'
+import { resolvePath } from './links'
 
 /**
  * A capture template, stored in its target file's preamble as
@@ -112,6 +113,33 @@ export function propertyOptions(text: string): Record<string, string[]> {
     if (HEADLINE_RE.test(l)) break
     const m = PROPERTY_ALL_RE.exec(l)
     if (m) out[m[1].toUpperCase()] = [...m[2].matchAll(/"([^"]*)"|(\S+)/g)].map((v) => v[1] ?? v[2])
+  }
+  return out
+}
+
+const PROPERTY_FROM_RE = /^\s*#\+property:\s+(\S+)_FROM\s+(\S+)\s*$/i
+
+/** A file's `#+PROPERTY: KEY_FROM other.org` lines, by upper-case property name: the file whose headlines are its values. */
+export function propertySources(text: string): Record<string, string> {
+  const out: Record<string, string> = {}
+  for (const l of text.split('\n')) {
+    if (HEADLINE_RE.test(l)) break
+    const m = PROPERTY_FROM_RE.exec(l)
+    if (m) out[m[1].toUpperCase()] = m[2]
+  }
+  return out
+}
+
+/**
+ * The values to offer for each property of `file`: its `_ALL` lists, and the top-level headlines of its `_FROM` files
+ * (e.g. the contacts), found relative to it like links, else from the root.
+ */
+export function fieldOptions(file: string, files: Record<string, string>): Record<string, string[]> {
+  const text = files[file] ?? ''
+  const out = propertyOptions(text)
+  for (const [key, src] of Object.entries(propertySources(text))) {
+    const other = files[resolvePath(file, src)] ?? files[src]
+    if (other !== undefined) out[key] = parseOrg(other).headlines.map((h) => h.title)
   }
   return out
 }

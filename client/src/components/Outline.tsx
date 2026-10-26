@@ -8,7 +8,7 @@ import { sectionBlocks, type Headline, type OrgDoc } from '../org/parser'
 import * as E from '../org/edit'
 import { compileMatch, textMatch } from '../org/agenda'
 import { imageSrc } from '../org/links'
-import { captureInto, propertyOptions, templatesIn } from '../org/capture'
+import { captureInto, propertyOptions, propertySources, templatesIn } from '../org/capture'
 import { LinkDialog } from './LinkDialog'
 import { dateKey, daysBetween, formatDuration, warningDays, type Timestamp } from '../org/timestamp'
 import { Blocks, Drawer } from './Blocks'
@@ -112,8 +112,11 @@ export function Outline({ path, doc, state, setState, filter, narrow, setNarrow,
   }, [filter, doc, path])
 
   const focusLater = (h: Headline) => (pendingFocus.current = { title: h.title, line: h.line })
-  // Properties with a fixed set of values (`#+PROPERTY: KEY_ALL`) show on each headline, like tags.
-  const shownProps = useMemo(() => new Set(Object.keys(propertyOptions(doc.lines.join('\n')))), [doc])
+  // Properties with a set of values (`#+PROPERTY: KEY_ALL` or `KEY_FROM`) show on each headline, like tags.
+  const shownProps = useMemo(() => {
+    const text = doc.lines.join('\n')
+    return new Set([...Object.keys(propertyOptions(text)), ...Object.keys(propertySources(text))])
+  }, [doc])
   const ops: NodeOps = { path, doc, foldOf, cycle, edit, editing, setEditing, matcher, setNarrow, narrowed: !!narrow, focusLater, shownProps }
   const narrowed = narrow ? doc.all.find((h) => h.key === narrow) : undefined
   const tops = narrowed ? [narrowed] : doc.headlines
