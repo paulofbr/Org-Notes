@@ -61,6 +61,12 @@ public static class L
         ["Imagem"] = ("Image", "Image", "Imagen"),
         ["Imagens"] = ("Images", "Images", "Imágenes"),
         ["A carregar imagem…"] = ("Uploading image…", "Envoi de l'image…", "Subiendo imagen…"),
+        ["Versão {0}"] = ("Version {0}", "Version {0}", "Versión {0}"),
+        ["Versão de desenvolvimento"] = ("Development version", "Version de développement", "Versión de desarrollo"),
+        ["Procurar atualizações"] = ("Check for updates", "Rechercher des mises à jour", "Buscar actualizaciones"),
+        ["Falta configurar o servidor e o token."] = ("The server and token are not set up yet.", "Le serveur et le jeton ne sont pas encore configurés.", "Falta configurar el servidor y el token."),
+        ["O servidor não tem instalador."] = ("The server has no installer.", "Le serveur n'a pas d'installateur.", "El servidor no tiene instalador."),
+        ["Já tens a versão mais recente ({0})."] = ("You already have the latest version ({0}).", "Tu as déjà la dernière version ({0}).", "Ya tienes la versión más reciente ({0})."),
         // AI review panel
         ["Sem sugestões: o texto parece estar bem."] = ("No suggestions: the text looks fine.", "Aucune suggestion : le texte semble correct.", "Sin sugerencias: el texto parece estar bien."),
         ["Descartar"] = ("Discard", "Ignorer", "Descartar"),

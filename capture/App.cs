@@ -15,6 +15,7 @@ public class App(bool showOnStart) : Application
     private readonly Config _config = Config.Load();
     private CaptureWindow? _capture;
     private TrayIcon? _tray;
+    private Updater? _updater;
     private bool _hotkey;
     private WindowIcon? _icon;
 
@@ -36,7 +37,8 @@ public class App(bool showOnStart) : Application
 
         _ = ListenForShow();
         _ = new Reminders(_config).Run();
-        _ = new Updater(_config, () => _capture?.IsVisible != true, () => Dispatcher.UIThread.Post(() => (ApplicationLifetime as IClassicDesktopStyleApplicationLifetime)?.Shutdown())).Run();
+        _updater = new Updater(_config, () => _capture?.IsVisible != true, () => Dispatcher.UIThread.Post(() => (ApplicationLifetime as IClassicDesktopStyleApplicationLifetime)?.Shutdown()));
+        _ = _updater.Run();
         // The installer may already have written the server's address: the token still has to be pasted in.
         if (!Config.Exists || _config.Token == "") ShowSettings();
         else if (showOnStart) ShowCapture();
@@ -48,6 +50,13 @@ public class App(bool showOnStart) : Application
         var menu = new NativeMenu();
         menu.Add(Item(L.Tr("Capturar"), ShowCapture));
         menu.Add(Item(L.Tr("Definições"), ShowSettings));
+        menu.Add(new NativeMenuItemSeparator());
+        menu.Add(new NativeMenuItem(Updater.Version is { } v ? L.Tr("Versão {0}", v) : L.Tr("Versão de desenvolvimento")) { IsEnabled = false });
+        if (Updater.Supported)
+            menu.Add(Item(L.Tr("Procurar atualizações"), async () =>
+            {
+                if (await _updater!.Check(manual: true) is { Length: > 0 } result) Reminders.Show("Org Notes", result);
+            }));
         menu.Add(new NativeMenuItemSeparator());
         menu.Add(Item(L.Tr("Sair"), () => (ApplicationLifetime as IClassicDesktopStyleApplicationLifetime)?.Shutdown()));
         _tray!.Menu = menu;

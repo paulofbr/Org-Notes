@@ -48,7 +48,8 @@ public class Reminders(Config config)
         catch (JsonException) { return null; }
     }
 
-    private static void Show(string title, string body)
+    /// <summary>Shows a native notification (also used to answer a manual update check).</summary>
+    public static void Show(string title, string body)
     {
         var psi = OperatingSystem.IsWindows() ? WindowsToast(title, body) : new ProcessStartInfo("notify-send") { ArgumentList = { "-a", "Org Notes", title, body } };
         try { Process.Start(psi)?.Dispose(); }

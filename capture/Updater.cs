@@ -6,8 +6,9 @@ using System.Text.Json;
 namespace OrgNotes.Capture;
 
 /// <summary>
-/// Keeps the Windows app at the version the server offers: every hour, when the server's installer comes from another
-/// commit and the capture window is closed, downloads it, quits, and lets a small script swap the files and restart.
+/// Keeps the Windows app at the version the server offers: shortly after starting and every 15 minutes (or when asked
+/// from the tray), when the server's installer comes from another commit and the capture window is closed, downloads
+/// it, quits, and lets a small script swap the files and restart.
 /// </summary>
 public class Updater(Config config, Func<bool> idle, Action quit)
 {
@@ -15,22 +16,45 @@ public class Updater(Config config, Func<bool> idle, Action quit)
     public static string? Version =>
         Assembly.GetEntryAssembly()?.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion.Split('+') is [_, var rev] ? rev : null;
 
+    /// <summary>Whether this build can update itself: an installed Windows build, not a development one.</summary>
+    public static bool Supported => OperatingSystem.IsWindows() && Version != null;
+
+    private int _busy;
+
     public async Task Run()
     {
-        if (!OperatingSystem.IsWindows() || Version == null) return;
+        if (!Supported) return;
         await Task.Delay(TimeSpan.FromSeconds(30));
-        using var timer = new PeriodicTimer(TimeSpan.FromHours(1));
-        do
+        using var timer = new PeriodicTimer(TimeSpan.FromMinutes(15));
+        do await Check(manual: false);
+        while (await timer.WaitForNextTickAsync());
+    }
+
+    /// <summary>
+    /// Updates when the server offers another version (a manual check does not wait for the capture window to close);
+    /// returns what happened, for a manual check to tell the user.
+    /// </summary>
+    public async Task<string> Check(bool manual)
+    {
+        if (!Config.Exists || config.Token == "") return L.Tr("Falta configurar o servidor e o token.");
+        if (Interlocked.Exchange(ref _busy, 1) == 1) return "";
+        try
         {
-            if (!Config.Exists || config.Token == "") continue;
-            try
-            {
-                var offered = (await new Api(config).Me()).WindowsVersion;
-                if (offered != null && offered != Version && idle()) await Apply();
-            }
-            // Offline or a broken download: try again in an hour.
-            catch (Exception e) when (e is HttpRequestException or TaskCanceledException or JsonException or IOException or InvalidDataException) { }
-        } while (await timer.WaitForNextTickAsync());
+            var offered = (await new Api(config).Me()).WindowsVersion;
+            if (offered == null) return L.Tr("O servidor não tem instalador.");
+            if (offered == Version) return L.Tr("Já tens a versão mais recente ({0}).", Version!);
+            if (manual || idle()) await Apply();
+            return "";
+        }
+        // Offline or a broken download: the next check tries again.
+        catch (Exception e) when (e is HttpRequestException or TaskCanceledException or JsonException or IOException or InvalidDataException)
+        {
+            return e.Message;
+        }
+        finally
+        {
+            Interlocked.Exchange(ref _busy, 0);
+        }
     }
 
     private async Task Apply()
