@@ -10,6 +10,9 @@ public record Improved(Dictionary<string, string> Fields, string[] Changes);
 
 public record Me(bool Ai, string? Lang, string? WindowsVersion);
 
+/// <summary>An item the server's AI proposes from free text, for one of the user's templates.</summary>
+public record ProposedItem(string File, string Key, string Template, string Title, string Date, string Time, string Body, Dictionary<string, string> Props);
+
 public record LinkTargets(string File, List<string> Headings);
 
 public record Reminder(string Id, DateTime From, DateTime Until, string Title, string Body);
@@ -81,6 +84,24 @@ public class Api(Config config)
         await Check(response);
         using var doc = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
         return doc.RootElement.GetProperty("path").GetString() ?? throw new HttpRequestException(L.Tr("Resposta vazia."));
+    }
+
+    /// <summary>Items for the user's templates from free text (an email...), proposed by the server's AI.</summary>
+    public async Task<List<ProposedItem>> Extract(string text)
+    {
+        var request = Request(HttpMethod.Post, "/api/ai/extract");
+        request.Content = JsonContent.Create(new { text, now = DateTime.Now }, options: Json);
+        using var response = await Http.SendAsync(request);
+        if ((int)response.StatusCode is 400 or >= 404)
+        {
+            var body = await response.Content.ReadAsStringAsync();
+            string? detail = null;
+            try { detail = JsonDocument.Parse(body).RootElement.GetProperty("detail").GetString(); }
+            catch (Exception e) when (e is JsonException or KeyNotFoundException or InvalidOperationException) { }
+            throw new HttpRequestException(detail ?? L.Tr("Erro {0}: {1}", (int)response.StatusCode, body.Trim('"')));
+        }
+        await Check(response);
+        return await response.Content.ReadFromJsonAsync<List<ProposedItem>>(Json) ?? [];
     }
 
     /// <summary>Every file and its headlines, for internal links.</summary>

@@ -35,6 +35,7 @@ public class CaptureWindow : Window
     private readonly TextBox _linkText = new() { PlaceholderText = L.Tr("Texto (opcional)") };
     // Internal links search the notes' files and headlines, as the web's link dialog does.
     private bool _linkInternal;
+    private readonly Button _fromText = new() { Content = L.Tr("Do texto (IA)"), IsVisible = false };
     private readonly AutoCompleteBox _linkSearch = new()
     {
         PlaceholderText = L.Tr("Procurar ficheiro ou título"),
@@ -110,7 +111,9 @@ public class CaptureWindow : Window
         internalLink.Click += async (_, _) => await OpenLink(true);
         var image = new Button { Content = L.Tr("Imagem") };
         image.Click += async (_, _) => await AddImage();
-        var tools = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8, Children = { external, internalLink, image } };
+        ToolTip.SetTip(_fromText, L.Tr("Criar tarefas, eventos e contactos a partir de um email ou outro texto"));
+        _fromText.Click += (_, _) => { new ExtractWindow(_api, _body.Text ?? "") { Icon = Icon }.Show(); Hide(); };
+        var tools = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8, Children = { external, internalLink, image, _fromText } };
         _when.Children.Add(_date);
         Grid.SetColumn(_time, 1);
         _when.Children.Add(_time);
@@ -187,7 +190,7 @@ public class CaptureWindow : Window
                 LanguageChanged?.Invoke(me.Lang!);
                 return;
             }
-            _ai.IsVisible = me.Ai;
+            _ai.IsVisible = _fromText.IsVisible = me.Ai;
             RenderTemplates();
             Select(_list.FirstOrDefault(t => t.File == _selected?.File && t.Key == _selected?.Key) ?? _list.FirstOrDefault());
             _status.Text = _list.Count == 0 ? L.Tr("Nenhum ficheiro tem template de captura.") : "";

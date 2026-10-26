@@ -49,6 +49,7 @@ public class App(bool showOnStart) : Application
     {
         var menu = new NativeMenu();
         menu.Add(Item(L.Tr("Capturar"), ShowCapture));
+        menu.Add(Item(L.Tr("Criar a partir de texto (IA)"), () => new ExtractWindow(new Api(_config)) { Icon = _icon }.Show()));
         menu.Add(Item(L.Tr("Definições"), ShowSettings));
         menu.Add(new NativeMenuItemSeparator());
         menu.Add(new NativeMenuItem(Updater.Version is { } v ? L.Tr("Versão {0}", v) : L.Tr("Versão de desenvolvimento")) { IsEnabled = false });
