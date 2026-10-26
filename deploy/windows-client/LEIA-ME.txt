@@ -3,13 +3,15 @@
 Esta app corre em cada computador: abre a captura com Win+Alt+C e mostra os lembretes da agenda.
 As notas ficam no servidor Org Notes, a que a app acede pela API com o token pessoal.
 
-Instalar: faz duplo clique em install.cmd e indica o endereço do servidor (ex.: https://notas.exemplo.pt).
+Instalar: faz duplo clique em install.cmd e indica o endereço do servidor (ex.: https://notas.exemplo.pt) e a pasta
+onde instalar (por omissão %LOCALAPPDATA%\OrgNotes\capture; tem de ser uma pasta onde possas escrever, para a app se
+atualizar sozinha). Também se pode indicar a pasta no comando: install.cmd -InstallDir D:\Apps\OrgNotes
 Não precisa de direitos de administrador nem de instalar o .NET.
 
 Depois:
 1. No site, entra e abre Conta e notificações; copia o token pessoal.
 2. Cola-o nas Definições da app (abrem sozinhas na primeira vez, ou no ícone da bandeja > Definições).
 
-A app fica em %LOCALAPPDATA%\OrgNotes\capture e arranca ao iniciar sessão.
+A app arranca ao iniciar sessão e atualiza-se sozinha quando o servidor tem uma versão nova.
 Se tinhas a versão antiga, que corria também o servidor neste computador, o instalador desliga-a; as notas dessa
 versão continuam em Documentos\Org Notes e podem ser copiadas para o servidor.

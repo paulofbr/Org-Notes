@@ -55,7 +55,9 @@ The site's texts are keyed by their Portuguese wording: translations live in `cl
   Running it again updates the server and leaves the notes alone. The zip ships `server/appsettings.Local.json`
   (allowed emails and AI key), so keep it private.
 - **`OrgNotes-client-win-x64.zip`**, for each user's Windows computer: double-click `install.cmd` and give the server's
-  address. It installs the local app in `%LOCALAPPDATA%\OrgNotes\capture`, starts it at sign-in and adds
+  address and the folder to install in (default `%LOCALAPPDATA%\OrgNotes\capture`, or the current installation's;
+  `install.cmd -InstallDir <folder>` skips the question). The folder must be writable by the user, since the app
+  updates itself there. It starts the app at sign-in and adds
   *Start → Org Notes* for the site. No admin rights are needed. The app then asks for the personal token.
   The server package carries this installer too: signed-in users download it from *Conta e notificações*
   (*Descarregar para Windows*), next to their token. Once installed, the app updates itself: every hour it compares
