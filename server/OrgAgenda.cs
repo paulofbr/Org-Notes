@@ -68,6 +68,28 @@ public static partial class OrgAgenda
         return items;
     }
 
+    /// <summary>
+    /// Every headline's title as an org link targets it (`*Title`): without its state, priority and tags, like the
+    /// client parser's title.
+    /// </summary>
+    public static List<string> Titles(string text)
+    {
+        var lines = text.Split('\n').Select(l => l.TrimEnd('\r')).ToArray();
+        var (todo, done) = TodoKeywords(lines);
+        var titles = new List<string>();
+        foreach (var l in lines)
+        {
+            if (HeadlineRe().Match(l) is not { Success: true } m) continue;
+            var rest = m.Groups[2].Value;
+            if (TagsRe().Match(rest) is { Success: true } t) rest = rest[..t.Index];
+            var first = rest.Split(' ', 2, StringSplitOptions.RemoveEmptyEntries).FirstOrDefault();
+            if (first != null && (todo.Contains(first) || done.Contains(first))) rest = rest.TrimStart()[first.Length..];
+            var title = Regex.Replace(rest.Trim(), @"^\[#[A-Z0-9]\]\s*", "").Trim();
+            if (title != "") titles.Add(title);
+        }
+        return titles;
+    }
+
     private static (HashSet<string> Todo, HashSet<string> Done) TodoKeywords(string[] lines)
     {
         var specs = lines.Select(l => TodoSpecRe().Match(l)).Where(m => m.Success).Select(m => m.Groups[1].Value).ToList();

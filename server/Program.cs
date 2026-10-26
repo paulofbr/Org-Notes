@@ -162,6 +162,13 @@ app.MapDelete("/api/admin/logins/{email}", (string email, HttpContext ctx) =>
 
 bool IsAdmin(HttpContext ctx) => access.IsAdmin(ctx.User.FindFirstValue(ClaimTypes.Email) ?? "");
 
+// Every file and its headlines, for the capture app's internal links.
+app.MapGet("/api/link-targets", (HttpContext ctx, Users users) =>
+{
+    var store = users.For(ctx.User);
+    return store.List().Select(f => new { file = f.Path, headings = OrgAgenda.Titles(store.Read(f.Path) ?? "") });
+});
+
 // The user's reminders for the day, for the capture app to show natively. `now` is the user's wall-clock time,
 // since the server may be in another time zone.
 app.MapGet("/api/reminders", (DateTime? now, HttpContext ctx, Users users, Notifier notifier) =>

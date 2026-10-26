@@ -10,6 +10,8 @@ public record Improved(Dictionary<string, string> Fields, string[] Changes);
 
 public record Me(bool Ai, string? Lang, string? WindowsVersion);
 
+public record LinkTargets(string File, List<string> Headings);
+
 public record Reminder(string Id, DateTime From, DateTime Until, string Title, string Body);
 
 /// <summary>The Org Notes server's capture endpoints, authenticated with the user's personal token.</summary>
@@ -79,6 +81,14 @@ public class Api(Config config)
         await Check(response);
         using var doc = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
         return doc.RootElement.GetProperty("path").GetString() ?? throw new HttpRequestException(L.Tr("Resposta vazia."));
+    }
+
+    /// <summary>Every file and its headlines, for internal links.</summary>
+    public async Task<List<LinkTargets>> LinkTargets()
+    {
+        using var response = await Http.SendAsync(Request(HttpMethod.Get, "/api/link-targets"));
+        await Check(response);
+        return await response.Content.ReadFromJsonAsync<List<LinkTargets>>(Json) ?? [];
     }
 
     /// <summary>Saves the server's Windows installer to <paramref name="path"/>.</summary>

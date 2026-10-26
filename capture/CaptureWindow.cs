@@ -33,7 +33,17 @@ public class CaptureWindow : Window
     // Links and images, as the web editor's tools: a link goes where the cursor was in the title or the notes.
     private readonly TextBox _linkUrl = new() { PlaceholderText = L.Tr("Endereço (https://…)") };
     private readonly TextBox _linkText = new() { PlaceholderText = L.Tr("Texto (opcional)") };
-    private readonly Grid _linkPanel = new() { ColumnDefinitions = new("2*,*,Auto"), ColumnSpacing = 8, IsVisible = false };
+    // Internal links search the notes' files and headlines, as the web's link dialog does.
+    private readonly ComboBox _linkKind = new() { ItemsSource = new[] { L.Tr("Externo"), L.Tr("Interno") }, SelectedIndex = 0 };
+    private readonly AutoCompleteBox _linkSearch = new()
+    {
+        PlaceholderText = L.Tr("Procurar ficheiro ou título"),
+        MinimumPrefixLength = 0,
+        FilterMode = AutoCompleteFilterMode.Contains,
+        IsVisible = false,
+    };
+    private Dictionary<string, (string File, string? Heading)> _internal = [];
+    private readonly Grid _linkPanel = new() { ColumnDefinitions = new("Auto,2*,*,Auto"), ColumnSpacing = 8, IsVisible = false };
     private TextBox _linkTarget;
     private (int Start, int End) _linkAt;
     private readonly Button _save = new() { Content = L.Tr("Guardar (Ctrl+Enter)"), IsDefault = false, Classes = { "accent" } };
@@ -85,8 +95,13 @@ public class CaptureWindow : Window
         _body.GotFocus += (_, _) => _linkTarget = _body;
         var insertLink = new Button { Content = L.Tr("Inserir") };
         insertLink.Click += (_, _) => InsertLink();
-        Grid.SetColumn(_linkText, 1);
-        Grid.SetColumn(insertLink, 2);
+        Grid.SetColumn(_linkUrl, 1);
+        Grid.SetColumn(_linkSearch, 1);
+        Grid.SetColumn(_linkText, 2);
+        Grid.SetColumn(insertLink, 3);
+        _linkKind.SelectionChanged += async (_, _) => await SetLinkKind();
+        _linkPanel.Children.Add(_linkKind);
+        _linkPanel.Children.Add(_linkSearch);
         _linkPanel.Children.Add(_linkUrl);
         _linkPanel.Children.Add(_linkText);
         _linkPanel.Children.Add(insertLink);
@@ -195,18 +210,75 @@ public class CaptureWindow : Window
         var end = Math.Clamp(Math.Max(_linkTarget.SelectionStart, _linkTarget.SelectionEnd), start, text.Length);
         _linkAt = (start, end);
         _linkUrl.Text = "";
+        _linkSearch.Text = "";
         _linkText.Text = text[start..end];
         _linkPanel.IsVisible = true;
-        _linkUrl.Focus();
+        (_linkKind.SelectedIndex == 1 ? (Control)_linkSearch : _linkUrl).Focus();
+    }
+
+    /// <summary>Shows the box for the chosen kind of link, loading the notes' files and headlines for internal ones.</summary>
+    private async Task SetLinkKind()
+    {
+        var isInternal = _linkKind.SelectedIndex == 1;
+        _linkUrl.IsVisible = !isInternal;
+        _linkSearch.IsVisible = isInternal;
+        (isInternal ? (Control)_linkSearch : _linkUrl).Focus();
+        if (!isInternal) return;
+        try
+        {
+            _internal = [];
+            foreach (var f in await _api.LinkTargets())
+            {
+                var name = f.File.EndsWith(".org") ? f.File[..^4] : f.File;
+                _internal[name] = (f.File, null);
+                foreach (var h in f.Headings) _internal.TryAdd($"{name} › {h}", (f.File, h));
+            }
+            _linkSearch.ItemsSource = _internal.Keys.ToList();
+        }
+        catch (Exception e) when (e is HttpRequestException or TaskCanceledException)
+        {
+            _status.Text = e.Message;
+        }
     }
 
     private void InsertLink()
     {
-        var url = _linkUrl.Text?.Trim();
-        if (string.IsNullOrEmpty(url)) return;
         var text = _linkText.Text?.Trim();
+        string target;
+        if (_linkKind.SelectedIndex == 1)
+        {
+            if (!_internal.TryGetValue(_linkSearch.Text ?? "", out var to)) return;
+            var from = _selected?.File ?? "";
+            var heading = to.Heading is { } h ? "*" + h : null;
+            // A heading in the same file needs no file name, as in Emacs and the web.
+            target = to.File == from && heading != null ? heading : $"file:{RelativePath(from, to.File)}{(heading != null ? "::" + heading : "")}";
+            if (string.IsNullOrEmpty(text)) text = to.Heading ?? Path.GetFileNameWithoutExtension(to.File);
+        }
+        else
+        {
+            var url = _linkUrl.Text?.Trim();
+            if (string.IsNullOrEmpty(url)) return;
+            target = System.Text.RegularExpressions.Regex.IsMatch(url, @"^[a-z][\w+.-]*:", System.Text.RegularExpressions.RegexOptions.IgnoreCase) ? url : "https://" + url;
+        }
         _linkPanel.IsVisible = false;
-        Insert(_linkTarget, string.IsNullOrEmpty(text) ? $"[[{url}]]" : $"[[{url}][{text}]]", _linkAt.Start, _linkAt.End);
+        Insert(_linkTarget, OrgLink(target, text), _linkAt.Start, _linkAt.End);
+    }
+
+    /// <summary>An org link; brackets in the description would end it early, so they become parentheses (as the web).</summary>
+    private static string OrgLink(string target, string? description)
+    {
+        var desc = description?.Trim().Replace('[', '(').Replace(']', ')');
+        return !string.IsNullOrEmpty(desc) && desc != target ? $"[[{target}][{desc}]]" : $"[[{target}]]";
+    }
+
+    /// <summary>The path of file <paramref name="to"/> as seen from file <paramref name="from"/>'s folder (as the web).</summary>
+    private static string RelativePath(string from, string to)
+    {
+        var fromDirs = from.Split('/')[..^1];
+        var toParts = to.Split('/');
+        var common = 0;
+        while (common < fromDirs.Length && common < toParts.Length - 1 && fromDirs[common] == toParts[common]) common++;
+        return string.Join('/', Enumerable.Repeat("..", fromDirs.Length - common).Concat(toParts[common..]));
     }
 
     private static void Insert(TextBox box, string value, int start, int end)
@@ -277,7 +349,8 @@ public class CaptureWindow : Window
         Template? hit = null;
         // While the list is open, Enter/Esc/arrows belong to it.
         if (_templates.IsDropDownOpen && e.Key is Key.Enter or Key.Escape or Key.Up or Key.Down) return;
-        var inLinkPanel = FocusManager?.GetFocusedElement() is var f && (f == _linkUrl || f == _linkText);
+        // While the search list is open, Enter picks from it.
+        var inLinkPanel = _linkPanel.IsKeyboardFocusWithin && !_linkSearch.IsDropDownOpen;
         if (e.Key == Key.Escape && _linkPanel.IsVisible)
         {
             _linkPanel.IsVisible = false;
