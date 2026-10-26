@@ -60,6 +60,7 @@ export const fr: Record<string, string> = {
   'Carregar imagem': 'Téléverser une image',
   'Cola aqui o texto…': 'Colle le texte ici…',
   'Cola um email ou outro texto: a IA propõe tarefas, eventos e contactos com os teus templates, e tu revês antes de criar.': "Colle un e-mail ou un autre texte : l'IA propose des tâches, des événements et des contacts avec tes modèles, et tu les vérifies avant de les créer.",
+  'Cola um endereço web para criar um link, ou cola / arrasta uma imagem.': 'Colle une adresse web pour créer un lien, ou colle / glisse une image.',
   'Com datetree, usa títulos de nível 4': 'Avec datetree, utilise des titres de niveau 4',
   'Comandos': 'Commandes',
   'Comandos e ficheiros': 'Commandes et fichiers',

@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom'
 import { Link2 } from 'lucide-react'
 import { LinkDialog } from './LinkDialog'
 import { tr } from '../i18n'
+import { pastedLink } from '../org/links'
 
 type Props = Omit<InputHTMLAttributes<HTMLInputElement>, 'value' | 'onChange'> & {
   value: string
@@ -33,6 +34,15 @@ export function TitleInput({ value, onChange, path, linkButton, inputRef, onKeyD
       ref={setRefs}
       value={value}
       onChange={(e) => onChange(e.target.value)}
+      onPaste={(e) => {
+        const start = e.currentTarget.selectionStart ?? value.length
+        const end = e.currentTarget.selectionEnd ?? start
+        const link = pastedLink(e.clipboardData.getData('text/plain'), value.slice(start, end), value.slice(0, start))
+        if (!link) return
+        e.preventDefault()
+        onChange(value.slice(0, start) + link + value.slice(end))
+        requestAnimationFrame(() => own.current?.setSelectionRange(start + link.length, start + link.length))
+      }}
       onKeyDown={(e) => {
         if (path && e.key.toLowerCase() === 'l' && (e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey) {
           e.preventDefault()
@@ -48,7 +58,7 @@ export function TitleInput({ value, onChange, path, linkButton, inputRef, onKeyD
       {linkButton && path ? (
         <div className="title-input-row">
           {input}
-          <button type="button" className="icon-btn" title={tr('Link ou imagem') + ' (Ctrl+L)'} aria-label={tr('Link ou imagem')} onClick={open}>
+          <button type="button" className="icon-btn" title={tr('Link interno') + ' (Ctrl+L)'} aria-label={tr('Link interno')} onClick={open}>
             <Link2 size={16} />
           </button>
         </div>
@@ -59,6 +69,7 @@ export function TitleInput({ value, onChange, path, linkButton, inputRef, onKeyD
       {linking && path && createPortal(
         <LinkDialog
           path={path}
+          only="internal"
           initialText={value.slice(linking.start, linking.end)}
           onInsert={(link) => {
             onChange(value.slice(0, linking.start) + link + value.slice(linking.end))

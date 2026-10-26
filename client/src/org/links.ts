@@ -27,6 +27,16 @@ export function orgLink(target: string, description?: string) {
   return desc && desc !== target ? `[[${target}][${desc}]]` : `[[${target}]]`
 }
 
+/**
+ * What pasting `pasted` over `selected` (at text `before` the cursor) should insert: a web address becomes an org link,
+ * described by the selected text if any; undefined to paste it as it is (not an address, or inside a link already).
+ */
+export function pastedLink(pasted: string, selected: string, before: string): string | undefined {
+  const url = pasted.trim()
+  if (!/^https?:\/\/\S+$/i.test(url) || /\[\[[^\]]*$/.test(before)) return undefined
+  return orgLink(url, selected.trim() || undefined)
+}
+
 /** Where to load a local image linked from file `from` (e.g. `[[file:.images/x.png]]`). */
 export function imageSrc(from: string, target: string) {
   return '/api/raw/' + resolvePath(from, target.replace(/^file:/, '')).split('/').map(encodeURIComponent).join('/')

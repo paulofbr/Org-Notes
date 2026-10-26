@@ -1,10 +1,11 @@
 import { useEffect, useLayoutEffect, useRef, useState, type FocusEvent, type KeyboardEvent } from 'react'
 import { createPortal } from 'react-dom'
 import { alignTable } from '../org/edit'
-import { ExternalLink, ImagePlus, Link2 } from 'lucide-react'
+import { Link2 } from 'lucide-react'
 import { ITEM_RE } from '../org/parser'
 import { LinkDialog, uploadImageLink, type LinkTab } from './LinkDialog'
 import * as Rich from './richText'
+import { pastedLink } from '../org/links'
 import { tr } from '../i18n'
 
 interface Props {
@@ -35,7 +36,6 @@ export function OrgTextarea({ value, onChange, autoGrow, onKeyDown, path, tools,
   const host = useRef<HTMLDivElement>(null)
   const pendingCursor = useRef<number | null>(null)
   const [linking, setLinking] = useState<{ start: number; end: number; only?: LinkTab }>()
-  const imageInput = useRef<HTMLInputElement>(null)
   // Uploads finish later, so they insert into the latest text, not the text from when they started.
   const latest = useRef({ value, onChange })
   latest.current = { value, onChange }
@@ -102,7 +102,7 @@ export function OrgTextarea({ value, onChange, autoGrow, onKeyDown, path, tools,
     if (path && e.key.toLowerCase() === 'l' && ctrl && !e.shiftKey && !e.altKey) {
       e.preventDefault()
       e.stopPropagation()
-      setLinking({ start: pos, end: selEnd })
+      setLinking({ start: pos, end: selEnd, only: 'internal' })
       return
     }
     // The rich surface only holds org text: no bold/italic markup from the browser, and Enter is a plain newline.
@@ -190,7 +190,8 @@ export function OrgTextarea({ value, onChange, autoGrow, onKeyDown, path, tools,
             e.preventDefault()
             const { start, end } = selection()
             if (uploadImages(e.clipboardData.files, start)) return
-            const text = e.clipboardData.getData('text/plain').replace(/\r\n?/g, '\n')
+            const pasted = e.clipboardData.getData('text/plain').replace(/\r\n?/g, '\n')
+            const text = pastedLink(pasted, value.slice(start, end), value.slice(0, start)) ?? pasted
             set(value.slice(0, start) + text + value.slice(end), start + text.length)
           }}
           onDragOver={(e) => path && e.dataTransfer.types.includes('Files') && e.preventDefault()}
@@ -208,7 +209,12 @@ export function OrgTextarea({ value, onChange, autoGrow, onKeyDown, path, tools,
           spellCheck={false}
           value={value}
           onChange={(e) => onChange(e.target.value)}
-          onPaste={(e) => uploadImages(e.clipboardData.files, e.currentTarget.selectionStart) && e.preventDefault()}
+          onPaste={(e) => {
+            const { selectionStart: start, selectionEnd: end } = e.currentTarget
+            if (uploadImages(e.clipboardData.files, start)) return e.preventDefault()
+            const link = pastedLink(e.clipboardData.getData('text/plain'), value.slice(start, end), value.slice(0, start))
+            if (link) (e.preventDefault(), insert(link, start, end))
+          }}
           onDragOver={(e) => path && e.dataTransfer.types.includes('Files') && e.preventDefault()}
           onDrop={(e) => uploadImages(e.dataTransfer.files, e.currentTarget.selectionStart) && e.preventDefault()}
           onKeyDown={keyDown}
@@ -217,19 +223,9 @@ export function OrgTextarea({ value, onChange, autoGrow, onKeyDown, path, tools,
       )}
       {tools && path && (
         // mousedown would take the focus (and the cursor position) away from the text.
-        <div className="text-tools" onMouseDown={(e) => e.target !== imageInput.current && e.preventDefault()}>
-          <button type="button" title={tr('Link para uma página web')} onClick={() => setLinking({ ...selection(), only: 'external' })}><ExternalLink size={14} /> {tr('Link externo')}</button>
+        <div className="text-tools" onMouseDown={(e) => e.preventDefault()}>
           <button type="button" title={tr('Link para um ficheiro ou título das notas')} onClick={() => setLinking({ ...selection(), only: 'internal' })}><Link2 size={14} /> {tr('Link interno')}</button>
-          <button type="button" title={tr('Inserir imagem')} onClick={() => imageInput.current?.click()}><ImagePlus size={14} /> {tr('Imagem')}</button>
-          <span className="hint">{tr('ou cola / arrasta uma imagem para o texto')}</span>
-          <input
-            ref={imageInput}
-            type="file"
-            accept="image/png,image/jpeg,image/gif,image/webp"
-            multiple
-            hidden
-            onChange={(e) => (uploadImages(e.target.files ?? undefined, selection().start), (e.target.value = ''))}
-          />
+          <span className="hint">{tr('Cola um endereço web para criar um link, ou cola / arrasta uma imagem.')}</span>
         </div>
       )}
       {/* In <body>, so its forms are never nested in a form around this editor. */}

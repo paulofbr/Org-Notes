@@ -1,8 +1,11 @@
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
+using Avalonia.Input.Platform;
+using Avalonia.Interactivity;
 using Avalonia.Layout;
 using Avalonia.Media;
+using Avalonia.Media.Imaging;
 using Avalonia.Platform.Storage;
 
 namespace OrgNotes.Capture;
@@ -31,10 +34,8 @@ public class CaptureWindow : Window
     };
     private readonly TextBlock _status = new() { Opacity = 0.7, TextWrapping = TextWrapping.Wrap };
     // Links and images, as the web editor's tools: a link goes where the cursor was in the title or the notes.
-    private readonly TextBox _linkUrl = new() { PlaceholderText = L.Tr("Endereço (https://…)") };
     private readonly TextBox _linkText = new() { PlaceholderText = L.Tr("Texto (opcional)") };
     // Internal links search the notes' files and headlines, as the web's link dialog does.
-    private bool _linkInternal;
     private readonly Button _fromText = new() { Content = L.Tr("Do texto (IA)"), IsVisible = false };
     private readonly AutoCompleteBox _linkSearch = new()
     {
@@ -99,21 +100,27 @@ public class CaptureWindow : Window
         Grid.SetColumn(_linkText, 1);
         Grid.SetColumn(insertLink, 2);
         _linkPanel.Children.Add(_linkSearch);
-        _linkPanel.Children.Add(_linkUrl);
         _linkPanel.Children.Add(_linkText);
         _linkPanel.Children.Add(insertLink);
         // The same three tools as the web editor.
-        var external = new Button { Content = L.Tr("Link externo") };
-        ToolTip.SetTip(external, L.Tr("Link para uma página web") + " (Ctrl+L)");
-        external.Click += async (_, _) => await OpenLink(false);
+        // A pasted web address becomes a link by itself, so only internal links need a button.
+        _title.PastingFromClipboard += async (_, e) => await Paste(_title, e);
+        _body.PastingFromClipboard += async (_, e) => await Paste(_body, e);
         var internalLink = new Button { Content = L.Tr("Link interno") };
-        ToolTip.SetTip(internalLink, L.Tr("Link para um ficheiro ou título das notas"));
-        internalLink.Click += async (_, _) => await OpenLink(true);
-        var image = new Button { Content = L.Tr("Imagem") };
-        image.Click += async (_, _) => await AddImage();
+        ToolTip.SetTip(internalLink, L.Tr("Link para um ficheiro ou título das notas") + " (Ctrl+L)");
+        internalLink.Click += async (_, _) => await OpenLink();
+        // Images come in by pasting or dropping them on the notes, as on the web.
+        DragDrop.SetAllowDrop(_body, true);
+        _body.AddHandler(DragDrop.DragOverEvent, (_, e) => e.DragEffects = e.DataTransfer.Contains(DataFormat.File) ? DragDropEffects.Copy : e.DragEffects, handledEventsToo: true);
+        _body.AddHandler(DragDrop.DropEvent, async (_, e) =>
+        {
+            if (e.DataTransfer.TryGetFiles() is not { Length: > 0 } files) return;
+            e.Handled = true;
+            await InsertImages(files);
+        }, handledEventsToo: true);
         ToolTip.SetTip(_fromText, L.Tr("Criar tarefas, eventos e contactos a partir de um email ou outro texto"));
         _fromText.Click += (_, _) => { new ExtractWindow(_api, _body.Text ?? "") { Icon = Icon }.Show(); Hide(); };
-        var tools = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8, Children = { external, internalLink, image, _fromText } };
+        var tools = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8, Children = { internalLink, _fromText, new TextBlock { Text = L.Tr("ou cola / arrasta uma imagem para as notas"), Opacity = 0.6, VerticalAlignment = VerticalAlignment.Center } } };
         _when.Children.Add(_date);
         Grid.SetColumn(_time, 1);
         _when.Children.Add(_time);
@@ -206,28 +213,18 @@ public class CaptureWindow : Window
         }
     }
 
-    /// <summary>Opens the link panel for the title or notes box last used, keeping its selection as the link's text.</summary>
-    private async Task OpenLink(bool isInternal)
+    /// <summary>Opens the internal link panel for the title or notes box last used, keeping its selection as the link's text.</summary>
+    private async Task OpenLink()
     {
         var text = _linkTarget.Text ?? "";
         var start = Math.Clamp(Math.Min(_linkTarget.SelectionStart, _linkTarget.SelectionEnd), 0, text.Length);
         var end = Math.Clamp(Math.Max(_linkTarget.SelectionStart, _linkTarget.SelectionEnd), start, text.Length);
         _linkAt = (start, end);
-        _linkUrl.Text = "";
         _linkSearch.Text = "";
         _linkText.Text = text[start..end];
         _linkPanel.IsVisible = true;
-        await SetLinkKind(isInternal);
-    }
-
-    /// <summary>Shows the box for the chosen kind of link, loading the notes' files and headlines for internal ones.</summary>
-    private async Task SetLinkKind(bool isInternal)
-    {
-        _linkInternal = isInternal;
-        _linkUrl.IsVisible = !isInternal;
-        _linkSearch.IsVisible = isInternal;
-        (isInternal ? (Control)_linkSearch : _linkUrl).Focus();
-        if (!isInternal) return;
+        _linkSearch.Focus();
+        // The notes' files and headlines, fresh each time.
         try
         {
             _internal = [];
@@ -248,24 +245,46 @@ public class CaptureWindow : Window
     private void InsertLink()
     {
         var text = _linkText.Text?.Trim();
-        string target;
-        if (_linkInternal)
-        {
-            if (!_internal.TryGetValue(_linkSearch.Text ?? "", out var to)) return;
-            var from = _selected?.File ?? "";
-            var heading = to.Heading is { } h ? "*" + h : null;
-            // A heading in the same file needs no file name, as in Emacs and the web.
-            target = to.File == from && heading != null ? heading : $"file:{RelativePath(from, to.File)}{(heading != null ? "::" + heading : "")}";
-            if (string.IsNullOrEmpty(text)) text = to.Heading ?? Path.GetFileNameWithoutExtension(to.File);
-        }
-        else
-        {
-            var url = _linkUrl.Text?.Trim();
-            if (string.IsNullOrEmpty(url)) return;
-            target = System.Text.RegularExpressions.Regex.IsMatch(url, @"^[a-z][\w+.-]*:", System.Text.RegularExpressions.RegexOptions.IgnoreCase) ? url : "https://" + url;
-        }
+        if (!_internal.TryGetValue(_linkSearch.Text ?? "", out var to)) return;
+        var from = _selected?.File ?? "";
+        var heading = to.Heading is { } h ? "*" + h : null;
+        // A heading in the same file needs no file name, as in Emacs and the web.
+        var target = to.File == from && heading != null ? heading : $"file:{RelativePath(from, to.File)}{(heading != null ? "::" + heading : "")}";
+        if (string.IsNullOrEmpty(text)) text = to.Heading ?? Path.GetFileNameWithoutExtension(to.File);
         _linkPanel.IsVisible = false;
         Insert(_linkTarget, OrgLink(target, text), _linkAt.Start, _linkAt.End);
+    }
+
+    /// <summary>
+    /// Pastes into the title or the notes: a web address alone becomes an org link, described by the selected text if any
+    /// (as on the web); anything else, or an address pasted inside a link, is pasted as it is.
+    /// </summary>
+    private async Task Paste(TextBox box, RoutedEventArgs e)
+    {
+        e.Handled = true;
+        if (Clipboard is not { } clipboard) return;
+        // Images pasted on the notes: copied files, or a picture such as a screenshot.
+        if (box == _body && await clipboard.TryGetFilesAsync() is { Length: > 0 } files)
+        {
+            await InsertImages(files);
+            return;
+        }
+        if (box == _body && await clipboard.TryGetBitmapAsync() is { } bitmap)
+        {
+            using var png = new MemoryStream();
+            bitmap.Save(png, new PngBitmapEncoderOptions());
+            await InsertImage(png.ToArray());
+            return;
+        }
+        if (await clipboard.TryGetTextAsync() is not { } pasted) return;
+        var text = box.Text ?? "";
+        var start = Math.Clamp(Math.Min(box.SelectionStart, box.SelectionEnd), 0, text.Length);
+        var end = Math.Clamp(Math.Max(box.SelectionStart, box.SelectionEnd), start, text.Length);
+        var url = pasted.Trim();
+        var isLink = System.Text.RegularExpressions.Regex.IsMatch(url, @"^https?://\S+$", System.Text.RegularExpressions.RegexOptions.IgnoreCase)
+            && !System.Text.RegularExpressions.Regex.IsMatch(text[..start], @"\[\[[^\]]*$");
+        var value = isLink ? OrgLink(url, text[start..end]) : box.AcceptsReturn ? pasted : pasted.ReplaceLineEndings(" ");
+        Insert(box, value, start, end);
     }
 
     /// <summary>An org link; brackets in the description would end it early, so they become parentheses (as the web).</summary>
@@ -295,24 +314,29 @@ public class CaptureWindow : Window
         box.CaretIndex = start + value.Length;
     }
 
-    /// <summary>Uploads a picked image next to the chosen file's notes and links it in the notes, as the web does.</summary>
-    private async Task AddImage()
+    private static readonly string[] ImageExtensions = [".png", ".jpg", ".jpeg", ".gif", ".webp"];
+
+    /// <summary>Uploads image files (pasted or dropped on the notes) and links them where the cursor is, as the web does.</summary>
+    private async Task InsertImages(IEnumerable<IStorageItem> items)
+    {
+        foreach (var file in items.OfType<IStorageFile>().Where(f => ImageExtensions.Contains(Path.GetExtension(f.Name).ToLowerInvariant())))
+        {
+            await using var stream = await file.OpenReadAsync();
+            using var buffer = new MemoryStream();
+            await stream.CopyToAsync(buffer);
+            await InsertImage(buffer.ToArray());
+        }
+    }
+
+    /// <summary>Uploads an image next to the chosen file's notes and links it in the notes at the cursor.</summary>
+    private async Task InsertImage(byte[] image)
     {
         if (_selected is not { } t) return;
         var at = _body.CaretIndex;
-        var picked = await StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
-        {
-            AllowMultiple = false,
-            FileTypeFilter = [new FilePickerFileType(L.Tr("Imagens")) { Patterns = ["*.png", "*.jpg", "*.jpeg", "*.gif", "*.webp"] }],
-        });
-        if (picked.Count == 0) return;
         _status.Text = L.Tr("A carregar imagem…");
         try
         {
-            await using var stream = await picked[0].OpenReadAsync();
-            using var buffer = new MemoryStream();
-            await stream.CopyToAsync(buffer);
-            var path = await _api.UploadImage(t.File, buffer.ToArray());
+            var path = await _api.UploadImage(t.File, image);
             // Relative to the notes' file, as org (and the web) write file links.
             var dir = Path.GetDirectoryName(t.File)?.Replace('\\', '/') ?? "";
             var link = dir == "" ? path : Path.GetRelativePath(dir, path).Replace('\\', '/');
@@ -361,7 +385,7 @@ public class CaptureWindow : Window
             _linkTarget.Focus();
         }
         else if (e.Key == Key.Enter && inLinkPanel && e.KeyModifiers == KeyModifiers.None) InsertLink();
-        else if (e.Key == Key.L && e.KeyModifiers == KeyModifiers.Control) await OpenLink(false);
+        else if (e.Key == Key.L && e.KeyModifiers == KeyModifiers.Control) await OpenLink();
         else if (e.Key == Key.Escape) Hide();
         else if (e.Key == Key.R && e.KeyModifiers == KeyModifiers.Alt) await Review("develop");
         else if (e.Key == Key.R && e.KeyModifiers == (KeyModifiers.Alt | KeyModifiers.Shift)) await Review("fix");

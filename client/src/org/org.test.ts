@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { parseOrg, sectionBlocks } from './parser'
-import { imageSrc, orgLink, relativePath, resolvePath } from './links'
+import { imageSrc, orgLink, pastedLink, relativePath, resolvePath } from './links'
 import { insertEntry, setKeyword, toggleCheckbox, clockIn, clockOut, moveSubtree, shiftLevel, refile, archive, alignTable, setPlanning, setProperty, setFileKeyword, setDescription, descriptionOf, insertHeadline } from './edit'
 import { agenda, compileMatch, entries } from './agenda'
 import { captureInto, emptyProps, expand, fieldOptions, hideTemplates, propertyOptions, setPropertyOptions, setTemplates, templatesIn } from './capture'
@@ -238,6 +238,18 @@ describe('capture', () => {
       '#+TITLE: C\n#+PROPERTY: COMPANY_ALL Acme "Initech Lda"\n#+PROPERTY: TIPO_ALL A\n#+BEGIN_CAPTURE k C\n,* %{title}\n#+END_CAPTURE\n\n* x',
     )
     expect(setPropertyOptions('#+TITLE: C\n\n* x', { A: ['1'] })).toBe('#+TITLE: C\n#+PROPERTY: A_ALL 1\n\n* x')
+  })
+})
+
+describe('pastedLink', () => {
+  it('turns a pasted web address into a link, described by the selection', () => {
+    expect(pastedLink(' https://example.com/a?b=1 ', '', 'Ver ')).toBe('[[https://example.com/a?b=1]]')
+    expect(pastedLink('https://example.com', 'a proposta', 'Ver ')).toBe('[[https://example.com][a proposta]]')
+  })
+  it('leaves other text, and addresses pasted inside a link, as they are', () => {
+    expect(pastedLink('não é um endereço', '', '')).toBeUndefined()
+    expect(pastedLink('https://a.pt e mais', '', '')).toBeUndefined()
+    expect(pastedLink('https://example.com', '', 'texto [[')).toBeUndefined()
   })
 })
 
