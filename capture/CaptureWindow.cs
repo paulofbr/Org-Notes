@@ -34,7 +34,7 @@ public class CaptureWindow : Window
     private readonly TextBox _linkUrl = new() { PlaceholderText = L.Tr("Endereço (https://…)") };
     private readonly TextBox _linkText = new() { PlaceholderText = L.Tr("Texto (opcional)") };
     // Internal links search the notes' files and headlines, as the web's link dialog does.
-    private readonly ComboBox _linkKind = new() { ItemsSource = new[] { L.Tr("Externo"), L.Tr("Interno") }, SelectedIndex = 0 };
+    private bool _linkInternal;
     private readonly AutoCompleteBox _linkSearch = new()
     {
         PlaceholderText = L.Tr("Procurar ficheiro ou título"),
@@ -43,7 +43,7 @@ public class CaptureWindow : Window
         IsVisible = false,
     };
     private Dictionary<string, (string File, string? Heading)> _internal = [];
-    private readonly Grid _linkPanel = new() { ColumnDefinitions = new("Auto,2*,*,Auto"), ColumnSpacing = 8, IsVisible = false };
+    private readonly Grid _linkPanel = new() { ColumnDefinitions = new("2*,*,Auto"), ColumnSpacing = 8, IsVisible = false };
     private TextBox _linkTarget;
     private (int Start, int End) _linkAt;
     private readonly Button _save = new() { Content = L.Tr("Guardar (Ctrl+Enter)"), IsDefault = false, Classes = { "accent" } };
@@ -95,21 +95,22 @@ public class CaptureWindow : Window
         _body.GotFocus += (_, _) => _linkTarget = _body;
         var insertLink = new Button { Content = L.Tr("Inserir") };
         insertLink.Click += (_, _) => InsertLink();
-        Grid.SetColumn(_linkUrl, 1);
-        Grid.SetColumn(_linkSearch, 1);
-        Grid.SetColumn(_linkText, 2);
-        Grid.SetColumn(insertLink, 3);
-        _linkKind.SelectionChanged += async (_, _) => await SetLinkKind();
-        _linkPanel.Children.Add(_linkKind);
+        Grid.SetColumn(_linkText, 1);
+        Grid.SetColumn(insertLink, 2);
         _linkPanel.Children.Add(_linkSearch);
         _linkPanel.Children.Add(_linkUrl);
         _linkPanel.Children.Add(_linkText);
         _linkPanel.Children.Add(insertLink);
-        var link = new Button { Content = L.Tr("Link (Ctrl+L)") };
-        link.Click += (_, _) => OpenLink();
+        // The same three tools as the web editor.
+        var external = new Button { Content = L.Tr("Link externo") };
+        ToolTip.SetTip(external, L.Tr("Link para uma página web") + " (Ctrl+L)");
+        external.Click += async (_, _) => await OpenLink(false);
+        var internalLink = new Button { Content = L.Tr("Link interno") };
+        ToolTip.SetTip(internalLink, L.Tr("Link para um ficheiro ou título das notas"));
+        internalLink.Click += async (_, _) => await OpenLink(true);
         var image = new Button { Content = L.Tr("Imagem") };
         image.Click += async (_, _) => await AddImage();
-        var tools = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8, Children = { link, image } };
+        var tools = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8, Children = { external, internalLink, image } };
         _when.Children.Add(_date);
         Grid.SetColumn(_time, 1);
         _when.Children.Add(_time);
@@ -203,7 +204,7 @@ public class CaptureWindow : Window
     }
 
     /// <summary>Opens the link panel for the title or notes box last used, keeping its selection as the link's text.</summary>
-    private void OpenLink()
+    private async Task OpenLink(bool isInternal)
     {
         var text = _linkTarget.Text ?? "";
         var start = Math.Clamp(Math.Min(_linkTarget.SelectionStart, _linkTarget.SelectionEnd), 0, text.Length);
@@ -213,13 +214,13 @@ public class CaptureWindow : Window
         _linkSearch.Text = "";
         _linkText.Text = text[start..end];
         _linkPanel.IsVisible = true;
-        (_linkKind.SelectedIndex == 1 ? (Control)_linkSearch : _linkUrl).Focus();
+        await SetLinkKind(isInternal);
     }
 
     /// <summary>Shows the box for the chosen kind of link, loading the notes' files and headlines for internal ones.</summary>
-    private async Task SetLinkKind()
+    private async Task SetLinkKind(bool isInternal)
     {
-        var isInternal = _linkKind.SelectedIndex == 1;
+        _linkInternal = isInternal;
         _linkUrl.IsVisible = !isInternal;
         _linkSearch.IsVisible = isInternal;
         (isInternal ? (Control)_linkSearch : _linkUrl).Focus();
@@ -245,7 +246,7 @@ public class CaptureWindow : Window
     {
         var text = _linkText.Text?.Trim();
         string target;
-        if (_linkKind.SelectedIndex == 1)
+        if (_linkInternal)
         {
             if (!_internal.TryGetValue(_linkSearch.Text ?? "", out var to)) return;
             var from = _selected?.File ?? "";
@@ -357,7 +358,7 @@ public class CaptureWindow : Window
             _linkTarget.Focus();
         }
         else if (e.Key == Key.Enter && inLinkPanel && e.KeyModifiers == KeyModifiers.None) InsertLink();
-        else if (e.Key == Key.L && e.KeyModifiers == KeyModifiers.Control) OpenLink();
+        else if (e.Key == Key.L && e.KeyModifiers == KeyModifiers.Control) await OpenLink(false);
         else if (e.Key == Key.Escape) Hide();
         else if (e.Key == Key.R && e.KeyModifiers == KeyModifiers.Alt) await Review("develop");
         else if (e.Key == Key.R && e.KeyModifiers == (KeyModifiers.Alt | KeyModifiers.Shift)) await Review("fix");
