@@ -165,6 +165,20 @@ export function insertHeadline(
   })
 }
 
+/** Inserts a captured entry as a sibling or child of a headline (or at the end), shifting its headlines to that level. */
+export function insertEntry(text: string, afterLine: number | undefined, mode: 'sibling' | 'child', entry: string[]) {
+  return withLines(text, (lines, doc) => {
+    const level = afterLine === undefined ? 1 : mode === 'child' ? at(doc, afterLine).level + 1 : at(doc, afterLine).level
+    const first = entry.map((l) => /^(\*+)(?=\s|$)/.exec(l)).find(Boolean)
+    const delta = first ? level - first[1].length : 0
+    const shifted = entry.map((l) => l.replace(/^(\*+)(?=\s|$)/, (stars) => '*'.repeat(Math.max(1, stars.length + delta))))
+    let pos = afterLine === undefined ? lines.length : at(doc, afterLine).end
+    // Before the file's final newline, not after it.
+    if (pos === lines.length && lines[pos - 1] === '') pos--
+    lines.splice(pos, 0, ...shifted)
+  })
+}
+
 export function deleteSubtree(text: string, line: number) {
   return withLines(text, (lines, doc) => {
     const h = at(doc, line)

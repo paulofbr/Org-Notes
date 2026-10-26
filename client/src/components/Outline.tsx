@@ -8,7 +8,7 @@ import { sectionBlocks, type Headline, type OrgDoc } from '../org/parser'
 import * as E from '../org/edit'
 import { compileMatch, textMatch } from '../org/agenda'
 import { imageSrc } from '../org/links'
-import { propertyOptions } from '../org/capture'
+import { captureInto, propertyOptions, templatesIn } from '../org/capture'
 import { LinkDialog } from './LinkDialog'
 import { dateKey, daysBetween, formatDuration, warningDays, type Timestamp } from '../org/timestamp'
 import { Blocks, Drawer } from './Blocks'
@@ -17,7 +17,11 @@ import { OrgTextarea } from './OrgTextarea'
 import { DateDialog, DescriptionDialog, KeywordDialog, NewEntryDialog, PropertyDialog, TagsDialog } from './Dialogs'
 import { moveFocus } from '../shortcuts'
 import { useAiReview } from './AiReview'
+import { TitleInput } from './TitleInput'
+import { CaptureDialog } from './Capture'
 import { tr } from '../i18n'
+
+const hasTemplates = (path: string, doc: OrgDoc) => templatesIn(path, doc.lines.join('\n')).length > 0
 
 export type Fold = 'folded' | 'children' | 'subtree'
 export type Visibility = 'overview' | 'contents' | 'showall'
@@ -137,6 +141,13 @@ export function Outline({ path, doc, state, setState, filter, narrow, setNarrow,
           className="add-heading"
           onClick={() => {
             const last = narrowed ?? doc.headlines[doc.headlines.length - 1]
+            if (hasTemplates(path, doc))
+              return app.showDialog(
+                <CaptureDialog
+                  path={path}
+                  onEntry={(entry, tpl) => edit((t) => (narrowed ? E.insertEntry(t, narrowed.line, 'child', entry) : captureInto(t, entry, tpl.datetree)))}
+                />,
+              )
             app.showDialog(
               <NewEntryDialog path={path} keywords={doc.todo.todo} initialKeyword={last?.keyword && doc.todo.todo[0]} onSubmit={({ title, ...rest }) =>
                 edit((t) => E.insertHeadline(t, narrowed?.line, narrowed ? 'child' : 'sibling', title, rest))
@@ -222,11 +233,16 @@ function HeadlineRow({ h, ops, fold }: { h: Headline; ops: NodeOps; fold: Fold }
   const description = E.descriptionOf(doc, h)
 
   // New entries start as tasks when added next to (or under) a task.
+  // A file with capture templates gets its new entries from them, placed here instead of at the end.
   const newEntry = (mode: 'child' | 'sibling') =>
     app.showDialog(
-      <NewEntryDialog path={path} keywords={doc.todo.todo} initialKeyword={h.keyword && doc.todo.todo[0]} onSubmit={({ title, ...rest }) =>
-        edit((t) => E.insertHeadline(t, h.line, mode, title, rest), { ...h, title, line: h.end })
-      } />,
+      hasTemplates(path, doc) ? (
+        <CaptureDialog path={path} onEntry={(entry) => edit((t) => E.insertEntry(t, h.line, mode, entry))} />
+      ) : (
+        <NewEntryDialog path={path} keywords={doc.todo.todo} initialKeyword={h.keyword && doc.todo.todo[0]} onSubmit={({ title, ...rest }) =>
+          edit((t) => E.insertHeadline(t, h.line, mode, title, rest), { ...h, title, line: h.end })
+        } />
+      ),
     )
 
   const actions = {
@@ -304,14 +320,16 @@ function HeadlineRow({ h, ops, fold }: { h: Headline; ops: NodeOps; fold: Fold }
         </select>
         {h.priority && <button className={`prio prio-${h.priority}`} onClick={() => actions.priority(1)} tabIndex={-1}>{h.priority}</button>}
         {titleEdit !== null ? (
-          <input
+          <TitleInput
             className="title-input"
             autoFocus
+            path={path}
             value={titleEdit}
-            onChange={(e) => setTitleEdit(e.target.value)}
+            onChange={setTitleEdit}
             onFocus={() => (titleCancelled.current = false)}
-            onBlur={() => {
-              if (titleCancelled.current) return
+            onBlur={(e) => {
+              // Opening the link dialog (Ctrl+L) is not leaving the title.
+              if (titleCancelled.current || (e.relatedTarget as HTMLElement | null)?.closest('.modal')) return
               if (titleEdit !== h.title) edit((t) => E.setTitle(t, h.line, titleEdit.trim()), { ...h, title: titleEdit.trim() })
               else ops.focusLater(h)
               setTitleEdit(null)

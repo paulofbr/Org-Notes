@@ -6,6 +6,7 @@ import { refile } from '../org/edit'
 import { SHORTCUTS } from '../shortcuts'
 import { api, type Me } from '../api'
 import { OrgTextarea } from './OrgTextarea'
+import { TitleInput } from './TitleInput'
 import { LANGS, isLang, lang, rememberLang, tr, type Lang } from '../i18n'
 
 export function Modal({ title, children, onClose, wide }: { title: string; children: ReactNode; onClose?: () => void; wide?: boolean }) {
@@ -78,7 +79,7 @@ export function NewEntryDialog({ path, keywords, initialKeyword, onSubmit }: {
               {keywords.map((k) => <option key={k} value={k}>{k}</option>)}
             </select>
           </label>
-          <label>{tr('Título')}<input autoFocus value={title} onChange={(e) => setTitle(e.target.value)} /></label>
+          <label>{tr('Título')}<TitleInput autoFocus path={path} linkButton value={title} onChange={setTitle} /></label>
         </div>
         {/* Not a <label>: a click in it would be forwarded to its first button (Link externo). */}
         <div className="field">{tr('Descrição (opcional)')}

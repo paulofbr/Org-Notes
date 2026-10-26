@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { parseOrg, sectionBlocks } from './parser'
 import { imageSrc, orgLink, relativePath, resolvePath } from './links'
-import { setKeyword, toggleCheckbox, clockIn, clockOut, moveSubtree, shiftLevel, refile, archive, alignTable, setPlanning, setProperty, setFileKeyword, setDescription, descriptionOf, insertHeadline } from './edit'
+import { insertEntry, setKeyword, toggleCheckbox, clockIn, clockOut, moveSubtree, shiftLevel, refile, archive, alignTable, setPlanning, setProperty, setFileKeyword, setDescription, descriptionOf, insertHeadline } from './edit'
 import { agenda, compileMatch, entries } from './agenda'
 import { captureInto, emptyProps, expand, hideTemplates, propertyOptions, setPropertyOptions, setTemplates, templatesIn } from './capture'
 import { parseTimestamp } from './timestamp'
@@ -228,6 +228,15 @@ describe('capture', () => {
     )
     expect(setPropertyOptions('#+TITLE: C\n\n* x', { A: ['1'] })).toBe('#+TITLE: C\n#+PROPERTY: A_ALL 1\n\n* x')
   })
+})
+
+describe('insertEntry', () => {
+  const text = '* A\n** A1\nbody\n* B\n'
+  const entry = ['* TODO New', ':PROPERTIES:', ':LOCAL: Web', ':END:', '** Sub']
+  it('places a captured entry as a sibling, at the headline level', () =>
+    expect(insertEntry(text, 1, 'sibling', entry)).toBe('* A\n** A1\nbody\n** TODO New\n:PROPERTIES:\n:LOCAL: Web\n:END:\n*** Sub\n* B\n'))
+  it('places it as a child, one level down', () =>
+    expect(insertEntry(text, 3, 'child', entry)).toBe('* A\n** A1\nbody\n* B\n** TODO New\n:PROPERTIES:\n:LOCAL: Web\n:END:\n*** Sub\n'))
 })
 
 describe('diffWords', () => {

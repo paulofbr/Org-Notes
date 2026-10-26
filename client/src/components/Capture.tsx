@@ -3,14 +3,18 @@ import { useApp } from '../context'
 import { allTemplates, captureInto, emptyProps, expand, propertyOptions, saveDrafts, templatesIn, usesWhen, type CaptureTemplate, type TemplateDraft } from '../org/capture'
 import { Modal } from './Dialogs'
 import { OrgTextarea } from './OrgTextarea'
+import { TitleInput } from './TitleInput'
 import { aiEnabled, useAiReview } from './AiReview'
 import { api } from '../api'
 import { tr } from '../i18n'
 
-/** Captures into a template's file; with `path` (the open page), that page's template is chosen first. */
-export function CaptureDialog({ path }: { path?: string }) {
+/**
+ * Captures into a template's file; with `path` (the open page), that page's template is chosen first. With `onEntry`,
+ * only that file's templates are offered and the filled-in entry goes to `onEntry` instead, to be placed by the caller.
+ */
+export function CaptureDialog({ path, onEntry }: { path?: string; onEntry?: (entry: string[], tpl: CaptureTemplate) => void }) {
   const { store, closeDialog } = useApp()
-  const templates = useMemo(() => allTemplates(store.files), [store.files])
+  const templates = useMemo(() => allTemplates(store.files).filter((t) => !onEntry || t.file === path), [store.files, onEntry, path])
   const [tpl, setTpl] = useState<CaptureTemplate | undefined>(() => templates.find((t) => t.file === path) ?? templates[0])
   const [title, setTitle] = useState('')
   const [body, setBody] = useState('')
@@ -26,7 +30,8 @@ export function CaptureDialog({ path }: { path?: string }) {
   const save = () => {
     if (!title.trim() || !tpl) return
     const entry = expand(tpl, { title: title.trim(), body, date: date || undefined, time, props })
-    store.update(tpl.file, captureInto(store.files[tpl.file] ?? '', entry, tpl.datetree))
+    if (onEntry) onEntry(entry, tpl)
+    else store.update(tpl.file, captureInto(store.files[tpl.file] ?? '', entry, tpl.datetree))
     closeDialog()
   }
 
@@ -61,7 +66,7 @@ export function CaptureDialog({ path }: { path?: string }) {
           ))}
         </select>
         <div className="hint">{tr('Escolhe o ficheiro na lista')} (<kbd>↑</kbd> <kbd>↓</kbd>) {tr('ou pela tecla do template;')} <kbd>Enter</kbd> {tr('passa ao título.')}</div>
-        <input ref={titleRef} placeholder={tr('Título')} value={title} onChange={(e) => setTitle(e.target.value)} />
+        <TitleInput inputRef={titleRef} path={tpl.file} linkButton placeholder={tr('Título')} value={title} onChange={setTitle} />
         {emptyProps(tpl).map((k) => {
           const options = propertyOptions(store.files[tpl.file] ?? '')[k.toUpperCase()]
           return (
