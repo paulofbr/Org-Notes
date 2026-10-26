@@ -1,0 +1,94 @@
+using Avalonia;
+using Avalonia.Controls;
+using Avalonia.Layout;
+using Avalonia.Media;
+using Avalonia.Threading;
+
+namespace OrgNotes.Capture;
+
+/// <summary>
+/// The agenda reminders in a small window that stays above every other one, in the corner of the screen, until OK or
+/// "Adiar 5 min" (which brings them back five minutes later). Reminders that arrive meanwhile join the list.
+/// </summary>
+public class ReminderWindow : Window
+{
+    private readonly StackPanel _list = new() { Spacing = 10 };
+    private readonly List<(string Title, string Body)> _items = [];
+
+    public ReminderWindow()
+    {
+        Title = L.Tr("Lembretes · Org Notes");
+        Width = 380;
+        SizeToContent = SizeToContent.Height;
+        CanResize = false;
+        Topmost = true;
+        // Visible without taking the keyboard from whatever the user is typing in.
+        ShowActivated = false;
+
+        var snooze = new Button { Content = L.Tr("Adiar 5 min") };
+        snooze.Click += (_, _) => Snooze(TimeSpan.FromMinutes(5));
+        var ok = new Button { Content = "OK", Classes = { "accent" } };
+        ok.Click += (_, _) => Dismiss();
+        Content = new Border
+        {
+            BorderBrush = new SolidColorBrush(Color.Parse("#6d4aff")),
+            BorderThickness = new Thickness(0, 4, 0, 0),
+            Padding = new Thickness(16),
+            Child = new StackPanel
+            {
+                Spacing = 12,
+                Children =
+                {
+                    _list,
+                    new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Spacing = 8, Children = { snooze, ok } },
+                },
+            },
+        };
+        // Closing it is the same as OK; it is reused for the next reminders.
+        Closing += (_, e) =>
+        {
+            e.Cancel = true;
+            Dismiss();
+        };
+        SizeChanged += (_, _) => PlaceInCorner();
+    }
+
+    public void Add(string title, string body)
+    {
+        _items.Add((title, body));
+        _list.Children.Add(new StackPanel
+        {
+            Spacing = 2,
+            Children =
+            {
+                new TextBlock { Text = title, FontWeight = FontWeight.Bold, FontSize = 15, TextWrapping = TextWrapping.Wrap },
+                new TextBlock { Text = body, TextWrapping = TextWrapping.Wrap, Opacity = 0.8, IsVisible = body != "" },
+            },
+        });
+        Show();
+        PlaceInCorner();
+    }
+
+    private void PlaceInCorner()
+    {
+        if ((Screens.ScreenFromWindow(this) ?? Screens.Primary) is not { } screen) return;
+        var area = screen.WorkingArea;
+        var size = PixelSize.FromSize(Bounds.Size, screen.Scaling);
+        var margin = (int)(16 * screen.Scaling);
+        Position = new PixelPoint(area.Right - size.Width - margin, area.Bottom - size.Height - margin);
+    }
+
+    private void Dismiss()
+    {
+        _items.Clear();
+        _list.Children.Clear();
+        Hide();
+    }
+
+    private void Snooze(TimeSpan delay)
+    {
+        var later = _items.ToList();
+        Dismiss();
+        DispatcherTimer.RunOnce(() => later.ForEach(i => Add(i.Title, i.Body)), delay);
+    }
+}

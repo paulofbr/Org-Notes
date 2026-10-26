@@ -8,6 +8,7 @@ import { AgendaView } from './components/Agenda'
 import { CaptureDialog, NewFileDialog } from './components/Capture'
 import { AiExtractDialog } from './components/AiExtract'
 import { InboxDialog, MailDialog } from './components/MailInbox'
+import { WebReminders } from './components/WebReminders'
 import { saveDrafts } from './org/capture'
 import { resolvePath } from './org/links'
 import { FileTree } from './components/FileTree'
@@ -296,6 +297,7 @@ export default function App() {
           {store.loaded && !dialog && <ShortcutBar view={nav.view} />}
         </main>
         {dialog}
+        <WebReminders />
       </div>
     </Ctx.Provider>
   )

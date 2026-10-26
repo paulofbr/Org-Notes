@@ -24,6 +24,7 @@ public class SettingsWindow : Window
             IsChecked = OperatingSystem.IsWindows() && WindowsStartup.IsEnabled,
         };
         var reminders = new CheckBox { Content = L.Tr("Mostrar lembretes da agenda neste computador"), IsChecked = config.Reminders };
+        var reminderWindow = new CheckBox { Content = L.Tr("Mostrar os lembretes numa janela por cima das outras"), IsChecked = config.ReminderWindow };
         var status = new TextBlock { Opacity = 0.7, TextWrapping = Avalonia.Media.TextWrapping.Wrap };
         var test = new Button { Content = L.Tr("Testar ligação") };
         var save = new Button { Content = L.Tr("Guardar"), Classes = { "accent" } };
@@ -45,7 +46,7 @@ public class SettingsWindow : Window
         save.Click += (_, _) =>
         {
             var edited = Edited();
-            (config.Server, config.Token, config.Hotkey, config.Reminders) = (edited.Server, edited.Token, edited.Hotkey, reminders.IsChecked == true);
+            (config.Server, config.Token, config.Hotkey, config.Reminders, config.ReminderWindow) = (edited.Server, edited.Token, edited.Hotkey, reminders.IsChecked == true, reminderWindow.IsChecked == true);
             config.Save();
             if (OperatingSystem.IsWindows()) WindowsStartup.Set(autostart.IsChecked == true);
             Close();
@@ -62,6 +63,7 @@ public class SettingsWindow : Window
                 new TextBlock { Text = L.Tr("Atalho global, ex. Win+Alt+C (reinicia a app para aplicar)"), IsVisible = OperatingSystem.IsWindows() }, hotkey,
                 autostart,
                 reminders,
+                reminderWindow,
                 new TextBlock
                 {
                     Text = L.Tr("No Linux o atalho é definido no ambiente de trabalho: liga uma tecla a «OrgNotes.Capture --show»."),

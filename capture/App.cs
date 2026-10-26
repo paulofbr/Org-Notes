@@ -16,6 +16,7 @@ public class App(bool showOnStart) : Application
     private CaptureWindow? _capture;
     private TrayIcon? _tray;
     private Updater? _updater;
+    private ReminderWindow? _reminders;
     private bool _hotkey;
     private WindowIcon? _icon;
 
@@ -36,7 +37,10 @@ public class App(bool showOnStart) : Application
         RenderTray();
 
         _ = ListenForShow();
-        _ = new Reminders(_config).Run();
+        _ = new Reminders(_config, (title, body) => Dispatcher.UIThread.Post(() =>
+        {
+            if (_config.ReminderWindow) (_reminders ??= new ReminderWindow { Icon = _icon }).Add(title, body);
+        })).Run();
         _updater = new Updater(_config, () => _capture?.IsVisible != true, () => Dispatcher.UIThread.Post(() => (ApplicationLifetime as IClassicDesktopStyleApplicationLifetime)?.Shutdown()));
         _ = _updater.Run();
         // The installer may already have written the server's address: the token still has to be pasted in.

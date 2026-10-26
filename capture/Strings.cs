@@ -81,6 +81,9 @@ public static class L
         ["Voltar"] = ("Back", "Retour", "Volver"),
         ["A IA não encontrou nada para criar neste texto."] = ("The AI found nothing to create in this text.", "L'IA n'a rien trouvé à créer dans ce texte.", "La IA no encontró nada que crear en este texto."),
         ["Criar {0} itens"] = ("Create {0} items", "Créer {0} éléments", "Crear {0} elementos"),
+        ["Lembretes · Org Notes"] = ("Reminders · Org Notes", "Rappels · Org Notes", "Recordatorios · Org Notes"),
+        ["Adiar 5 min"] = ("Snooze 5 min", "Reporter de 5 min", "Posponer 5 min"),
+        ["Mostrar os lembretes numa janela por cima das outras"] = ("Show reminders in a window above the others", "Afficher les rappels dans une fenêtre au-dessus des autres", "Mostrar los recordatorios en una ventana encima de las demás"),
         // AI review panel
         ["Sem sugestões: o texto parece estar bem."] = ("No suggestions: the text looks fine.", "Aucune suggestion : le texte semble correct.", "Sin sugerencias: el texto parece estar bien."),
         ["Descartar"] = ("Discard", "Ignorer", "Descartar"),

@@ -124,8 +124,10 @@ public class Notifier(Users users, IConfiguration config, IHttpClientFactory htt
     private async Task Ntfy(string topic, string title, string body, CancellationToken stop)
     {
         log.LogInformation("ntfy {Topic}: {Title}", topic, title);
-        // JSON publishing keeps non-ASCII titles intact (HTTP headers would not).
-        var res = await http.CreateClient().PostAsync(NtfyServer, new StringContent(JsonSerializer.Serialize(new { topic, title, message = body }), Encoding.UTF8, "application/json"), stop);
+        // JSON publishing keeps non-ASCII titles intact (HTTP headers would not). High priority (4) makes the phone
+        // vibrate and ring, so the reminder is not missed; the tag shows as an alarm clock.
+        var json = JsonSerializer.Serialize(new { topic, title, message = body, priority = 4, tags = new[] { "alarm_clock" } });
+        var res = await http.CreateClient().PostAsync(NtfyServer, new StringContent(json, Encoding.UTF8, "application/json"), stop);
         if (!res.IsSuccessStatusCode) log.LogWarning("ntfy returned {Status}", (int)res.StatusCode);
     }
 }

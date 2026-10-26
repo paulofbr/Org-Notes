@@ -338,6 +338,11 @@ label.inline input { width: auto; }
 .inbox-head { display: flex; flex-direction: column; align-items: flex-start; gap: 0.15rem; width: 100%; background: none; border: none; padding: 0.6rem 0.75rem; text-align: left; cursor: pointer; }
 .inbox-entry .proposals { padding: 0 0.6rem 0.6rem; }
 .error-text { color: var(--danger, #c0392b); }
+.reminder-cards { position: fixed; top: 1rem; right: 1rem; z-index: 1000; width: min(24rem, calc(100vw - 2rem)); }
+.reminder-card { background: var(--bg); border: 1px solid var(--border); border-top: 4px solid var(--accent); border-radius: 10px; padding: 0.8rem 1rem; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25); display: flex; flex-direction: column; gap: 0.6rem; }
+.reminder-head { display: flex; align-items: center; gap: 0.4rem; color: var(--accent); font-weight: 600; }
+.reminder-item .muted { white-space: pre-line; font-size: 0.9rem; }
+.reminder-card .actions { margin: 0; }
 .proposals { display: flex; flex-direction: column; gap: 0.6rem; }
 .proposal { border: 1px solid var(--border); border-radius: 8px; padding: 0.6rem; margin: 0; display: flex; flex-direction: column; gap: 0.45rem; }
 .proposal.skipped { opacity: 0.5; }

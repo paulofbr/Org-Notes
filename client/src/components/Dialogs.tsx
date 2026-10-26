@@ -355,6 +355,19 @@ export function HelpDialog() {
   )
 }
 
+/** Lets the browser show the reminders as system notifications while the site is open. */
+function BrowserNotifications() {
+  const [permission, setPermission] = useState(() => ('Notification' in window ? Notification.permission : 'unsupported'))
+  if (permission === 'unsupported') return null
+  if (permission === 'granted') return <p className="hint">{tr('Notificações do browser ativas: com o site aberto, os lembretes também aparecem como notificação.')}</p>
+  if (permission === 'denied') return <p className="hint">{tr('As notificações do browser estão bloqueadas: permite-as nas definições deste site no browser.')}</p>
+  return (
+    <p>
+      <button type="button" onClick={() => Notification.requestPermission().then(setPermission)}>{tr('Ativar notificações do browser')}</button>
+    </p>
+  )
+}
+
 /** The administrator's list of who may sign in: add an email, or remove one added here. */
 export function LoginsDialog() {
   const { closeDialog } = useApp()
@@ -425,6 +438,7 @@ export function AccountDialog() {
       {me && (
         <>
           <label className="inline"><input type="checkbox" checked={me.ntfy.enabled} onChange={(e) => toggle(e.target.checked)} /> {tr('Enviar lembretes da agenda pelo ntfy')}</label>
+          <BrowserNotifications />
           <p>{tr('Tópico')}: <a href={url} target="_blank" rel="noreferrer"><code>{url}</code></a></p>
           <p className="hint">
             {tr('Subscreve este tópico na app ntfy (Android/iOS) ou no PC com')} <code>ntfy subscribe {url}</code>.{' '}

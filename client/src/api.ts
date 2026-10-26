@@ -34,6 +34,15 @@ export interface ProposedItem {
   props: Record<string, string>
 }
 
+/** A reminder to show between `from` and `until` (the user's wall-clock time). */
+export interface Reminder {
+  id: string
+  from: string
+  until: string
+  title: string
+  body: string
+}
+
 export interface MailAccount {
   host: string
   port: number
@@ -90,6 +99,7 @@ export const api = {
     if (!res.ok) throw new Error((await res.json().catch(() => null))?.detail ?? `${res.status}`)
     return res.json()
   },
+  reminders: async (): Promise<Reminder[]> => (await check(await fetch(`/api/reminders?now=${localNow()}`))).json(),
   mail: async (): Promise<MailAccount | null> => (await check(await fetch('/api/mail'))).json(),
   saveMail: async (account: Omit<MailAccount, 'lastCheck' | 'lastError'> & { password: string }) => {
     const res = await fetch('/api/mail', { method: 'PUT', body: JSON.stringify(account), headers: { 'Content-Type': 'application/json' } })

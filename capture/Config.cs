@@ -15,6 +15,8 @@ public class Config
     public string Lang { get; set; } = "";
     /// <summary>Whether to show the agenda reminders on this machine.</summary>
     public bool Reminders { get; set; } = true;
+    /// <summary>Whether the reminders also open a window above all the others (besides the notification).</summary>
+    public bool ReminderWindow { get; set; } = true;
 
     public static string Dir => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "orgnotes");
     private static string FilePath => Path.Combine(Dir, "capture.json");
