@@ -10,6 +10,8 @@ public record Improved(Dictionary<string, string> Fields, string[] Changes);
 
 public record Me(bool Ai, string? Lang);
 
+public record Reminder(string Id, DateTime From, DateTime Until, string Title, string Body);
+
 /// <summary>The Org Notes server's capture endpoints, authenticated with the user's personal token.</summary>
 public class Api(Config config)
 {
@@ -64,6 +66,14 @@ public class Api(Config config)
         request.Content = JsonContent.Create(new { file = t.File, key = t.Key, title, body, date, time, props, now = DateTime.Now }, options: Json);
         using var response = await Http.SendAsync(request);
         await Check(response);
+    }
+
+    /// <summary>Today's reminders, worked out by the server for this machine's wall-clock time.</summary>
+    public async Task<List<Reminder>> Reminders(DateTime now)
+    {
+        using var response = await Http.SendAsync(Request(HttpMethod.Get, $"/api/reminders?now={now:yyyy-MM-ddTHH:mm:ss}"));
+        await Check(response);
+        return await response.Content.ReadFromJsonAsync<List<Reminder>>(Json) ?? [];
     }
 
     private static async Task Check(HttpResponseMessage response)

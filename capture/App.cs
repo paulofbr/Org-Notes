@@ -35,7 +35,9 @@ public class App(bool showOnStart) : Application
         RenderTray();
 
         _ = ListenForShow();
-        if (!Config.Exists) ShowSettings();
+        _ = new Reminders(_config).Run();
+        // The installer may already have written the server's address: the token still has to be pasted in.
+        if (!Config.Exists || _config.Token == "") ShowSettings();
         else if (showOnStart) ShowCapture();
         base.OnFrameworkInitializationCompleted();
     }

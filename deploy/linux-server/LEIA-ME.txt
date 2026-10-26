@@ -1,0 +1,13 @@
+Org Notes: servidor (site e API) para Linux (Debian/Ubuntu, x86-64)
+
+Instalar ou atualizar:
+  unzip OrgNotes-server-linux-x64.zip && cd OrgNotes-server-linux-x64
+  sudo ./install.sh notas.exemplo.pt     # com domínio: HTTPS automático com o Caddy
+  sudo ./install.sh                      # sem domínio: HTTP na porta 5080
+
+O servidor fica em /opt/org-notes (serviço systemd org-notes) e as notas em /var/lib/org-notes/users/<email>/.
+A configuração (emails autorizados e IA) vem em appsettings.Local.json: guarda este zip em privado.
+Para trazer notas de outra instalação, copia a pasta users/<email>/ para /var/lib/org-notes/users/ e
+faz: sudo chown -R org-notes: /var/lib/org-notes
+
+Em cada computador, instala a app local (OrgNotes-client-win-x64.zip) e aponta-a para este servidor.

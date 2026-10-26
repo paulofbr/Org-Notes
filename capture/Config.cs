@@ -13,6 +13,8 @@ public class Config
     public double Scale { get; set; }
     /// <summary>The user's interface language, as last read from the server (empty: the system's).</summary>
     public string Lang { get; set; } = "";
+    /// <summary>Whether to show the agenda reminders on this machine.</summary>
+    public bool Reminders { get; set; } = true;
 
     public static string Dir => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "orgnotes");
     private static string FilePath => Path.Combine(Dir, "capture.json");

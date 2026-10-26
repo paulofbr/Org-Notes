@@ -61,6 +61,7 @@ public static class L
         // Settings
         ["Definições · Org Notes Capture"] = ("Settings · Org Notes Capture", "Paramètres · Org Notes Capture", "Ajustes · Org Notes Capture"),
         ["Só necessário com login Google"] = ("Only needed with Google sign-in", "Nécessaire seulement avec la connexion Google", "Solo necesario con el inicio de sesión de Google"),
+        ["Mostrar lembretes da agenda neste computador"] = ("Show agenda reminders on this computer", "Afficher les rappels de l'agenda sur cet ordinateur", "Mostrar recordatorios de la agenda en este equipo"),
         ["Arrancar com o Windows"] = ("Start with Windows", "Démarrer avec Windows", "Iniciar con Windows"),
         ["Testar ligação"] = ("Test connection", "Tester la connexion", "Probar conexión"),
         ["Guardar"] = ("Save", "Enregistrer", "Guardar"),

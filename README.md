@@ -10,6 +10,14 @@ Portuguese, English, French and Spanish (the screenshots and the labels quoted b
 |---|---|
 | ![Week agenda with scheduled items, deadlines and events](docs/images/agenda.png) | ![The same file in the dark theme](docs/images/dark.png) |
 
+## Architecture
+
+- **Server** (`server/`, on a remote machine): the site and the API in one ASP.NET Core process, the users' notes,
+  and the agenda reminders sent through ntfy (so they reach phones even with every computer off).
+- **Local app** (`capture/`, on each user's computer): sits in the tray, opens the capture form with a global shortcut
+  and shows the agenda reminders as native notifications. It holds no notes: everything goes through the API, with
+  the user's personal token.
+
 ## Running
 
 ```bash
@@ -37,31 +45,33 @@ app all follow it. Before signing in, the login page uses the browser's language
 The site's texts are keyed by their Portuguese wording: translations live in `client/src/i18n/{en,fr,es}.ts`
 (a test checks that every text has all three), and the server's and the capture app's in their `Strings.cs`.
 
-## Windows installer
+## Packages
 
-`OrgNotes-win-x64.zip` (built into `dist/`, which is not in git) holds the server and the capture app, both built for
-Windows with .NET included, and an install script. Unzip it and double-click `install.cmd`. No admin rights are needed. The script:
+`deploy/package.sh` builds two zips into `dist/` (not in git), both with .NET included:
 
-- copies both apps to `%LOCALAPPDATA%\OrgNotes`;
-- keeps the notes in `Documents\Org Notes`, so reinstalling does not touch them;
-- starts the server and the capture app at sign-in;
-- adds *Start → Org Notes* and opens http://localhost:5080.
-
-The zip ships `server/appsettings.Local.json` (allowed emails and AI key), so keep it private.
+- **`OrgNotes-server-linux-x64.zip`**, for the server (Debian/Ubuntu): `sudo ./install.sh notes.example.com` installs it
+  in `/opt/org-notes` as the `org-notes` systemd service, keeps the notes in `/var/lib/org-notes`, and puts
+  [Caddy](https://caddyserver.com) in front for HTTPS. Without a domain it listens on port 5080 over plain HTTP.
+  Running it again updates the server and leaves the notes alone. The zip ships `server/appsettings.Local.json`
+  (allowed emails and AI key), so keep it private.
+- **`OrgNotes-client-win-x64.zip`**, for each user's Windows computer: double-click `install.cmd` and give the server's
+  address. It installs the local app in `%LOCALAPPDATA%\OrgNotes\capture`, starts it at sign-in and adds
+  *Start → Org Notes* for the site. No admin rights are needed. The app then asks for the personal token.
 
 ## Agenda notifications
 
-The server sends reminders even with the site closed: N minutes before each timed item (`SCHEDULED`, `DEADLINE`,
+Reminders arrive even with the site closed: N minutes before each timed item (`SCHEDULED`, `DEADLINE`,
 active timestamps, repeats included), a daily summary (today, overdue, upcoming deadlines) and, at summary time,
 one reminder per deadline (`DEADLINE`) 7, 3, 1 and 0 days ahead (`DeadlineReminders`). Two channels:
 
 - **ntfy**: each user has a secret topic, shown and switched on or off in *Conta e notificações* (Account and
   notifications, bell icon in the menu). Receive it in the ntfy app (Android/iOS) or on a PC with `ntfy subscribe <url>`.
   Off by default.
-- **Native** (`notify-send` on Linux, a toast on Windows): shown on the machine the server runs on. On by default
-  only in single-user mode.
+- **Native** (`notify-send` on Linux, a toast on Windows): shown by the local app on each computer it runs on. It gets
+  the day's reminders from `/api/reminders`, already worked out and translated by the server, and shows each once
+  when it is due. On by default; *Mostrar lembretes da agenda neste computador* in its settings turns it off.
 
-Settings are in `appsettings.json` → `Notifications` (`MinutesBefore`, `DailySummaryAt`, `DeadlineReminders`, `NtfyServer`, `Native`, `Enabled`).
+Settings are in the server's `appsettings.json` → `Notifications` (`MinutesBefore`, `DailySummaryAt`, `DeadlineReminders`, `NtfyServer`, `Enabled`).
 
 ## Capture templates
 
@@ -91,7 +101,7 @@ With AI configured, the template editor can write a template from a plain descri
 
 `capture/` is a small app (.NET + Avalonia) that sits in the tray and opens the capture form with a global
 shortcut: pick the template by its key, type the title, date/time, property fields and notes, <kbd>Ctrl+Enter</kbd> saves, <kbd>Esc</kbd> closes.
-It uses the files' templates and saves through the server (`/api/capture`). On first run it asks for the server and
+It also shows the agenda reminders (see above). It uses the files' templates and saves through the server (`/api/capture`). On first run it asks for the server and
 your personal token (on the site: bell → *Conta e notificações*). Settings are in `~/.config/orgnotes/capture.json`
 or `%APPDATA%\orgnotes\capture.json`.
 
@@ -166,6 +176,8 @@ Pass the secrets through environment variables or `server/appsettings.Local.json
 
 ### Deploying on a VPS (Debian/Ubuntu)
 
+The server package's `install.sh` does all of this. By hand:
+
 Google only accepts HTTPS on a domain, so the app sits behind [Caddy](https://caddyserver.com) (automatic certificate)
 and listens only on `localhost:5080`.
 
@@ -192,31 +204,6 @@ Restart=always
 WantedBy=multi-user.target
 UNIT
 systemctl enable --now org-notes
-```
-
-### Running locally with autostart (single user, native notifications)
-
-Set `Auth:AllowedEmails` to your email (e.g. `Environment=Auth__AllowedEmails__0=me@gmail.com` below).
-
-```bash
-# Linux (systemd, user service)
-cd client && npm run build && cd ../server && dotnet publish -c Release -o ~/.local/share/org-notes
-cat > ~/.config/systemd/user/org-notes.service <<UNIT
-[Service]
-WorkingDirectory=%h/.local/share/org-notes
-ExecStart=%h/.local/share/org-notes/OrgNotes.Server
-Environment=OrgDirectory=%h/org
-[Install]
-WantedBy=default.target
-UNIT
-systemctl --user enable --now org-notes
-```
-
-```powershell
-# Windows: a task that starts at sign-in (set OrgDirectory in the published appsettings.json)
-cd server; dotnet publish -c Release -o $env:LOCALAPPDATA\OrgNotes
-$a = New-ScheduledTaskAction -Execute "$env:LOCALAPPDATA\OrgNotes\OrgNotes.Server.exe" -WorkingDirectory "$env:LOCALAPPDATA\OrgNotes"
-Register-ScheduledTask OrgNotes -Action $a -Trigger (New-ScheduledTaskTrigger -AtLogOn) -Settings (New-ScheduledTaskSettingsSet -ExecutionTimeLimit 0)
 ```
 
 ## Features

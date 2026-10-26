@@ -139,6 +139,11 @@ app.MapDelete("/api/folders/{*path}", (string path, HttpContext ctx, Users users
 app.MapPost("/api/rename", (RenameRequest req, HttpContext ctx, Users users) =>
     users.For(ctx.User).Rename(req.From, req.To) ? Results.NoContent() : Results.BadRequest("Cannot rename"));
 
+// The user's reminders for the day, for the capture app to show natively. `now` is the user's wall-clock time,
+// since the server may be in another time zone.
+app.MapGet("/api/reminders", (DateTime? now, HttpContext ctx, Users users, Notifier notifier) =>
+    notifier.Reminders(users.Key(ctx.User), now ?? DateTime.Now));
+
 app.MapGet("/api/me", (HttpContext ctx, Users users, Notifier notifier, AiAssistant ai) =>
 {
     var s = users.Settings(users.Key(ctx.User));
