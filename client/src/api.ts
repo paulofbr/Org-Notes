@@ -1,3 +1,4 @@
+import { dateKey } from './org/timestamp'
 export interface FileInfo {
   path: string
   size: number
@@ -5,6 +6,9 @@ export interface FileInfo {
 }
 
 const enc = (path: string) => path.split('/').map(encodeURIComponent).join('/')
+
+/** This computer's wall-clock time without a zone, as the server reads it (relative dates follow the user's clock). */
+const localNow = (d = new Date()) => `${dateKey(d)}T${d.toTimeString().slice(0, 8)}`
 
 export interface Me {
   email?: string
@@ -14,6 +18,18 @@ export interface Me {
   lang?: string
   admin: boolean
   windowsInstaller: boolean
+}
+
+/** An item the AI proposes from free text, for one of the user's templates. */
+export interface ProposedItem {
+  file: string
+  key: string
+  template: string
+  title: string
+  date: string
+  time: string
+  body: string
+  props: Record<string, string>
 }
 
 export interface Login {
@@ -46,6 +62,11 @@ export const api = {
   me: async (): Promise<Me> => (await check(await fetch('/api/me'))).json(),
   improve: async (fields: Record<string, string>, mode: string): Promise<{ fields: Record<string, string>; changes: string[] }> => {
     const res = await fetch('/api/ai/improve', { method: 'POST', body: JSON.stringify({ fields, mode }), headers: { 'Content-Type': 'application/json' } })
+    if (!res.ok) throw new Error((await res.json().catch(() => null))?.detail ?? `${res.status}`)
+    return res.json()
+  },
+  aiExtract: async (text: string): Promise<ProposedItem[]> => {
+    const res = await fetch('/api/ai/extract', { method: 'POST', body: JSON.stringify({ text, now: localNow() }), headers: { 'Content-Type': 'application/json' } })
     if (!res.ok) throw new Error((await res.json().catch(() => null))?.detail ?? `${res.status}`)
     return res.json()
   },

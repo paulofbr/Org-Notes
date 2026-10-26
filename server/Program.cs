@@ -23,6 +23,7 @@ var microsoft = builder.Configuration.GetSection("Auth:Microsoft");
 var allowed = builder.Configuration.GetSection("Auth:AllowedEmails").Get<string[]>() ?? [];
 var access = new Access(root, allowed, builder.Configuration.GetSection("Auth:Admins").Get<string[]>() ?? []);
 builder.Services.AddSingleton(access);
+builder.Services.AddSingleton<Extraction>();
 
 builder.Services.AddSingleton(new Users(root, Path.Combine(AppContext.BaseDirectory, "Seed")));
 var windowsInstaller = Path.Combine(AppContext.BaseDirectory, "downloads", "OrgNotes-client-win-x64.zip");
@@ -300,6 +301,21 @@ app.MapPost("/api/ai/improve", async (ImproveRequest req, HttpContext ctx, AiAss
     catch (InvalidOperationException e) { return Results.Problem(Strings.Tr(ctx, e.Message), statusCode: 502); }
 });
 
+// Items for the user's templates from free text (an email...), for the user to review before capturing them.
+app.MapPost("/api/ai/extract", async (ExtractRequest req, HttpContext ctx, Users users, AiAssistant ai, Extraction extraction, ILogger<AiAssistant> log, CancellationToken ct) =>
+{
+    if (!ai.Enabled) return Results.NotFound(Strings.Tr(ctx, "IA não configurada"));
+    if (string.IsNullOrWhiteSpace(req.Text)) return Results.BadRequest(Strings.Tr(ctx, "Falta o texto"));
+    try { return Results.Ok(await extraction.Run(users.For(ctx.User), req.Text, req.Now ?? DateTime.Now, Strings.Of(ctx), ct)); }
+    catch (Exception e) when (AiAssistant.IsRateLimit(e)) { return Results.Problem(Strings.Tr(ctx, "Demasiados pedidos à IA; tenta daqui a pouco."), statusCode: 429); }
+    catch (Exception e) when (e is AnthropicException or HttpRequestException or JsonException or KeyNotFoundException)
+    {
+        log.LogWarning(e, "AI request failed");
+        return Results.Problem(Strings.Tr(ctx, "A IA falhou: {0}", AiAssistant.ProviderMessage(e)), statusCode: 502);
+    }
+    catch (InvalidOperationException e) { return Results.Problem(Strings.Tr(ctx, e.Message), statusCode: 502); }
+});
+
 app.MapPost("/api/ai/template", async (TemplateRequest req, HttpContext ctx, AiAssistant ai, ILogger<AiAssistant> log, CancellationToken ct) =>
 {
     if (!ai.Enabled) return Results.NotFound(Strings.Tr(ctx, "IA não configurada"));
@@ -330,4 +346,5 @@ record ImproveRequest(Dictionary<string, string> Fields, string? Mode);
 record TemplateRequest(string Description);
 record LangRequest(string Lang);
 record LoginRequest(string Email);
+record ExtractRequest(string Text, DateTime? Now);
 record CaptureRequest(string File, string Key, string Title, string? Body, DateOnly? Date, TimeOnly? Time, DateTime? Now, Dictionary<string, string>? Props);

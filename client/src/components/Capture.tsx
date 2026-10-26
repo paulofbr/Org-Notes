@@ -4,6 +4,7 @@ import { allTemplates, captureInto, emptyProps, expand, fieldOptions, saveDrafts
 import { Modal } from './Dialogs'
 import { OrgTextarea } from './OrgTextarea'
 import { TitleInput } from './TitleInput'
+import { AiExtractDialog } from './AiExtract'
 import { aiEnabled, useAiReview } from './AiReview'
 import { api } from '../api'
 import { tr } from '../i18n'
@@ -13,7 +14,7 @@ import { tr } from '../i18n'
  * only that file's templates are offered and the filled-in entry goes to `onEntry` instead, to be placed by the caller.
  */
 export function CaptureDialog({ path, onEntry }: { path?: string; onEntry?: (entry: string[], tpl: CaptureTemplate) => void }) {
-  const { store, closeDialog } = useApp()
+  const { store, closeDialog, showDialog } = useApp()
   const templates = useMemo(() => allTemplates(store.files).filter((t) => !onEntry || t.file === path), [store.files, onEntry, path])
   const [tpl, setTpl] = useState<CaptureTemplate | undefined>(() => templates.find((t) => t.file === path) ?? templates[0])
   const [title, setTitle] = useState('')
@@ -87,6 +88,11 @@ export function CaptureDialog({ path, onEntry }: { path?: string; onEntry?: (ent
         {ai.panel}
         <div className="actions">
           {ai.button}
+          {ai.button && (
+            <button type="button" title={tr('Criar tarefas, eventos e contactos a partir de um email ou outro texto')} onClick={() => showDialog(<AiExtractDialog initialText={body} />)}>
+              {tr('Do texto (IA)')}
+            </button>
+          )}
           <button type="button" onClick={closeDialog}>{tr('Cancelar')}</button>
           <button className="primary" disabled={!title.trim()}>{tr('Guardar')} <kbd>Ctrl+Enter</kbd></button>
         </div>

@@ -333,6 +333,13 @@ label.inline input { width: auto; }
 .ai-btn { display: inline-flex; align-items: center; gap: 0.1rem; }
 .ai-btn { color: var(--accent); }
 .editor-foot { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; }
+.proposals { display: flex; flex-direction: column; gap: 0.6rem; }
+.proposal { border: 1px solid var(--border); border-radius: 8px; padding: 0.6rem; margin: 0; display: flex; flex-direction: column; gap: 0.45rem; }
+.proposal.skipped { opacity: 0.5; }
+.proposal .row { align-items: flex-end; }
+.proposal-head { display: flex; gap: 0.5rem; align-items: center; }
+.proposal-head select, .proposal-head input[type='checkbox'] { width: auto; flex: none; }
+.proposal-head .grow { flex: 1; min-width: 8rem; }
 .ai-panel { border: 1px solid var(--border); border-radius: 8px; padding: 0.5rem 0.75rem; margin: 0.5rem 0; background: var(--panel); }
 .ai-diff { white-space: pre-wrap; font: 13px/1.5 var(--mono); margin: 0.25rem 0; }
 .ai-diff del { color: var(--danger); text-decoration: line-through; }

@@ -118,6 +118,75 @@ public class AiAssistant(IConfiguration config, IHttpClientFactory http)
             ?? throw new InvalidOperationException("Resposta vazia do modelo.");
     }
 
+    private const string ExtractInstructions = """
+        You turn free text the author received or wrote (often an email) into items for their org-mode notes.
+        The input has `now` (the author's date, weekday and time), `language`, `templates` (the author's capture templates:
+        id, name, file, the org text it produces, whether it takes a date, and its fields with their allowed options)
+        and `text`.
+        For each thing worth keeping, create one item with the most fitting template: something to do (a task),
+        a meeting, call or appointment (an event), a new person's details (a contact), a fact worth noting.
+        Do not create items for greetings, signatures or small talk; if nothing is worth keeping, return no items.
+        - template: the template's id, exactly as given.
+        - title: a short headline in `language`, stating the action or event (e.g. "Send the signed contract to Maria").
+        - date (YYYY-MM-DD) and time (HH:MM, 24h): only for templates that take a date, when the text gives or clearly
+          implies one (an event's day, a task's due or planned day). Resolve relative dates ("next Tuesday",
+          "tomorrow", "end of the month") against `now`. Otherwise empty strings.
+        - fields: only the template's own fields. For a field with options, use one option when the text clearly
+          matches it (e.g. the client among the contacts, matching the company or the sender); otherwise leave it out.
+          For other fields, the value from the text (e.g. a contact's email or phone).
+        - body: a short summary in `language`, 1-3 lines of org-mode text (`-` lists, no Markdown, no headlines), with
+          the details that matter for this item: who, what, where, amounts, links. Not the whole text.
+        Never invent names, dates, numbers or facts that are not in the text.
+        Answer with JSON only: {"items": [{"template": <id>, "title": <text>, "date": <text>, "time": <text>,
+        "body": <text>, "fields": [{"name": <text>, "value": <text>}]}]}.
+        """;
+
+    public record ExtractedField(string Name, string Value);
+
+    public record ExtractedRaw(string Template, string Title, string Date, string Time, string Body, ExtractedField[] Fields);
+
+    private record ExtractedList(ExtractedRaw[] Items);
+
+    /// <summary>Asks the model for the items in <paramref name="text"/>; <paramref name="templates"/> is their JSON description.</summary>
+    public async Task<ExtractedRaw[]> Extract(string text, string now, string language, string templates, CancellationToken ct)
+    {
+        var str = new { type = "string" };
+        var schema = new
+        {
+            type = "object",
+            additionalProperties = false,
+            required = new[] { "items" },
+            properties = new
+            {
+                items = new
+                {
+                    type = "array",
+                    items = new
+                    {
+                        type = "object",
+                        additionalProperties = false,
+                        required = new[] { "template", "title", "date", "time", "body", "fields" },
+                        properties = new
+                        {
+                            template = str, title = str, date = str, time = str, body = str,
+                            fields = new
+                            {
+                                type = "array",
+                                items = new { type = "object", additionalProperties = false, required = new[] { "name", "value" }, properties = new { name = str, value = str } },
+                            },
+                        },
+                    },
+                },
+            },
+        };
+        var input = new Dictionary<string, string> { ["now"] = now, ["language"] = language, ["templates"] = templates, ["text"] = text };
+        var json = _baseUrl != null
+            ? await OpenAiCompatible(input, schema, ExtractInstructions, ct)
+            : await Claude(input, schema, ExtractInstructions, ct);
+        json = Regex.Replace(json.Trim(), @"^```(?:json)?\s*|\s*```$", "");
+        return (JsonSerializer.Deserialize<ExtractedList>(json, JsonSerializerOptions.Web) ?? throw new InvalidOperationException("Resposta vazia do modelo.")).Items;
+    }
+
     private static string Instructions(string mode) =>
         "You help the author with notes written in Emacs org-mode syntax.\n" + Modes.GetValueOrDefault(mode, Modes["develop"]) + Rules;
 

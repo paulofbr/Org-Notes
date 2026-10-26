@@ -6,6 +6,7 @@ import * as E from './org/edit'
 import { formatDuration, nowStamp, parseTimestamp, wallMinutes } from './org/timestamp'
 import { AgendaView } from './components/Agenda'
 import { CaptureDialog, NewFileDialog } from './components/Capture'
+import { AiExtractDialog } from './components/AiExtract'
 import { saveDrafts } from './org/capture'
 import { resolvePath } from './org/links'
 import { FileTree } from './components/FileTree'
@@ -147,6 +148,7 @@ export default function App() {
     { label: tr('Agenda'), hint: 'a', run: () => setNav({ view: 'agenda' }) },
     { label: tr('Procurar'), hint: '/', run: () => setNav({ view: 'agenda', tab: 'search' }) },
     { label: tr('Capturar'), hint: 'c', run: () => ctx.showDialog(<CaptureDialog path={nav.view === 'doc' ? nav.path : undefined} />) },
+    { label: tr('Criar a partir de texto (IA)'), run: () => ctx.showDialog(<AiExtractDialog />) },
     { label: tr('Novo ficheiro'), run: () => newFile() },
     { label: tr('Nova pasta'), run: newFolder },
     { label: tr('Conta e notificações'), run: () => ctx.showDialog(<AccountDialog />) },
