@@ -383,6 +383,12 @@ export function AccountDialog() {
             {tr('Recebes um aviso antes de cada item com hora e um resumo diário, mesmo com o site fechado. Quem souber o tópico vê os títulos das tarefas: não o partilhes.')}
           </p>
           <h4>{tr('App de captura')}</h4>
+          <p className="hint">{tr('Abre a captura com um atalho global e mostra os lembretes da agenda no computador.')}</p>
+          {me.windowsInstaller && (
+            <p>
+              <a href="/api/downloads/windows" download>{tr('Descarregar para Windows')}</a>
+            </p>
+          )}
           <p>{tr('Servidor')}: <code>{location.origin}</code></p>
           <p>
             Token: <code>{me.token}</code>{' '}

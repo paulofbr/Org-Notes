@@ -70,12 +70,17 @@ public class Users(string root, string seedDir)
 
     public OrgStore For(ClaimsPrincipal user) => Store(Key(user));
 
+    // GetOrAdd may run this for the same user from parallel first requests: the lock makes the later ones find the
+    // files already seeded instead of copying them again.
     public OrgStore Store(string key) => _stores.GetOrAdd(key, k =>
     {
-        lock (_settingsLock) AdoptRootFiles(k);
-        var store = new OrgStore(Dir(k));
-        store.SeedIfEmpty(seedDir);
-        return store;
+        lock (_settingsLock)
+        {
+            AdoptRootFiles(k);
+            var store = new OrgStore(Dir(k));
+            store.SeedIfEmpty(seedDir);
+            return store;
+        }
     });
 
     /// <summary>Settings for a user, creating them with a fresh secret ntfy topic on first use.</summary>

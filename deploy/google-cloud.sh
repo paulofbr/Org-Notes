@@ -12,7 +12,7 @@ tz=${TIMEZONE:-$(timedatectl show -p Timezone --value)}
 root=$(cd "$(dirname "$0")/.." && pwd)
 pkg=OrgNotes-server-linux-x64
 
-"$root/deploy/package.sh" server
+"$root/deploy/package.sh"
 
 if ! gcloud compute instances describe "$name" --zone "$zone" >/dev/null 2>&1; then
   gcloud compute instances create "$name" --zone "$zone" --machine-type e2-micro \

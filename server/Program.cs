@@ -23,6 +23,7 @@ var microsoft = builder.Configuration.GetSection("Auth:Microsoft");
 var allowed = builder.Configuration.GetSection("Auth:AllowedEmails").Get<string[]>() ?? [];
 
 builder.Services.AddSingleton(new Users(root, Path.Combine(AppContext.BaseDirectory, "Seed")));
+var windowsInstaller = Path.Combine(AppContext.BaseDirectory, "downloads", "OrgNotes-client-win-x64.zip");
 builder.Services.AddHttpClient();
 builder.Services.AddSingleton<AiAssistant>();
 builder.Services.AddSingleton<Notifier>();
@@ -147,8 +148,12 @@ app.MapGet("/api/reminders", (DateTime? now, HttpContext ctx, Users users, Notif
 app.MapGet("/api/me", (HttpContext ctx, Users users, Notifier notifier, AiAssistant ai) =>
 {
     var s = users.Settings(users.Key(ctx.User));
-    return new { email = ctx.User.FindFirstValue(ClaimTypes.Email), ai = ai.Enabled, token = users.Token(users.Key(ctx.User)), ntfy = new { server = notifier.NtfyServer, topic = s.NtfyTopic, enabled = s.Notify }, lang = s.Lang };
+    return new { email = ctx.User.FindFirstValue(ClaimTypes.Email), ai = ai.Enabled, token = users.Token(users.Key(ctx.User)), ntfy = new { server = notifier.NtfyServer, topic = s.NtfyTopic, enabled = s.Notify }, lang = s.Lang, windowsInstaller = File.Exists(windowsInstaller) };
 });
+
+// The local app's Windows installer, which the server package carries (absent when running from source).
+app.MapGet("/api/downloads/windows", () =>
+    File.Exists(windowsInstaller) ? Results.File(windowsInstaller, "application/zip", Path.GetFileName(windowsInstaller)) : Results.NotFound());
 
 // The interface language is a user setting, so notifications and the capture app follow it too.
 app.MapPut("/api/me/lang", (LangRequest req, HttpContext ctx, Users users) =>

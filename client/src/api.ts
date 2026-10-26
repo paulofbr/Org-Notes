@@ -12,6 +12,7 @@ export interface Me {
   token: string
   ntfy: { server: string; topic: string; enabled: boolean }
   lang?: string
+  windowsInstaller: boolean
 }
 
 async function check(res: Response) {

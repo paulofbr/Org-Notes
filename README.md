@@ -57,6 +57,8 @@ The site's texts are keyed by their Portuguese wording: translations live in `cl
 - **`OrgNotes-client-win-x64.zip`**, for each user's Windows computer: double-click `install.cmd` and give the server's
   address. It installs the local app in `%LOCALAPPDATA%\OrgNotes\capture`, starts it at sign-in and adds
   *Start → Org Notes* for the site. No admin rights are needed. The app then asks for the personal token.
+  The server package carries this installer too: signed-in users download it from *Conta e notificações*
+  (*Descarregar para Windows*), next to their token.
 
 ## Continuous deployment
 
