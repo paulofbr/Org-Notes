@@ -24,6 +24,8 @@ var allowed = builder.Configuration.GetSection("Auth:AllowedEmails").Get<string[
 var access = new Access(root, allowed, builder.Configuration.GetSection("Auth:Admins").Get<string[]>() ?? []);
 builder.Services.AddSingleton(access);
 builder.Services.AddSingleton<Extraction>();
+builder.Services.AddSingleton<MailInbox>();
+builder.Services.AddHostedService(sp => sp.GetRequiredService<MailInbox>());
 
 builder.Services.AddSingleton(new Users(root, Path.Combine(AppContext.BaseDirectory, "Seed")));
 var windowsInstaller = Path.Combine(AppContext.BaseDirectory, "downloads", "OrgNotes-client-win-x64.zip");
@@ -175,10 +177,56 @@ app.MapGet("/api/link-targets", (HttpContext ctx, Users users) =>
 app.MapGet("/api/reminders", (DateTime? now, HttpContext ctx, Users users, Notifier notifier) =>
     notifier.Reminders(users.Key(ctx.User), now ?? DateTime.Now));
 
-app.MapGet("/api/me", (HttpContext ctx, Users users, Notifier notifier, AiAssistant ai) =>
+// The mailbox the AI reads for items (password never sent back), and the emails waiting for review.
+app.MapGet("/api/mail", (HttpContext ctx, Users users) =>
+    users.Settings(users.Key(ctx.User)).Mail is { } m
+        ? Results.Ok(new { host = m.Host, port = m.Port, user = m.User, folder = m.Folder, enabled = m.Enabled, lastCheck = m.LastCheck, lastError = m.LastError })
+        : Results.Ok((object?)null));
+
+app.MapPut("/api/mail", async (MailRequest req, HttpContext ctx, Users users, MailInbox inbox, CancellationToken ct) =>
+{
+    var key = users.Key(ctx.User);
+    var old = users.Settings(key).Mail;
+    // An empty password keeps the saved one.
+    var password = string.IsNullOrEmpty(req.Password) ? (old != null ? inbox.Password(old) : null) : req.Password;
+    if (string.IsNullOrWhiteSpace(req.Host) || string.IsNullOrWhiteSpace(req.User) || password == null) return Results.BadRequest(Strings.Tr(ctx, "Falta o servidor, o utilizador ou a password"));
+    var account = new MailAccount(req.Host.Trim(), req.Port is > 0 ? req.Port : 993, req.User.Trim(), inbox.Protect(password), string.IsNullOrWhiteSpace(req.Folder) ? "INBOX" : req.Folder.Trim(), req.Enabled);
+    try
+    {
+        // Saved only once it connects; it reads from now on, never the mails already there.
+        var (validity, next) = await inbox.Test(account, password, ct);
+        users.Save(key, users.Settings(key) with { Mail = account with { UidValidity = validity, LastUid = next - 1 } });
+        return Results.NoContent();
+    }
+    catch (Exception e) when (e is not OperationCanceledException)
+    {
+        return Results.BadRequest(Strings.Tr(ctx, "Não foi possível ligar ao email: {0}", e.Message));
+    }
+});
+
+app.MapDelete("/api/mail", (HttpContext ctx, Users users) =>
+{
+    var key = users.Key(ctx.User);
+    users.Save(key, users.Settings(key) with { Mail = null });
+    return Results.NoContent();
+});
+
+app.MapPost("/api/mail/check", async (HttpContext ctx, Users users, MailInbox inbox, CancellationToken ct) =>
+{
+    var key = users.Key(ctx.User);
+    await inbox.Check(key, ct);
+    return Results.Ok(new { lastError = users.Settings(key).Mail?.LastError, inbox = inbox.Inbox(key).Count });
+});
+
+app.MapGet("/api/inbox", (HttpContext ctx, Users users, MailInbox inbox) => inbox.Inbox(users.Key(ctx.User)));
+
+app.MapDelete("/api/inbox/{id}", (string id, HttpContext ctx, Users users, MailInbox inbox) =>
+    inbox.Remove(users.Key(ctx.User), id) ? Results.NoContent() : Results.NotFound());
+
+app.MapGet("/api/me", (HttpContext ctx, Users users, Notifier notifier, AiAssistant ai, MailInbox inbox) =>
 {
     var s = users.Settings(users.Key(ctx.User));
-    return new { email = ctx.User.FindFirstValue(ClaimTypes.Email), ai = ai.Enabled, token = users.Token(users.Key(ctx.User)), ntfy = new { server = notifier.NtfyServer, topic = s.NtfyTopic, enabled = s.Notify }, lang = s.Lang, admin = access.IsAdmin(ctx.User.FindFirstValue(ClaimTypes.Email) ?? ""), windowsInstaller = File.Exists(windowsInstaller),
+    return new { email = ctx.User.FindFirstValue(ClaimTypes.Email), ai = ai.Enabled, token = users.Token(users.Key(ctx.User)), ntfy = new { server = notifier.NtfyServer, topic = s.NtfyTopic, enabled = s.Notify }, lang = s.Lang, inbox = inbox.Inbox(users.Key(ctx.User)).Count, admin = access.IsAdmin(ctx.User.FindFirstValue(ClaimTypes.Email) ?? ""), windowsInstaller = File.Exists(windowsInstaller),
         windowsVersion = File.Exists(windowsVersion) ? File.ReadAllText(windowsVersion).Trim() : null };
 });
 
@@ -347,4 +395,5 @@ record TemplateRequest(string Description);
 record LangRequest(string Lang);
 record LoginRequest(string Email);
 record ExtractRequest(string Text, DateTime? Now);
+record MailRequest(string Host, int Port, string User, string? Password, string Folder, bool Enabled);
 record CaptureRequest(string File, string Key, string Title, string? Body, DateOnly? Date, TimeOnly? Time, DateTime? Now, Dictionary<string, string>? Props);

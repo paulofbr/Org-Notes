@@ -333,6 +333,11 @@ label.inline input { width: auto; }
 .ai-btn { display: inline-flex; align-items: center; gap: 0.1rem; }
 .ai-btn { color: var(--accent); }
 .editor-foot { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; }
+.nav-count { margin-left: auto; background: var(--accent); color: #fff; border-radius: 99px; padding: 0 0.45rem; font-size: 0.72rem; line-height: 1.4rem; }
+.inbox-entry { border: 1px solid var(--border); border-radius: 8px; margin-bottom: 0.6rem; }
+.inbox-head { display: flex; flex-direction: column; align-items: flex-start; gap: 0.15rem; width: 100%; background: none; border: none; padding: 0.6rem 0.75rem; text-align: left; cursor: pointer; }
+.inbox-entry .proposals { padding: 0 0.6rem 0.6rem; }
+.error-text { color: var(--danger, #c0392b); }
 .proposals { display: flex; flex-direction: column; gap: 0.6rem; }
 .proposal { border: 1px solid var(--border); border-radius: 8px; padding: 0.6rem; margin: 0; display: flex; flex-direction: column; gap: 0.45rem; }
 .proposal.skipped { opacity: 0.5; }

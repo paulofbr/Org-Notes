@@ -7,6 +7,7 @@ import { SHORTCUTS } from '../shortcuts'
 import { api, type Login, type Me } from '../api'
 import { OrgTextarea } from './OrgTextarea'
 import { TitleInput } from './TitleInput'
+import { MailDialog } from './MailInbox'
 import { LANGS, isLang, lang, rememberLang, tr, type Lang } from '../i18n'
 
 export function Modal({ title, children, onClose, wide }: { title: string; children: ReactNode; onClose?: () => void; wide?: boolean }) {
@@ -429,6 +430,13 @@ export function AccountDialog() {
             {tr('Subscreve este tópico na app ntfy (Android/iOS) ou no PC com')} <code>ntfy subscribe {url}</code>.{' '}
             {tr('Recebes um aviso antes de cada item com hora e um resumo diário, mesmo com o site fechado. Quem souber o tópico vê os títulos das tarefas: não o partilhes.')}
           </p>
+          {me.ai && (
+            <>
+              <h4>{tr('Email para a IA')}</h4>
+              <p className="hint">{tr('Liga uma pasta de email: a IA propõe tarefas, eventos e contactos para cada email novo, e tu revês antes de integrar.')}</p>
+              <p><button type="button" onClick={() => showDialog(<MailDialog />)}>{tr('Configurar email')}</button></p>
+            </>
+          )}
           <h4>{tr('App de captura')}</h4>
           <p className="hint">{tr('Abre a captura com um atalho global e mostra os lembretes da agenda no computador.')}</p>
           {me.windowsInstaller && (

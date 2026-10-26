@@ -24,7 +24,13 @@ export function saveProposals(store: OrgStore, items: ProposedItem[]) {
 }
 
 /** The proposed items, each editable and ticked by default, with the template it will be captured with. */
-export function ProposalReview({ items, onSave, onCancel, saveLabel }: { items: ProposedItem[]; onSave: (kept: ProposedItem[]) => void; onCancel: () => void; saveLabel?: string }) {
+export function ProposalReview({ items, onSave, onCancel, saveLabel, cancelLabel }: {
+  items: ProposedItem[]
+  onSave: (kept: ProposedItem[]) => void
+  onCancel: () => void
+  saveLabel?: (n: number) => string
+  cancelLabel?: string
+}) {
   const { store } = useApp()
   const templates = useMemo(() => allTemplates(store.files), [store.files])
   const [rows, setRows] = useState<Row[]>(() => items.map((it) => ({ ...it, keep: true })))
@@ -78,9 +84,9 @@ export function ProposalReview({ items, onSave, onCancel, saveLabel }: { items: 
         )
       })}
       <div className="actions">
-        <button type="button" onClick={onCancel}>{tr('Cancelar')}</button>
+        <button type="button" onClick={onCancel}>{cancelLabel ?? tr('Cancelar')}</button>
         <button type="button" className="primary" disabled={!kept.length} onClick={() => onSave(kept.map(({ keep: _, ...it }) => it))}>
-          {saveLabel ?? tr('Criar {n} itens', { n: kept.length })}
+          {saveLabel ? saveLabel(kept.length) : tr('Criar {n} itens', { n: kept.length })}
         </button>
       </div>
     </div>

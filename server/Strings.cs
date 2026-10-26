@@ -31,6 +31,8 @@ public static class Strings
         ["A imagem tem de ser PNG, JPEG, GIF ou WebP, até 10 MB"] = ("The image must be PNG, JPEG, GIF or WebP, up to 10 MB", "L'image doit être en PNG, JPEG, GIF ou WebP, jusqu'à 10 Mo", "La imagen debe ser PNG, JPEG, GIF o WebP, de hasta 10 MB"),
         ["Template não encontrado"] = ("Template not found", "Modèle introuvable", "Plantilla no encontrada"),
         ["Falta o título"] = ("The title is missing", "Le titre manque", "Falta el título"),
+        ["Falta o servidor, o utilizador ou a password"] = ("The server, user or password is missing", "Le serveur, l'utilisateur ou le mot de passe manque", "Falta el servidor, el usuario o la contraseña"),
+        ["Não foi possível ligar ao email: {0}"] = ("Could not connect to the email: {0}", "Impossible de se connecter à la messagerie : {0}", "No se pudo conectar con el correo: {0}"),
         ["Falta o texto"] = ("The text is missing", "Le texte manque", "Falta el texto"),
         ["Falta a descrição"] = ("The description is missing", "La description manque", "Falta la descripción"),
         ["IA não configurada"] = ("AI is not configured", "IA non configurée", "IA no configurada"),

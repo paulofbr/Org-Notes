@@ -151,6 +151,18 @@ cd capture && dotnet publish -c Release -r win-x64 --self-contained -o publish-w
   ```
   It runs through XWayland; each monitor's scale comes from `hyprctl` (or set a fixed `"Scale"` in the settings).
 
+## Items from free text and email (AI)
+
+*Do texto (IA)* (in the capture form, the command palette and the desktop app) takes an email or other text and has
+the AI propose items for the user's own templates: tasks, events, contacts, notes, with dates resolved against the
+user's clock, fields such as the client picked from the contacts, and a short summary. Each item can be unticked,
+edited or moved to another template before it is captured.
+
+In *Conta e notificações* → *Configurar email*, a user can connect an IMAP folder (for Gmail: `imap.gmail.com`, port
+993, an app password, and a label such as `OrgNotes`). The server reads it every 5 minutes, read-only and only for
+mail arriving after it was set up, and keeps the proposed items under *Propostas* until the user integrates or
+discards them. The password is stored encrypted with ASP.NET Core data protection.
+
 ## AI text review
 
 In the capture form (site and app) and in the section editor, the ✨ button opens the AI modes: **Desenvolver**

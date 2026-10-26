@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { FolderPlus, Bell, Pencil, PanelLeftClose, PanelLeftOpen, CalendarDays, Check, Command as CommandIcon, FilePlus, HelpCircle, Loader2, Menu as MenuIcon, Moon, Search, Square, Sun, TriangleAlert } from 'lucide-react'
+import { FolderPlus, Bell, Mail, Pencil, PanelLeftClose, PanelLeftOpen, CalendarDays, Check, Command as CommandIcon, FilePlus, HelpCircle, Loader2, Menu as MenuIcon, Moon, Search, Square, Sun, TriangleAlert } from 'lucide-react'
 import { useOrgStore } from './store'
 import { Ctx, type AppCtx, type RunningClock } from './context'
 import * as E from './org/edit'
@@ -7,6 +7,7 @@ import { formatDuration, nowStamp, parseTimestamp, wallMinutes } from './org/tim
 import { AgendaView } from './components/Agenda'
 import { CaptureDialog, NewFileDialog } from './components/Capture'
 import { AiExtractDialog } from './components/AiExtract'
+import { InboxDialog, MailDialog } from './components/MailInbox'
 import { saveDrafts } from './org/capture'
 import { resolvePath } from './org/links'
 import { FileTree } from './components/FileTree'
@@ -61,11 +62,18 @@ export default function App() {
   }, [theme])
 
   // The language is a user setting: the server's value wins over this browser's, and a user without one gets this browser's.
+  // The emails waiting for review, as the server reads the mailbox in the background.
+  const [inbox, setInbox] = useState(0)
+  const refreshInbox = () => api.me().then((me) => setInbox(me.inbox), () => {})
   useEffect(() => {
     api.me().then(
-      (me) => void (isLang(me.lang) ? rememberLang(me.lang) : api.setLang(lang)),
+      (me) => void (setInbox(me.inbox), isLang(me.lang) ? rememberLang(me.lang) : api.setLang(lang)),
       () => {},
     )
+  }, [])
+  useEffect(() => {
+    const t = setInterval(refreshInbox, 120000)
+    return () => clearInterval(t)
   }, [])
 
   const running = useMemo<RunningClock | undefined>(() => {
@@ -149,6 +157,8 @@ export default function App() {
     { label: tr('Procurar'), hint: '/', run: () => setNav({ view: 'agenda', tab: 'search' }) },
     { label: tr('Capturar'), hint: 'c', run: () => ctx.showDialog(<CaptureDialog path={nav.view === 'doc' ? nav.path : undefined} />) },
     { label: tr('Criar a partir de texto (IA)'), run: () => ctx.showDialog(<AiExtractDialog />) },
+    ...(inbox ? [{ label: `${tr('Propostas do email')} (${inbox})`, run: () => ctx.showDialog(<InboxDialog onChange={refreshInbox} />) }] : []),
+    { label: tr('Email para a IA'), run: () => ctx.showDialog(<MailDialog />) },
     { label: tr('Novo ficheiro'), run: () => newFile() },
     { label: tr('Nova pasta'), run: newFolder },
     { label: tr('Conta e notificações'), run: () => ctx.showDialog(<AccountDialog />) },
@@ -235,6 +245,11 @@ export default function App() {
             <button title={`${tr('Comandos')} (Ctrl+K)`} onClick={() => (ctx.showDialog(<CommandPalette commands={commands()} />), setSidebar(false))}>
               <CommandIcon size={16} /> <span className="label">{tr('Comandos')}</span> <kbd>Ctrl+K</kbd>
             </button>
+            {inbox > 0 && (
+              <button title={tr('Propostas do email')} onClick={() => (ctx.showDialog(<InboxDialog onChange={refreshInbox} />), setSidebar(false))}>
+                <Mail size={16} /> <span className="label">{tr('Propostas')}</span> <span className="nav-count">{inbox}</span>
+              </button>
+            )}
           </nav>
           <div className="files-head">
             <span className="label">{tr('Ficheiros')}</span>

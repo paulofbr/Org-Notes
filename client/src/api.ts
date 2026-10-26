@@ -16,6 +16,8 @@ export interface Me {
   token: string
   ntfy: { server: string; topic: string; enabled: boolean }
   lang?: string
+  /** Emails whose AI-proposed items wait for review. */
+  inbox: number
   admin: boolean
   windowsInstaller: boolean
 }
@@ -30,6 +32,24 @@ export interface ProposedItem {
   time: string
   body: string
   props: Record<string, string>
+}
+
+export interface MailAccount {
+  host: string
+  port: number
+  user: string
+  folder: string
+  enabled: boolean
+  lastCheck?: string
+  lastError?: string
+}
+
+export interface InboxEntry {
+  id: string
+  from: string
+  subject: string
+  date: string
+  items: ProposedItem[]
 }
 
 export interface Login {
@@ -70,6 +90,15 @@ export const api = {
     if (!res.ok) throw new Error((await res.json().catch(() => null))?.detail ?? `${res.status}`)
     return res.json()
   },
+  mail: async (): Promise<MailAccount | null> => (await check(await fetch('/api/mail'))).json(),
+  saveMail: async (account: Omit<MailAccount, 'lastCheck' | 'lastError'> & { password: string }) => {
+    const res = await fetch('/api/mail', { method: 'PUT', body: JSON.stringify(account), headers: { 'Content-Type': 'application/json' } })
+    if (!res.ok) throw new Error((await res.text()).replace(/^"|"$/g, ''))
+  },
+  removeMail: async () => check(await fetch('/api/mail', { method: 'DELETE' })),
+  checkMail: async (): Promise<{ lastError?: string; inbox: number }> => (await check(await fetch('/api/mail/check', { method: 'POST' }))).json(),
+  inbox: async (): Promise<InboxEntry[]> => (await check(await fetch('/api/inbox'))).json(),
+  removeInbox: async (id: string) => check(await fetch(`/api/inbox/${encodeURIComponent(id)}`, { method: 'DELETE' })),
   aiTemplate: async (description: string): Promise<{ name: string; datetree: boolean; body: string; options: { property: string; values: string[] }[] }> => {
     const res = await fetch('/api/ai/template', { method: 'POST', body: JSON.stringify({ description }), headers: { 'Content-Type': 'application/json' } })
     if (!res.ok) throw new Error((await res.json().catch(() => null))?.detail ?? `${res.status}`)

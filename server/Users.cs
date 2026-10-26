@@ -7,7 +7,7 @@ using System.Text.RegularExpressions;
 namespace OrgNotes.Server;
 
 /// <param name="SummarySent">Day the daily summary last went out, so a restart does not send it again.</param>
-public record UserSettings(string NtfyTopic, bool Notify, string? ApiToken = null, DateOnly? SummarySent = null, string? PasswordHash = null, string? Lang = null);
+public record UserSettings(string NtfyTopic, bool Notify, string? ApiToken = null, DateOnly? SummarySent = null, string? PasswordHash = null, string? Lang = null, MailAccount? Mail = null);
 
 /// <summary>
 /// Per-user file stores: each user gets `users/&lt;email&gt;/` under the root. Files left in the root by the
@@ -112,7 +112,7 @@ public class Users(string root, string seedDir)
     private void AdoptRootFiles(string key)
     {
         if (Exists(key) || All().Any() || !Directory.Exists(root)) return;
-        var entries = Directory.EnumerateFileSystemEntries(root).Where(e => Path.GetFileName(e) is not ("users" or Access.FileName)).ToList();
+        var entries = Directory.EnumerateFileSystemEntries(root).Where(e => Path.GetFileName(e) is not ("users" or Access.FileName or ".aspnet")).ToList();
         if (entries.Count == 0) return;
         Directory.CreateDirectory(Dir(key));
         foreach (var e in entries)
