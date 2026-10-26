@@ -156,6 +156,11 @@ public class CaptureWindow : Window
         {
             _status.Text = L.Tr("Não foi possível ligar ao servidor: {0}", e.Message);
         }
+        // Anything else would leave the window stuck on "loading" with no list: show it instead.
+        catch (Exception e)
+        {
+            _status.Text = $"{e.GetType().Name}: {e.Message}";
+        }
     }
 
     /// <summary>Closes the window for good, e.g. to rebuild it in another language.</summary>

@@ -24,6 +24,8 @@ var allowed = builder.Configuration.GetSection("Auth:AllowedEmails").Get<string[
 
 builder.Services.AddSingleton(new Users(root, Path.Combine(AppContext.BaseDirectory, "Seed")));
 var windowsInstaller = Path.Combine(AppContext.BaseDirectory, "downloads", "OrgNotes-client-win-x64.zip");
+// The commit the installer was built from, for the app to update itself (see capture/Updater.cs).
+var windowsVersion = Path.ChangeExtension(windowsInstaller, ".version");
 builder.Services.AddHttpClient();
 builder.Services.AddSingleton<AiAssistant>();
 builder.Services.AddSingleton<Notifier>();
@@ -148,7 +150,8 @@ app.MapGet("/api/reminders", (DateTime? now, HttpContext ctx, Users users, Notif
 app.MapGet("/api/me", (HttpContext ctx, Users users, Notifier notifier, AiAssistant ai) =>
 {
     var s = users.Settings(users.Key(ctx.User));
-    return new { email = ctx.User.FindFirstValue(ClaimTypes.Email), ai = ai.Enabled, token = users.Token(users.Key(ctx.User)), ntfy = new { server = notifier.NtfyServer, topic = s.NtfyTopic, enabled = s.Notify }, lang = s.Lang, windowsInstaller = File.Exists(windowsInstaller) };
+    return new { email = ctx.User.FindFirstValue(ClaimTypes.Email), ai = ai.Enabled, token = users.Token(users.Key(ctx.User)), ntfy = new { server = notifier.NtfyServer, topic = s.NtfyTopic, enabled = s.Notify }, lang = s.Lang, windowsInstaller = File.Exists(windowsInstaller),
+        windowsVersion = File.Exists(windowsVersion) ? File.ReadAllText(windowsVersion).Trim() : null };
 });
 
 // The local app's Windows installer, which the server package carries (absent when running from source).

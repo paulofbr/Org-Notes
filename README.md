@@ -58,7 +58,8 @@ The site's texts are keyed by their Portuguese wording: translations live in `cl
   address. It installs the local app in `%LOCALAPPDATA%\OrgNotes\capture`, starts it at sign-in and adds
   *Start → Org Notes* for the site. No admin rights are needed. The app then asks for the personal token.
   The server package carries this installer too: signed-in users download it from *Conta e notificações*
-  (*Descarregar para Windows*), next to their token.
+  (*Descarregar para Windows*), next to their token. Once installed, the app updates itself: every hour it compares
+  its commit with the installer's on the server and, while the capture window is closed, swaps in the new version.
 
 ## Continuous deployment
 

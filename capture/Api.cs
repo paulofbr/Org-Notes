@@ -8,7 +8,7 @@ public record Template(string Key, string Name, string File, bool Datetree, bool
 
 public record Improved(Dictionary<string, string> Fields, string[] Changes);
 
-public record Me(bool Ai, string? Lang);
+public record Me(bool Ai, string? Lang, string? WindowsVersion);
 
 public record Reminder(string Id, DateTime From, DateTime Until, string Title, string Body);
 
@@ -39,7 +39,8 @@ public class Api(Config config)
         await Check(response);
         using var doc = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
         var root = doc.RootElement;
-        return new(root.TryGetProperty("ai", out var ai) && ai.GetBoolean(), root.TryGetProperty("lang", out var lang) ? lang.GetString() : null);
+        string? Text(string name) => root.TryGetProperty(name, out var v) && v.ValueKind == JsonValueKind.String ? v.GetString() : null;
+        return new(root.TryGetProperty("ai", out var ai) && ai.GetBoolean(), Text("lang"), Text("windowsVersion"));
     }
 
     public async Task<Improved> Improve(Dictionary<string, string> fields, string mode)
@@ -66,6 +67,15 @@ public class Api(Config config)
         request.Content = JsonContent.Create(new { file = t.File, key = t.Key, title, body, date, time, props, now = DateTime.Now }, options: Json);
         using var response = await Http.SendAsync(request);
         await Check(response);
+    }
+
+    /// <summary>Saves the server's Windows installer to <paramref name="path"/>.</summary>
+    public async Task DownloadInstaller(string path)
+    {
+        using var response = await Http.SendAsync(Request(HttpMethod.Get, "/api/downloads/windows"), HttpCompletionOption.ResponseHeadersRead);
+        await Check(response);
+        await using var file = File.Create(path);
+        await response.Content.CopyToAsync(file);
     }
 
     /// <summary>Today's reminders, worked out by the server for this machine's wall-clock time.</summary>
