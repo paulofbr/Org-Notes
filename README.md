@@ -58,6 +58,28 @@ The site's texts are keyed by their Portuguese wording: translations live in `cl
   address. It installs the local app in `%LOCALAPPDATA%\OrgNotes\capture`, starts it at sign-in and adds
   *Start → Org Notes* for the site. No admin rights are needed. The app then asks for the personal token.
 
+## Continuous deployment
+
+Every push to `main` runs the tests and, if they pass, deploys the server to the Google Cloud VM
+(`.github/workflows/deploy.yml`, which runs `deploy/google-cloud.sh`). The script can also be run by hand:
+`NAME=<vm> ZONE=<zone> TIMEZONE=Europe/Lisbon deploy/google-cloud.sh <duckdns-subdomain> <duckdns-token>`.
+
+One-time setup, with `gcloud` logged in to the VM's project and `gh` to the repository:
+
+```bash
+P=$(gcloud config get-value project) SA=github-deploy@$(gcloud config get-value project).iam.gserviceaccount.com
+gcloud iam service-accounts create github-deploy
+for r in compute.instanceAdmin.v1 compute.securityAdmin iam.serviceAccountUser; do
+  gcloud projects add-iam-policy-binding $P --member serviceAccount:$SA --role roles/$r
+done
+gcloud iam service-accounts keys create key.json --iam-account $SA
+gh secret set GCP_CREDENTIALS < key.json && rm key.json
+gh secret set APPSETTINGS_LOCAL < server/appsettings.Local.json   # allowed emails and AI key
+gh secret set DUCKDNS_TOKEN
+gh variable set DUCKDNS_SUBDOMAIN --body <subdomain>
+gh variable set GCE_NAME --body <vm>; gh variable set GCE_ZONE --body <zone>; gh variable set TIMEZONE --body Europe/Lisbon
+```
+
 ## Agenda notifications
 
 Reminders arrive even with the site closed: N minutes before each timed item (`SCHEDULED`, `DEADLINE`,
