@@ -9,6 +9,10 @@ domain=${1:-}
 app=/opt/org-notes
 data=/var/lib/org-notes
 
+# .NET needs ICU, which minimal images may lack (the package name carries its version).
+if ! ldconfig -p | grep -q libicuuc; then
+  apt-get update -qq && apt-get install -y -qq "$(apt-cache search --names-only '^libicu[0-9]+$' | cut -d' ' -f1 | sort -V | tail -1)"
+fi
 id org-notes >/dev/null 2>&1 || useradd -r -m -d "$data" -s /usr/sbin/nologin org-notes
 systemctl stop org-notes 2>/dev/null || true
 mkdir -p "$app"

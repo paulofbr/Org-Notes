@@ -1,0 +1,45 @@
+# Deploys the server to the Google Cloud VM on every push to main, once the tests pass.
+# Secrets: GCP_CREDENTIALS (service account key), DUCKDNS_TOKEN, APPSETTINGS_LOCAL (server/appsettings.Local.json,
+# which is not in git). Variables: GCE_NAME, GCE_ZONE, DUCKDNS_SUBDOMAIN, TIMEZONE.
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency: deploy
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 26
+          cache: npm
+          cache-dependency-path: client/package-lock.json
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Test
+        run: |
+          cd client && npm ci && npm test
+          cd ../server && dotnet build
+
+      - uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_CREDENTIALS }}
+      - uses: google-github-actions/setup-gcloud@v2
+
+      - name: Deploy
+        env:
+          APPSETTINGS_LOCAL: ${{ secrets.APPSETTINGS_LOCAL }}
+          NAME: ${{ vars.GCE_NAME }}
+          ZONE: ${{ vars.GCE_ZONE }}
+          TIMEZONE: ${{ vars.TIMEZONE }}
+        run: |
+          printf '%s' "$APPSETTINGS_LOCAL" > server/appsettings.Local.json
+          deploy/google-cloud.sh "${{ vars.DUCKDNS_SUBDOMAIN }}" "${{ secrets.DUCKDNS_TOKEN }}"
