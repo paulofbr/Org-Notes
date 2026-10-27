@@ -1,7 +1,7 @@
-import { useEffect, useImperativeHandle, useLayoutEffect, useRef, useState, type FocusEvent, type KeyboardEvent, type Ref } from 'react'
+import { useEffect, useImperativeHandle, useLayoutEffect, useRef, useState, type FocusEvent, type KeyboardEvent, type PointerEvent as ReactPointerEvent, type Ref } from 'react'
 import { createPortal } from 'react-dom'
 import { alignTable } from '../org/edit'
-import { ImagePlus, Link2 } from 'lucide-react'
+import { Crop, ImagePlus, Link2 } from 'lucide-react'
 import { ITEM_RE } from '../org/parser'
 import { LinkDialog, uploadImageLink, type LinkTab } from './LinkDialog'
 import * as Rich from './richText'
@@ -9,6 +9,9 @@ import { pastedLink } from '../org/links'
 import { setImageWidth } from '../org/images'
 import { ImageEditDialog } from './ImageEdit'
 import { tr } from '../i18n'
+
+const HANDLES = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'] as const
+type Handle = (typeof HANDLES)[number]
 
 interface Props {
   value: string
@@ -48,6 +51,62 @@ export function OrgTextarea({ value, onChange, autoGrow, onKeyDown, path, tools,
   const host = useRef<HTMLDivElement>(null)
   const pendingCursor = useRef<number | null>(null)
   const imageInput = useRef<HTMLInputElement>(null)
+  // The image selected in the rich editor, by its offset in the text, and its frame over it.
+  const wrap = useRef<HTMLDivElement>(null)
+  const [picked, setPicked] = useState<number>()
+  const [frame, setFrame] = useState<{ left: number; top: number; width: number; height: number }>()
+  const pickedImage = () => (picked === undefined || !host.current ? undefined : Rich.chipAt(host.current, picked) as HTMLImageElement | undefined)
+  const placeFrame = () => {
+    const img = pickedImage()
+    if (!(img instanceof HTMLImageElement) || !wrap.current) return void (setFrame(undefined), setPicked(undefined))
+    const r = img.getBoundingClientRect()
+    const w = wrap.current.getBoundingClientRect()
+    setFrame({ left: r.left - w.left, top: r.top - w.top, width: r.width, height: r.height })
+  }
+  useLayoutEffect(() => {
+    if (picked === undefined) return void setFrame(undefined)
+    placeFrame()
+    const img = pickedImage()
+    // The frame follows the image as it loads.
+    img?.addEventListener('load', placeFrame)
+    return () => img?.removeEventListener('load', placeFrame)
+  }, [value, picked])
+  // Dragging a handle resizes the image, keeping its proportions; the width goes in an #+ATTR_ORG: line when dropped.
+  const resizeFrom = (handle: Handle) => (e: ReactPointerEvent) => {
+    const img = pickedImage()
+    if (!img || picked === undefined) return
+    e.preventDefault()
+    e.stopPropagation()
+    const r = img.getBoundingClientRect()
+    const ratio = r.width / r.height
+    const [startX, startY] = [e.clientX, e.clientY]
+    const widthAt = (ev: PointerEvent) => {
+      const dx = ev.clientX - startX
+      const dy = ev.clientY - startY
+      const grow = handle.includes('e') ? dx : handle.includes('w') ? -dx : (handle === 's' ? dy : -dy) * ratio
+      return Math.max(40, Math.round(r.width + grow))
+    }
+    const move = (ev: PointerEvent) => {
+      img.style.width = `${widthAt(ev)}px`
+      img.style.maxHeight = 'none'
+      placeFrame()
+    }
+    const up = (ev: PointerEvent) => {
+      window.removeEventListener('pointermove', move)
+      window.removeEventListener('pointerup', up)
+      const { value: v, onChange: change } = latest.current
+      const next = setImageWidth(v, picked, widthAt(ev))
+      // The width line goes before the image, which moves by what was added.
+      setPicked(picked + next.length - v.length)
+      change(next)
+    }
+    window.addEventListener('pointermove', move)
+    window.addEventListener('pointerup', up)
+  }
+  const cropPicked = () => {
+    const img = pickedImage()
+    if (img && picked !== undefined) setEditingImage({ offset: picked, raw: img.dataset.org!, src: img.src, sized: !!img.style.width })
+  }
   const [editingImage, setEditingImage] = useState<{ offset: number; raw: string; src: string; sized: boolean }>()
   const [linking, setLinking] = useState<{ start: number; end: number; only?: LinkTab }>()
   // Uploads finish later, so they insert into the latest text, not the text from when they started.
@@ -110,6 +169,7 @@ export function OrgTextarea({ value, onChange, autoGrow, onKeyDown, path, tools,
   }
 
   const keyDown = (e: KeyboardEvent<HTMLElement>) => {
+    setPicked(undefined)
     onKeyDown?.(e)
     if (e.defaultPrevented) return
     const { start: pos, end: selEnd } = selection()
@@ -185,6 +245,7 @@ export function OrgTextarea({ value, onChange, autoGrow, onKeyDown, path, tools,
   return (
     <>
       {rich ? (
+        <div className="rich-wrap" ref={wrap}>
         <div
           ref={host}
           className={`rich-text ${singleLine ? 'single-line' : ''} ${className ?? ''}`}
@@ -220,30 +281,28 @@ export function OrgTextarea({ value, onChange, autoGrow, onKeyDown, path, tools,
           onBlur={onBlur}
           onFocus={onFocus}
           onPointerDown={(e) => {
-            // Dragging an image sideways resizes it; the width is saved in an #+ATTR_ORG: line when dropped.
+            // A click on an image selects it, showing its frame with resize handles.
             const img = (e.target as HTMLElement).closest('img.rt-img') as HTMLImageElement | null
-            if (!img || e.button !== 0) return
+            if (!img || e.button !== 0) return setPicked(undefined)
             e.preventDefault()
-            const startX = e.clientX
-            const startWidth = img.getBoundingClientRect().width
-            const widthAt = (x: number) => Math.max(40, Math.round(startWidth + x - startX))
-            const move = (ev: PointerEvent) => ((img.style.width = `${widthAt(ev.clientX)}px`), (img.style.maxHeight = 'none'))
-            const up = (ev: PointerEvent) => {
-              window.removeEventListener('pointermove', move)
-              window.removeEventListener('pointerup', up)
-              if (Math.abs(ev.clientX - startX) < 3) return
-              const { value: v, onChange: change } = latest.current
-              change(setImageWidth(v, Rich.offsetOf(host.current!, img), widthAt(ev.clientX)))
-            }
-            window.addEventListener('pointermove', move)
-            window.addEventListener('pointerup', up)
+            setPicked(Rich.offsetOf(host.current!, img))
           }}
+          onScroll={() => picked !== undefined && placeFrame()}
           onDoubleClick={(e) => {
             const img = (e.target as HTMLElement).closest('img.rt-img') as HTMLImageElement | null
             if (!img || !path) return
             setEditingImage({ offset: Rich.offsetOf(host.current!, img), raw: img.dataset.org!, src: img.src, sized: !!img.style.width })
           }}
         />
+        {frame && (
+          <div className="img-frame" style={frame}>
+            {HANDLES.map((h) => <span key={h} className={`h h-${h}`} onPointerDown={resizeFrom(h)} />)}
+            <button type="button" className="icon-btn img-crop" title={tr('Recortar')} aria-label={tr('Recortar')} onPointerDown={(e) => e.preventDefault()} onClick={cropPicked}>
+              <Crop size={14} />
+            </button>
+          </div>
+        )}
+        </div>
       ) : (
         <textarea
           ref={ref}

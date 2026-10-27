@@ -22,7 +22,7 @@ function chip(raw: string, target: string, desc: string | undefined, path: strin
       img.style.width = width
       img.style.maxHeight = 'none'
     }
-    img.title = tr('Arrasta para mudar o tamanho · duplo clique para recortar')
+    img.title = tr('Clica para mudar o tamanho ou recortar')
     el = img
   } else {
     el = document.createElement('span')
@@ -67,6 +67,18 @@ export function offsetOf(host: HTMLElement, node: Node): number {
     n += c instanceof Text ? c.length : c instanceof HTMLElement && c.dataset.org !== undefined ? c.dataset.org.length : 0
   }
   return n
+}
+
+/** The chip (link or image element) that starts at `offset` in the org text, if any. */
+export function chipAt(host: HTMLElement, offset: number): HTMLElement | undefined {
+  let n = 0
+  for (const c of host.childNodes) {
+    if (c instanceof HTMLElement && c.dataset.org !== undefined) {
+      if (n === offset) return c
+      n += c.dataset.org.length
+    } else if (c instanceof Text) n += c.length
+  }
+  return undefined
 }
 
 /** The org text of a node, including what the browser may have added while editing (line breaks, divs). */

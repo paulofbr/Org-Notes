@@ -4,6 +4,9 @@ import { uploadImageLink } from './LinkDialog'
 import { tr } from '../i18n'
 
 type Box = { x: number; y: number; w: number; h: number }
+const HANDLES = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'] as const
+/** What a drag does: draw a new area, move the area, or pull one of its handles. */
+type Drag = { mode: 'new' | 'move' | (typeof HANDLES)[number]; x: number; y: number; box?: Box }
 
 /**
  * An image in the notes: drag over it to choose an area and crop it (the cropped copy is uploaded and the link points
@@ -22,7 +25,7 @@ export function ImageEditDialog({ src, path, sized, onCrop, onOriginalSize, onCl
   const [box, setBox] = useState<Box>()
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
-  const start = useRef<{ x: number; y: number } | undefined>(undefined)
+  const drag = useRef<Drag | undefined>(undefined)
 
   const point = (e: PointerEvent) => {
     const r = img.current!.getBoundingClientRect()
@@ -53,7 +56,7 @@ export function ImageEditDialog({ src, path, sized, onCrop, onOriginalSize, onCl
 
   return (
     <Modal title={tr('Imagem')} onClose={onClose} wide>
-      <p className="hint">{tr('Arrasta sobre a imagem para escolher a área a recortar.')}</p>
+      <p className="hint">{tr('Arrasta sobre a imagem para escolher a área a recortar; depois ajusta-a pelos pontos ou arrasta-a.')}</p>
       <div
         className="crop-area"
         onPointerDown={(e) => {
@@ -63,22 +66,44 @@ export function ImageEditDialog({ src, path, sized, onCrop, onOriginalSize, onCl
           } catch {
             /* without capture the drag only ends inside the image */
           }
-          start.current = point(e)
-          setBox(undefined)
+          const p = point(e)
+          const handle = (e.target as HTMLElement).dataset.handle as Drag['mode'] | undefined
+          const inside = box && p.x >= box.x && p.x <= box.x + box.w && p.y >= box.y && p.y <= box.y + box.h
+          drag.current = { mode: handle ?? (inside ? 'move' : 'new'), ...p, box }
+          if (!handle && !inside) setBox(undefined)
         }}
         onPointerMove={(e) => {
-          if (!start.current) return
+          const d = drag.current
+          if (!d) return
           const p = point(e)
-          const s = start.current
-          setBox({ x: Math.min(s.x, p.x), y: Math.min(s.y, p.y), w: Math.abs(p.x - s.x), h: Math.abs(p.y - s.y) })
+          const r = img.current!.getBoundingClientRect()
+          if (d.mode === 'new' || !d.box) {
+            setBox({ x: Math.min(d.x, p.x), y: Math.min(d.y, p.y), w: Math.abs(p.x - d.x), h: Math.abs(p.y - d.y) })
+          } else if (d.mode === 'move') {
+            const b = d.box
+            setBox({ ...b, x: Math.min(Math.max(b.x + p.x - d.x, 0), r.width - b.w), y: Math.min(Math.max(b.y + p.y - d.y, 0), r.height - b.h) })
+          } else {
+            // A handle moves its own edges; the opposite ones stay put.
+            const b = d.box
+            let [l, t, rt, bt] = [b.x, b.y, b.x + b.w, b.y + b.h]
+            if (d.mode.includes('w')) l = p.x
+            if (d.mode.includes('e')) rt = p.x
+            if (d.mode.includes('n')) t = p.y
+            if (d.mode.includes('s')) bt = p.y
+            setBox({ x: Math.min(l, rt), y: Math.min(t, bt), w: Math.abs(rt - l), h: Math.abs(bt - t) })
+          }
         }}
         onPointerUp={() => {
-          start.current = undefined
+          drag.current = undefined
           setBox((b) => (b && b.w > 4 && b.h > 4 ? b : undefined))
         }}
       >
         <img ref={img} src={src} alt="" draggable={false} crossOrigin={/^https?:/.test(src) ? 'anonymous' : undefined} />
-        {box && <div className="crop-box" style={{ left: box.x, top: box.y, width: box.w, height: box.h }} />}
+        {box && (
+          <div className="crop-box" style={{ left: box.x, top: box.y, width: box.w, height: box.h }}>
+            {HANDLES.map((h) => <span key={h} className={`h h-${h}`} data-handle={h} />)}
+          </div>
+        )}
       </div>
       {error && <p className="hint">{error}</p>}
       <div className="actions">

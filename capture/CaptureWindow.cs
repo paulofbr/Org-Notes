@@ -38,15 +38,11 @@ public class CaptureWindow : Window
     private readonly TextBox _linkText = new() { PlaceholderText = L.Tr("Texto (opcional)") };
     // Internal links search the notes' files and headlines, as the web's link dialog does.
     private readonly Button _fromText = new() { Content = L.Tr("Do texto (IA)"), IsVisible = false };
-    private readonly AutoCompleteBox _linkSearch = new()
-    {
-        PlaceholderText = L.Tr("Procurar ficheiro ou título"),
-        MinimumPrefixLength = 0,
-        FilterMode = AutoCompleteFilterMode.Contains,
-        IsVisible = false,
-    };
+    private readonly TextBox _linkSearch = new() { PlaceholderText = L.Tr("Procurar ficheiro ou título") };
+    // The matches stay listed under the search, to click or to pick with the arrows and Enter.
+    private readonly ListBox _linkList = new() { MaxHeight = 220 };
     private Dictionary<string, (string File, string? Heading)> _internal = [];
-    private readonly Grid _linkPanel = new() { ColumnDefinitions = new("2*,*,Auto"), ColumnSpacing = 8, IsVisible = false };
+    private readonly StackPanel _linkPanel = new() { Spacing = 6, IsVisible = false };
     private TextBox _linkTarget;
     private (int Start, int End) _linkAt;
     private readonly Button _save = new() { Content = L.Tr("Guardar (Ctrl+Enter)"), IsDefault = false, Classes = { "accent" } };
@@ -101,9 +97,10 @@ public class CaptureWindow : Window
         insertLink.Click += (_, _) => InsertLink();
         Grid.SetColumn(_linkText, 1);
         Grid.SetColumn(insertLink, 2);
-        _linkPanel.Children.Add(_linkSearch);
-        _linkPanel.Children.Add(_linkText);
-        _linkPanel.Children.Add(insertLink);
+        _linkPanel.Children.Add(new Grid { ColumnDefinitions = new("2*,*,Auto"), ColumnSpacing = 8, Children = { _linkSearch, _linkText, insertLink } });
+        _linkPanel.Children.Add(_linkList);
+        _linkSearch.TextChanged += (_, _) => FilterLinks();
+        _linkList.DoubleTapped += (_, _) => InsertLink();
         // The same three tools as the web editor.
         // A pasted web address becomes a link by itself, so only internal links need a button.
         _title.PastingFromClipboard += async (_, e) => await Paste(_title, e);
@@ -251,7 +248,7 @@ public class CaptureWindow : Window
                 _internal[name] = (f.File, null);
                 foreach (var h in f.Headings) _internal.TryAdd($"{name} › {h}", (f.File, h));
             }
-            _linkSearch.ItemsSource = _internal.Keys.ToList();
+            FilterLinks();
         }
         catch (Exception e) when (e is HttpRequestException or TaskCanceledException)
         {
@@ -259,10 +256,19 @@ public class CaptureWindow : Window
         }
     }
 
+    /// <summary>Lists the files and headlines that contain every word of the search, and selects the first.</summary>
+    private void FilterLinks()
+    {
+        var words = (_linkSearch.Text ?? "").Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        var matches = _internal.Keys.Where(k => words.All(w => k.Contains(w, StringComparison.CurrentCultureIgnoreCase))).Take(200).ToList();
+        _linkList.ItemsSource = matches;
+        _linkList.SelectedIndex = matches.Count > 0 ? 0 : -1;
+    }
+
     private void InsertLink()
     {
         var text = _linkText.Text?.Trim();
-        if (!_internal.TryGetValue(_linkSearch.Text ?? "", out var to)) return;
+        if (_linkList.SelectedItem is not string choice || !_internal.TryGetValue(choice, out var to)) return;
         var from = _selected?.File ?? "";
         var heading = to.Heading is { } h ? "*" + h : null;
         // A heading in the same file needs no file name, as in Emacs and the web.
@@ -470,9 +476,14 @@ public class CaptureWindow : Window
         Template? hit = null;
         // While the list is open, Enter/Esc/arrows belong to it.
         if (_templates.IsDropDownOpen && e.Key is Key.Enter or Key.Escape or Key.Up or Key.Down) return;
-        // While the search list is open, Enter picks from it.
-        var inLinkPanel = _linkPanel.IsKeyboardFocusWithin && !_linkSearch.IsDropDownOpen;
-        if (e.Key == Key.Escape && _linkPanel.IsVisible)
+        var inLinkPanel = _linkPanel.IsKeyboardFocusWithin;
+        // The arrows in the search move through the matches.
+        if (_linkSearch.IsKeyboardFocusWithin && e.Key is Key.Up or Key.Down && _linkList.ItemCount > 0)
+        {
+            _linkList.SelectedIndex = Math.Clamp(_linkList.SelectedIndex + (e.Key == Key.Down ? 1 : -1), 0, _linkList.ItemCount - 1);
+            _linkList.ScrollIntoView(_linkList.SelectedIndex);
+        }
+        else if (e.Key == Key.Escape && _linkPanel.IsVisible)
         {
             _linkPanel.IsVisible = false;
             _linkTarget.Focus();

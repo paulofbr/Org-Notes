@@ -87,7 +87,7 @@ public static class L
         ["Largura (px)"] = ("Width (px)", "Largeur (px)", "Ancho (px)"),
         ["Recortar"] = ("Crop", "Recadrer", "Recortar"),
         ["Recortar imagem"] = ("Crop image", "Recadrer l'image", "Recortar imagen"),
-        ["Arrasta sobre a imagem para escolher a área a recortar."] = ("Drag over the image to choose the area to keep.", "Glisse sur l'image pour choisir la zone à garder.", "Arrastra sobre la imagen para elegir la zona a recortar."),
+        ["Arrasta sobre a imagem para escolher a área a recortar; depois ajusta-a pelos pontos ou arrasta-a."] = ("Drag over the image to choose the area to keep; then adjust it by its handles or drag it.", "Glisse sur l'image pour choisir la zone à garder ; puis ajuste-la par ses poignées ou déplace-la.", "Arrastra sobre la imagen para elegir la zona a recortar; luego ajústala con los puntos o arrástrala."),
         // AI review panel
         ["Sem sugestões: o texto parece estar bem."] = ("No suggestions: the text looks fine.", "Aucune suggestion : le texte semble correct.", "Sin sugerencias: el texto parece estar bien."),
         ["Descartar"] = ("Discard", "Ignorer", "Descartar"),
