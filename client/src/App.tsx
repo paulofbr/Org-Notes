@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { FolderPlus, Bell, Mail, Pencil, PanelLeftClose, PanelLeftOpen, CalendarDays, Check, Command as CommandIcon, FilePlus, HelpCircle, Loader2, Menu as MenuIcon, Moon, Search, Square, Sun, TriangleAlert } from 'lucide-react'
+import { FolderPlus, Bell, Mail, Users, Pencil, PanelLeftClose, PanelLeftOpen, CalendarDays, Check, Command as CommandIcon, FilePlus, HelpCircle, Loader2, Menu as MenuIcon, Moon, Search, Square, Sun, TriangleAlert } from 'lucide-react'
 import { useOrgStore } from './store'
 import { Ctx, type AppCtx, type RunningClock } from './context'
 import * as E from './org/edit'
@@ -12,7 +12,7 @@ import { WebReminders } from './components/WebReminders'
 import { saveDrafts } from './org/capture'
 import { resolvePath } from './org/links'
 import { FileTree } from './components/FileTree'
-import { AccountDialog, CommandPalette, HelpDialog, NewFolderDialog, RefileDialog, type Command } from './components/Dialogs'
+import { AccountDialog, CommandPalette, HelpDialog, LoginsDialog, NewFolderDialog, RefileDialog, type Command } from './components/Dialogs'
 import { DocView, fileActions } from './components/DocView'
 import { ShortcutBar } from './components/ShortcutBar'
 import { isTyping, moveFocus } from './shortcuts'
@@ -65,10 +65,12 @@ export default function App() {
   // The language is a user setting: the server's value wins over this browser's, and a user without one gets this browser's.
   // The emails waiting for review, as the server reads the mailbox in the background.
   const [inbox, setInbox] = useState(0)
+  // Only the administrator sees who may sign in.
+  const [admin, setAdmin] = useState(false)
   const refreshInbox = () => api.me().then((me) => setInbox(me.inbox), () => {})
   useEffect(() => {
     api.me().then(
-      (me) => void (setInbox(me.inbox), isLang(me.lang) ? rememberLang(me.lang) : api.setLang(lang)),
+      (me) => void (setInbox(me.inbox), setAdmin(me.admin), isLang(me.lang) ? rememberLang(me.lang) : api.setLang(lang)),
       () => {},
     )
   }, [])
@@ -160,6 +162,7 @@ export default function App() {
     { label: tr('Criar a partir de texto (IA)'), run: () => ctx.showDialog(<AiExtractDialog />) },
     ...(inbox ? [{ label: `${tr('Propostas do email')} (${inbox})`, run: () => ctx.showDialog(<InboxDialog onChange={refreshInbox} />) }] : []),
     { label: tr('Email para a IA'), run: () => ctx.showDialog(<MailDialog />) },
+    ...(admin ? [{ label: tr('Utilizadores (logins)'), run: () => ctx.showDialog(<LoginsDialog />) }] : []),
     { label: tr('Novo ficheiro'), run: () => newFile() },
     { label: tr('Nova pasta'), run: newFolder },
     { label: tr('Conta e notificações'), run: () => ctx.showDialog(<AccountDialog />) },
@@ -246,6 +249,11 @@ export default function App() {
             <button title={`${tr('Comandos')} (Ctrl+K)`} onClick={() => (ctx.showDialog(<CommandPalette commands={commands()} />), setSidebar(false))}>
               <CommandIcon size={16} /> <span className="label">{tr('Comandos')}</span> <kbd>Ctrl+K</kbd>
             </button>
+            {admin && (
+              <button title={tr('Quem pode entrar no site')} onClick={() => (ctx.showDialog(<LoginsDialog />), setSidebar(false))}>
+                <Users size={16} /> <span className="label">{tr('Utilizadores')}</span>
+              </button>
+            )}
             {inbox > 0 && (
               <button title={tr('Propostas do email')} onClick={() => (ctx.showDialog(<InboxDialog onChange={refreshInbox} />), setSidebar(false))}>
                 <Mail size={16} /> <span className="label">{tr('Propostas')}</span> <span className="nav-count">{inbox}</span>

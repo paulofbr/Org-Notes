@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState, type FocusEvent, type KeyboardEvent } from 'react'
+import { useEffect, useImperativeHandle, useLayoutEffect, useRef, useState, type FocusEvent, type KeyboardEvent, type Ref } from 'react'
 import { createPortal } from 'react-dom'
 import { alignTable } from '../org/edit'
 import { ImagePlus, Link2 } from 'lucide-react'
@@ -23,7 +23,17 @@ interface Props {
   autoFocus?: boolean
   rows?: number
   onBlur?: (e: FocusEvent<HTMLElement>) => void
+  onFocus?: (e: FocusEvent<HTMLElement>) => void
   onKeyDown?: (e: KeyboardEvent<HTMLElement>) => void
+  /** One line, like a title: Enter submits the surrounding form instead of breaking the line, and no images. */
+  singleLine?: boolean
+  /** For the caller to focus the editor or open its internal link dialog (e.g. from its own button). */
+  editorRef?: Ref<EditorHandle>
+}
+
+export interface EditorHandle {
+  focus: () => void
+  openLink: () => void
 }
 
 /**
@@ -31,7 +41,7 @@ interface Props {
  * Ctrl+L inserts a link or image, and pasting or dropping an image uploads it and links it.
  * Plain textarea by default; with `rich`, an editable surface that shows links and images (see richText.ts).
  */
-export function OrgTextarea({ value, onChange, autoGrow, onKeyDown, path, tools, rich, className, placeholder, autoFocus, rows, onBlur }: Props) {
+export function OrgTextarea({ value, onChange, autoGrow, onKeyDown, path, tools, rich, className, placeholder, autoFocus, rows, onBlur, onFocus, singleLine, editorRef }: Props) {
   const ref = useRef<HTMLTextAreaElement>(null)
   const host = useRef<HTMLDivElement>(null)
   const pendingCursor = useRef<number | null>(null)
@@ -44,6 +54,7 @@ export function OrgTextarea({ value, onChange, autoGrow, onKeyDown, path, tools,
   const selection = () =>
     rich ? Rich.getSelection(host.current!) : { start: ref.current!.selectionStart, end: ref.current!.selectionEnd }
   const focus = () => (rich ? host.current : ref.current)?.focus()
+  useImperativeHandle(editorRef, () => ({ focus, openLink: () => setLinking({ ...selection(), only: 'internal' }) }))
 
   useLayoutEffect(() => {
     if (rich) {
@@ -108,6 +119,11 @@ export function OrgTextarea({ value, onChange, autoGrow, onKeyDown, path, tools,
     }
     // The rich surface only holds org text: no bold/italic markup from the browser, and Enter is a plain newline.
     if (rich && ctrl && /^[biu]$/i.test(e.key)) return void e.preventDefault()
+    if (singleLine) {
+      // Like an input: Enter submits its form; nothing else of the multi-line conveniences applies.
+      if (e.key === 'Enter') (e.preventDefault(), (e.currentTarget.closest('form') as HTMLFormElement | null)?.requestSubmit())
+      return
+    }
     if (rich && e.key === 'Enter' && !e.altKey && !ctrl && !e.shiftKey) {
       e.preventDefault()
       set(value.slice(0, pos) + '\n' + value.slice(selEnd), pos + 1)
@@ -168,12 +184,12 @@ export function OrgTextarea({ value, onChange, autoGrow, onKeyDown, path, tools,
       {rich ? (
         <div
           ref={host}
-          className={`rich-text ${className ?? ''}`}
+          className={`rich-text ${singleLine ? 'single-line' : ''} ${className ?? ''}`}
           contentEditable
           suppressContentEditableWarning
           spellCheck={false}
           role="textbox"
-          aria-multiline
+          aria-multiline={!singleLine}
           data-placeholder={placeholder}
           style={rows ? { minHeight: `${rows * 1.6}em` } : undefined}
           onInput={(e) => {
@@ -190,15 +206,16 @@ export function OrgTextarea({ value, onChange, autoGrow, onKeyDown, path, tools,
           onPaste={(e) => {
             e.preventDefault()
             const { start, end } = selection()
-            if (uploadImages(e.clipboardData.files, start)) return
-            const pasted = e.clipboardData.getData('text/plain').replace(/\r\n?/g, '\n')
+            if (!singleLine && uploadImages(e.clipboardData.files, start)) return
+            const pasted = e.clipboardData.getData('text/plain').replace(/\r\n?/g, '\n').replace(singleLine ? /\s*\n\s*/g : /(?!)/, ' ')
             const text = pastedLink(pasted, value.slice(start, end), value.slice(0, start)) ?? pasted
             set(value.slice(0, start) + text + value.slice(end), start + text.length)
           }}
           onDragOver={(e) => path && e.dataTransfer.types.includes('Files') && e.preventDefault()}
-          onDrop={(e) => (e.preventDefault(), uploadImages(e.dataTransfer.files, selection().start))}
+          onDrop={(e) => (e.preventDefault(), !singleLine && uploadImages(e.dataTransfer.files, selection().start))}
           onKeyDown={keyDown}
           onBlur={onBlur}
+          onFocus={onFocus}
         />
       ) : (
         <textarea

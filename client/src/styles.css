@@ -7,6 +7,7 @@
   --text: #1d1d20;
   --muted: #74747c;
   --accent: #6d4aff;
+  --link: #1a5fd6;
   --accent-soft: #efeaff;
   --todo: #d9480f;
   --todo-soft: #fff1e6;
@@ -35,6 +36,7 @@
     --text: #e8e8ec;
     --muted: #9a9aa3;
     --accent: #9d86ff;
+    --link: #78aaff;
     --accent-soft: #2a2442;
     --todo: #ff922b;
     --todo-soft: #3a2614;
@@ -59,6 +61,7 @@
   --text: #e8e8ec;
   --muted: #9a9aa3;
   --accent: #9d86ff;
+  --link: #78aaff;
   --accent-soft: #2a2442;
   --todo: #ff922b;
   --todo-soft: #3a2614;
@@ -86,8 +89,10 @@ input, select, textarea { background: var(--bg); border: 1px solid var(--border)
 input:focus, select:focus, textarea:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
 kbd { font: 11px var(--mono); color: var(--muted); border: 1px solid var(--border); border-radius: 4px; padding: 0 0.3rem; background: var(--bg); }
 code, pre { font-family: var(--mono); font-size: 0.88em; }
-a { color: var(--accent); text-decoration: none; }
+a { color: var(--link); text-decoration: none; }
 a:hover { text-decoration: underline; }
+/* Links in the notes look like links: blue and underlined. */
+.content a, .modal .rich-text a { text-decoration: underline; text-underline-offset: 2px; }
 .muted { color: var(--muted); }
 .spin { animation: spin 1s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
@@ -123,7 +128,7 @@ a:hover { text-decoration: underline; }
 .rich-text { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 0.45rem 0.6rem; width: 100%; outline: none; white-space: pre-wrap; overflow-wrap: anywhere; cursor: text; font: 14px/1.6 var(--mono); color: var(--text); tab-size: 2; max-height: 60vh; overflow-y: auto; }
 .rich-text:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
 .rich-text:empty::before { content: attr(data-placeholder); color: var(--muted); pointer-events: none; }
-.rt-link { color: var(--accent); text-decoration: underline; text-underline-offset: 2px; font-family: var(--font); }
+.rt-link { color: var(--link); text-decoration: underline; text-underline-offset: 2px; font-family: var(--font); }
 .rt-img { display: inline-block; vertical-align: bottom; max-width: 100%; max-height: 14rem; border-radius: 6px; margin: 0.15rem 0; }
 .rt-img:hover, .rt-link:hover { outline: 2px solid var(--accent-soft); }
 .files ul { list-style: none; margin: 0; padding: 0; }
@@ -208,9 +213,11 @@ textarea.source { width: 100%; min-height: calc(100vh - 220px); font: 14px/1.6 v
 .level-3 > .hl-row .title { font-weight: 600; }
 .title { flex: 1; min-width: 0; cursor: default; overflow-wrap: anywhere; }
 .done .title { color: var(--muted); text-decoration: line-through; text-decoration-color: var(--border); }
+/* A title on the rich editor: one line in the text's own font, like the input it replaces. */
+.rich-text.single-line { white-space: pre; overflow-x: auto; overflow-y: hidden; font: inherit; max-height: none; scrollbar-width: none; }
 .title-input { flex: 1; padding: 0.15rem 0.4rem; }
 .title-input-row { display: flex; gap: 0.4rem; align-items: center; }
-.title-input-row > input { flex: 1; min-width: 0; }
+.title-input-row > .rich-text { flex: 1; min-width: 0; }
 .caret { background: none; border: none; padding: 0; width: 20px; height: 20px; justify-content: center; color: var(--muted); transition: transform 0.15s; flex: none; }
 .caret.open { transform: rotate(90deg); }
 .caret.empty { opacity: 0.25; }

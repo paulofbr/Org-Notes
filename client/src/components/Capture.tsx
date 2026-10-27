@@ -24,7 +24,7 @@ export function CaptureDialog({ path, onEntry }: { path?: string; onEntry?: (ent
   const [time, setTime] = useState('')
   const [props, setProps] = useState<Record<string, string>>({})
   const [tags, setTags] = useState<string[]>([])
-  const titleRef = useRef<HTMLInputElement>(null)
+  const titleRef = useRef<{ focus: () => void }>(null)
   const pickerRef = useRef<HTMLSelectElement>(null)
   useEffect(() => pickerRef.current?.focus(), [])
   const choose = (t: CaptureTemplate) => (setTpl(t), titleRef.current?.focus())
