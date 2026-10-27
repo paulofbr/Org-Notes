@@ -96,6 +96,7 @@ public class CaptureWindow : Window
         _linkTarget = _body;
         _title.GotFocus += (_, _) => _linkTarget = _title;
         _body.GotFocus += (_, _) => _linkTarget = _body;
+        _body.TextChanged += async (_, _) => await RefreshImages();
         var insertLink = new Button { Content = L.Tr("Inserir") };
         insertLink.Click += (_, _) => InsertLink();
         Grid.SetColumn(_linkText, 1);
@@ -172,6 +173,7 @@ public class CaptureWindow : Window
                 _when,
                 _body,
                 tools,
+                _images,
                 _linkPanel,
                 _status,
                 _aiPanel,
@@ -194,6 +196,7 @@ public class CaptureWindow : Window
     public async void ShowForCapture()
     {
         _title.Text = _body.Text = _time.Text = "";
+        _imageData.Clear();
         _tags.Tags = [];
         _date.SelectedDate = null;
         _aiPanel.IsVisible = false;
@@ -316,6 +319,82 @@ public class CaptureWindow : Window
         var common = 0;
         while (common < fromDirs.Length && common < toParts.Length - 1 && fromDirs[common] == toParts[common]) common++;
         return string.Join('/', Enumerable.Repeat("..", fromDirs.Length - common).Concat(toParts[common..]));
+    }
+
+    // The note's images, each with its width and Recortar, as the web editor's drag-to-resize and crop dialog.
+    private readonly StackPanel _images = new() { Spacing = 6 };
+    private readonly Dictionary<string, byte[]> _imageData = [];
+    private string _imagesShown = "";
+
+    private async Task RefreshImages()
+    {
+        var text = _body.Text ?? "";
+        var links = _selected is null ? [] : OrgImages.LinkRe().Matches(text).DistinctBy(m => m.Value).ToList();
+        var shown = string.Join("|", links.Select(m => $"{m.Value}={OrgImages.Width(text, m.Index)}"));
+        if (shown == _imagesShown) return;
+        _imagesShown = shown;
+        _images.Children.Clear();
+        foreach (var m in links)
+        {
+            var path = OrgImages.Resolve(_selected!.File, m.Groups[1].Value);
+            try { _imageData[path] = _imageData.GetValueOrDefault(path) ?? await _api.Image(path); }
+            catch (HttpRequestException) { continue; }
+            if (_imagesShown != shown) return;
+            _images.Children.Add(ImageRow(m.Value, _imageData[path], OrgImages.Width(text, m.Index)));
+        }
+    }
+
+    private Control ImageRow(string link, byte[] data, int? width)
+    {
+        var size = new TextBox { Text = width?.ToString() ?? "", PlaceholderText = L.Tr("Largura (px)"), Width = 120 };
+        void Resize()
+        {
+            var text = _body.Text ?? "";
+            var at = text.IndexOf(link, StringComparison.Ordinal);
+            if (at < 0) return;
+            int? w = int.TryParse(size.Text, out var px) && px > 0 ? px : null;
+            if (w != OrgImages.Width(text, at)) _body.Text = OrgImages.SetWidth(text, at, w);
+        }
+        size.LostFocus += (_, _) => Resize();
+        // Before the text box, which takes Enter for itself.
+        size.AddHandler(KeyDownEvent, (_, e) =>
+        {
+            if (e.Key != Key.Enter) return;
+            e.Handled = true;
+            Resize();
+        }, Avalonia.Interactivity.RoutingStrategies.Tunnel);
+        var crop = new Button { Content = L.Tr("Recortar") };
+        crop.Click += async (_, _) =>
+        {
+            if (_selected is not { } t || await new CropWindow(data) { Icon = Icon }.ShowDialog<byte[]?>(this) is not { } cropped) return;
+            try
+            {
+                var path = await _api.UploadImage(t.File, cropped);
+                var dir = Path.GetDirectoryName(t.File)?.Replace('\\', '/') ?? "";
+                var text = _body.Text ?? "";
+                var at = text.IndexOf(link, StringComparison.Ordinal);
+                // The cropped copy replaces the link; the width line before it stays.
+                if (at >= 0) _body.Text = text[..at] + $"[[file:{(dir == "" ? path : Path.GetRelativePath(dir, path).Replace('\\', '/'))}]]" + text[(at + link.Length)..];
+            }
+            catch (Exception e) when (e is HttpRequestException or TaskCanceledException)
+            {
+                _status.Text = e.Message;
+            }
+        };
+        Bitmap? thumb = null;
+        try { thumb = new Bitmap(new MemoryStream(data)); }
+        catch (Exception) { /* not an image the app can show: the width and crop still apply */ }
+        return new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            Spacing = 8,
+            Children =
+            {
+                new Image { Source = thumb, Height = 48, MaxWidth = 120, Stretch = Stretch.Uniform },
+                size,
+                crop,
+            },
+        };
     }
 
     private static void Insert(TextBox box, string value, int start, int end)

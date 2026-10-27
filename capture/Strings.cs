@@ -84,6 +84,10 @@ public static class L
         ["Mostrar os lembretes numa janela por cima das outras"] = ("Show reminders in a window above the others", "Afficher les rappels dans une fenêtre au-dessus des autres", "Mostrar los recordatorios en una ventana encima de las demás"),
         ["Etiquetas"] = ("Tags", "Étiquettes", "Etiquetas"),
         ["Novas etiquetas (separadas por espaços)"] = ("New tags (separated by spaces)", "Nouvelles étiquettes (séparées par des espaces)", "Etiquetas nuevas (separadas por espacios)"),
+        ["Largura (px)"] = ("Width (px)", "Largeur (px)", "Ancho (px)"),
+        ["Recortar"] = ("Crop", "Recadrer", "Recortar"),
+        ["Recortar imagem"] = ("Crop image", "Recadrer l'image", "Recortar imagen"),
+        ["Arrasta sobre a imagem para escolher a área a recortar."] = ("Drag over the image to choose the area to keep.", "Glisse sur l'image pour choisir la zone à garder.", "Arrastra sobre la imagen para elegir la zona a recortar."),
         // AI review panel
         ["Sem sugestões: o texto parece estar bem."] = ("No suggestions: the text looks fine.", "Aucune suggestion : le texte semble correct.", "Sin sugerencias: el texto parece estar bien."),
         ["Descartar"] = ("Discard", "Ignorer", "Descartar"),

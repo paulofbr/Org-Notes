@@ -120,6 +120,14 @@ public class Api(Config config)
         return await response.Content.ReadFromJsonAsync<List<LinkTargets>>(Json) ?? [];
     }
 
+    /// <summary>An image of the notes, by its path from the notes' root.</summary>
+    public async Task<byte[]> Image(string path)
+    {
+        using var response = await Http.SendAsync(Request(HttpMethod.Get, "/api/raw/" + string.Join('/', path.Split('/').Select(Uri.EscapeDataString))));
+        await Check(response);
+        return await response.Content.ReadAsByteArrayAsync();
+    }
+
     /// <summary>Saves the server's Windows installer to <paramref name="path"/>.</summary>
     public async Task DownloadInstaller(string path)
     {
