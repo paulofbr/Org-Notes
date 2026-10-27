@@ -1,5 +1,6 @@
 using Avalonia;
 using Avalonia.Controls;
+using Rectangle = Avalonia.Controls.Shapes.Rectangle;
 using Avalonia.Input;
 using Avalonia.Input.Platform;
 using Avalonia.Interactivity;
@@ -105,11 +106,12 @@ public class CaptureWindow : Window
         // A pasted web address becomes a link by itself, so only internal links need a button.
         _title.PastingFromClipboard += async (_, e) => await Paste(_title, e);
         _body.PastingFromClipboard += async (_, e) => await Paste(_body, e);
-        var internalLink = new Button { Content = L.Tr("Link interno") };
+        // Not focusable: a click would take the focus, and with it the selection, away from the title or the notes.
+        var internalLink = new Button { Content = L.Tr("Link interno"), Focusable = false };
         ToolTip.SetTip(internalLink, L.Tr("Link para um ficheiro ou título das notas") + " (Ctrl+L)");
         internalLink.Click += async (_, _) => await OpenLink();
         // Images come in from a file picker, or by pasting or dropping them on the notes, as on the web.
-        var image = new Button { Content = L.Tr("Imagem") };
+        var image = new Button { Content = L.Tr("Imagem"), Focusable = false };
         image.Click += async (_, _) =>
         {
             var picked = await StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
@@ -350,57 +352,114 @@ public class CaptureWindow : Window
         }
     }
 
+    private static readonly string[] Handles = ["nw", "n", "ne", "e", "se", "s", "sw", "w"];
+
+    /// <summary>
+    /// An image of the notes as on the web: shown at its width (scaled down to fit), in a frame whose handles resize it,
+    /// keeping its proportions, with a button to crop it.
+    /// </summary>
     private Control ImageRow(string link, byte[] data, int? width)
     {
-        var size = new TextBox { Text = width?.ToString() ?? "", PlaceholderText = L.Tr("Largura (px)"), Width = 120 };
-        void Resize()
+        Bitmap? bitmap = null;
+        try { bitmap = new Bitmap(new MemoryStream(data)); }
+        catch (Exception) { /* not an image the app can show: it can still be cropped */ }
+        var crop = new Button { Content = L.Tr("Recortar"), Focusable = false };
+        crop.Click += async (_, _) => await CropImage(link, data);
+        if (bitmap is null || bitmap.PixelSize.Width == 0) return new StackPanel { Children = { new TextBlock { Text = link, Opacity = 0.7 }, crop } };
+
+        double natural = bitmap.PixelSize.Width, ratio = bitmap.PixelSize.Height / natural;
+        var actual = width ?? natural;
+        // The preview fits the window; the handles change the image's real width by the same proportion.
+        var scale = Math.Min(1, Math.Min(500 / actual, 300 / (actual * ratio)));
+        var image = new Image { Source = bitmap, Stretch = Stretch.Fill };
+        var frame = new Border { BorderBrush = Brushes.DodgerBlue, BorderThickness = new Thickness(1.5) };
+        var label = new TextBlock { Opacity = 0.7, FontSize = 12 };
+        var canvas = new Canvas { HorizontalAlignment = HorizontalAlignment.Left, Children = { image, frame } };
+        var boxes = Handles.ToDictionary(h => h, h => new Rectangle
         {
-            var text = _body.Text ?? "";
-            var at = text.IndexOf(link, StringComparison.Ordinal);
-            if (at < 0) return;
-            int? w = int.TryParse(size.Text, out var px) && px > 0 ? px : null;
-            if (w != OrgImages.Width(text, at)) _body.Text = OrgImages.SetWidth(text, at, w);
-        }
-        size.LostFocus += (_, _) => Resize();
-        // Before the text box, which takes Enter for itself.
-        size.AddHandler(KeyDownEvent, (_, e) =>
-        {
-            if (e.Key != Key.Enter) return;
-            e.Handled = true;
-            Resize();
-        }, Avalonia.Interactivity.RoutingStrategies.Tunnel);
-        var crop = new Button { Content = L.Tr("Recortar") };
-        crop.Click += async (_, _) =>
-        {
-            if (_selected is not { } t || await new CropWindow(data) { Icon = Icon }.ShowDialog<byte[]?>(this) is not { } cropped) return;
-            try
+            Width = 10, Height = 10, Fill = Brushes.White, Stroke = Brushes.DodgerBlue, StrokeThickness = 1.5,
+            Cursor = new Cursor(h switch
             {
-                var path = await _api.UploadImage(t.File, cropped);
-                var dir = Path.GetDirectoryName(t.File)?.Replace('\\', '/') ?? "";
+                "nw" => StandardCursorType.TopLeftCorner, "ne" => StandardCursorType.TopRightCorner,
+                "se" => StandardCursorType.BottomRightCorner, "sw" => StandardCursorType.BottomLeftCorner,
+                "n" => StandardCursorType.TopSide, "s" => StandardCursorType.BottomSide,
+                "e" => StandardCursorType.RightSide, _ => StandardCursorType.LeftSide,
+            }),
+        });
+        foreach (var r in boxes.Values) canvas.Children.Add(r);
+        // The web's crop icon: two interlocking corners.
+        crop.Content = new Avalonia.Controls.Shapes.Path { Data = Geometry.Parse("M6 2 V18 H22 M2 6 H18 V22"), Stroke = Brushes.Black, StrokeThickness = 2, Stretch = Stretch.Uniform, Width = 14, Height = 14 };
+        (crop.Padding, crop.Background) = (new Thickness(4), Brushes.White);
+        ToolTip.SetTip(crop, L.Tr("Recortar"));
+        canvas.Children.Add(crop);
+
+        void Place(double shown)
+        {
+            double w = shown, h = shown * ratio;
+            (image.Width, image.Height, frame.Width, frame.Height) = (w, h, w, h);
+            (canvas.Width, canvas.Height) = (w + 12, h + 12);
+            foreach (var c in new Control[] { image, frame }) { Canvas.SetLeft(c, 6); Canvas.SetTop(c, 6); }
+            foreach (var (k, r) in boxes)
+            {
+                Canvas.SetLeft(r, 1 + (k.Contains('w') ? 0 : k.Contains('e') ? w : w / 2));
+                Canvas.SetTop(r, 1 + (k.Contains('n') ? 0 : k.Contains('s') ? h : h / 2));
+            }
+            Canvas.SetLeft(crop, w - 26);
+            Canvas.SetTop(crop, 10);
+            label.Text = $"{Math.Round(shown / scale)} px";
+        }
+        Place(actual * scale);
+
+        // Dragging a handle pulls its side out or in; the width is written to the notes when let go.
+        foreach (var (k, r) in boxes)
+        {
+            Point? from = null;
+            double start = 0;
+            r.PointerPressed += (_, e) =>
+            {
+                from = e.GetPosition(this);
+                start = image.Width;
+                e.Pointer.Capture(r);
+                e.Handled = true;
+            };
+            r.PointerMoved += (_, e) =>
+            {
+                if (from is not { } f) return;
+                var p = e.GetPosition(this);
+                var grow = k.Contains('e') ? p.X - f.X : k.Contains('w') ? f.X - p.X : (k == "s" ? p.Y - f.Y : f.Y - p.Y) / ratio;
+                Place(Math.Clamp(start + grow, 16, 500));
+            };
+            r.PointerReleased += (_, e) =>
+            {
+                if (from is null) return;
+                from = null;
+                e.Pointer.Capture(null);
+                var px = (int)Math.Round(image.Width / scale);
                 var text = _body.Text ?? "";
                 var at = text.IndexOf(link, StringComparison.Ordinal);
-                // The cropped copy replaces the link; the width line before it stays.
-                if (at >= 0) _body.Text = text[..at] + $"[[file:{(dir == "" ? path : Path.GetRelativePath(dir, path).Replace('\\', '/'))}]]" + text[(at + link.Length)..];
-            }
-            catch (Exception e) when (e is HttpRequestException or TaskCanceledException)
-            {
-                _status.Text = e.Message;
-            }
-        };
-        Bitmap? thumb = null;
-        try { thumb = new Bitmap(new MemoryStream(data)); }
-        catch (Exception) { /* not an image the app can show: the width and crop still apply */ }
-        return new StackPanel
+                if (at >= 0 && px != OrgImages.Width(text, at)) _body.Text = OrgImages.SetWidth(text, at, px);
+            };
+        }
+        return new StackPanel { Spacing = 2, Children = { canvas, label } };
+    }
+
+    /// <summary>Crops an image of the notes: the cropped copy is uploaded and the link points to it.</summary>
+    private async Task CropImage(string link, byte[] data)
+    {
+        if (_selected is not { } t || await new CropWindow(data) { Icon = Icon }.ShowDialog<byte[]?>(this) is not { } cropped) return;
+        try
         {
-            Orientation = Orientation.Horizontal,
-            Spacing = 8,
-            Children =
-            {
-                new Image { Source = thumb, Height = 48, MaxWidth = 120, Stretch = Stretch.Uniform },
-                size,
-                crop,
-            },
-        };
+            var path = await _api.UploadImage(t.File, cropped);
+            var dir = Path.GetDirectoryName(t.File)?.Replace('\\', '/') ?? "";
+            var text = _body.Text ?? "";
+            var at = text.IndexOf(link, StringComparison.Ordinal);
+            // The cropped copy replaces the link; the width line before it stays.
+            if (at >= 0) _body.Text = text[..at] + $"[[file:{(dir == "" ? path : Path.GetRelativePath(dir, path).Replace('\\', '/'))}]]" + text[(at + link.Length)..];
+        }
+        catch (Exception e) when (e is HttpRequestException or TaskCanceledException)
+        {
+            _status.Text = e.Message;
+        }
     }
 
     private static void Insert(TextBox box, string value, int start, int end)

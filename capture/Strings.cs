@@ -85,7 +85,6 @@ public static class L
         ["Mostrar os lembretes numa janela por cima das outras"] = ("Show reminders in a window above the others", "Afficher les rappels dans une fenêtre au-dessus des autres", "Mostrar los recordatorios en una ventana encima de las demás"),
         ["Etiquetas"] = ("Tags", "Étiquettes", "Etiquetas"),
         ["Novas etiquetas (separadas por espaços)"] = ("New tags (separated by spaces)", "Nouvelles étiquettes (séparées par des espaces)", "Etiquetas nuevas (separadas por espacios)"),
-        ["Largura (px)"] = ("Width (px)", "Largeur (px)", "Ancho (px)"),
         ["Recortar"] = ("Crop", "Recadrer", "Recortar"),
         ["Recortar imagem"] = ("Crop image", "Recadrer l'image", "Recortar imagen"),
         ["Arrasta sobre a imagem para escolher a área a recortar; depois ajusta-a pelos pontos ou arrasta-a."] = ("Drag over the image to choose the area to keep; then adjust it by its handles or drag it.", "Glisse sur l'image pour choisir la zone à garder ; puis ajuste-la par ses poignées ou déplace-la.", "Arrastra sobre la imagen para elegir la zona a recortar; luego ajústala con los puntos o arrástrala."),
