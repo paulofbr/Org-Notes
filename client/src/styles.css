@@ -505,3 +505,6 @@ button kbd { margin-left: 0.15rem; }
   .content { overflow: visible; padding: 0; }
 }
 button.tag.active .muted { color: rgba(255, 255, 255, 0.75); }
+
+/* A link to a file attached to the entry. */
+a.attachment::before { content: '📎'; margin-right: 0.15rem; font-size: 0.9em; }

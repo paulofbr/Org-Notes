@@ -307,15 +307,57 @@ app.MapPost("/api/images", async (string file, HttpContext ctx, Users users) =>
     return Results.Ok(new { path = $"{folder}/{name}" });
 });
 
-// Images linked from notes, by their path in the user's folder.
+// Files attached to an entry, saved next to the note in `<note>_attachments/` under their own name (made unique) and
+// linked as [[file:<note>_attachments/<name>][<name>]].
+const long maxAttachment = 25 * 1024 * 1024;
+app.MapPost("/api/attachments", async (string file, string name, HttpContext ctx, Users users) =>
+{
+    if (users.For(ctx.User).AttachmentsFolder(file) is not { } folder) return Results.BadRequest(Strings.Tr(ctx, "Ficheiro inválido"));
+    if (ctx.Request.ContentLength > maxAttachment) return Results.BadRequest(Strings.Tr(ctx, "O anexo pode ter até 25 MB"));
+    // Only the file's own name, without folders or characters Windows or links can't take.
+    var clean = string.Concat(Path.GetFileName(name.Replace('\\', '/')).Select(c => Path.GetInvalidFileNameChars().Contains(c) || "[]:*?\"<>|".Contains(c) ? '_' : c)).Trim().TrimStart('.');
+    if (clean == "") clean = "anexo";
+    var dir = Path.Combine(users.Root(users.Key(ctx.User)), folder);
+    Directory.CreateDirectory(dir);
+    var (stem, ext) = (Path.GetFileNameWithoutExtension(clean), Path.GetExtension(clean));
+    var unique = clean;
+    for (var n = 2; File.Exists(Path.Combine(dir, unique)); n++) unique = $"{stem} ({n}){ext}";
+    var target = Path.Combine(dir, unique);
+    try
+    {
+        await using (var output = File.Create(target))
+        {
+            var buffer = new byte[81920];
+            long total = 0;
+            int read;
+            while ((read = await ctx.Request.Body.ReadAsync(buffer)) > 0)
+            {
+                if ((total += read) > maxAttachment) throw new InvalidDataException();
+                await output.WriteAsync(buffer.AsMemory(0, read));
+            }
+        }
+    }
+    catch (InvalidDataException)
+    {
+        File.Delete(target);
+        return Results.BadRequest(Strings.Tr(ctx, "O anexo pode ter até 25 MB"));
+    }
+    return Results.Ok(new { path = $"{folder}/{unique}", name = unique });
+});
+
+// Images and attached files linked from notes, by their path in the user's folder. Images and PDFs open in the browser;
+// anything else is downloaded, so a page in an attachment never runs as part of the site.
+var contentTypes = new Microsoft.AspNetCore.StaticFiles.FileExtensionContentTypeProvider();
 app.MapGet("/api/raw/{*path}", (string path, HttpContext ctx, Users users) =>
 {
     var root = Path.GetFullPath(users.Root(users.Key(ctx.User)));
     var full = Path.GetFullPath(Path.Combine(root, path));
-    return full.StartsWith(root + Path.DirectorySeparatorChar, StringComparison.Ordinal) && File.Exists(full)
-        && imageTypes.TryGetValue(Path.GetExtension(full).ToLowerInvariant(), out var type)
-        ? Results.File(full, type)
-        : Results.NotFound();
+    if (!full.StartsWith(root + Path.DirectorySeparatorChar, StringComparison.Ordinal) || !File.Exists(full)) return Results.NotFound();
+    var ext = Path.GetExtension(full).ToLowerInvariant();
+    if (imageTypes.TryGetValue(ext, out var type)) return Results.File(full, type);
+    if (ext == ".pdf") return Results.File(full, "application/pdf");
+    if (!full.Contains($"_attachments{Path.DirectorySeparatorChar}", StringComparison.Ordinal)) return Results.NotFound();
+    return Results.File(full, contentTypes.TryGetContentType(full, out var t) && !t.Contains("html") && !t.Contains("svg") && !t.Contains("javascript") ? t : "application/octet-stream", Path.GetFileName(full));
 });
 
 app.MapGet("/api/capture/templates", (HttpContext ctx, Users users) =>

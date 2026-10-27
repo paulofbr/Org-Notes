@@ -37,7 +37,14 @@ export function pastedLink(pasted: string, selected: string, before: string): st
   return orgLink(url, selected.trim() || undefined)
 }
 
-/** Where to load a local image linked from file `from` (e.g. `[[file:.images/x.png]]`). */
+/** Where to load a local image or attached file linked from file `from` (e.g. `[[file:.images/x.png]]`). */
 export function imageSrc(from: string, target: string) {
   return '/api/raw/' + resolvePath(from, target.replace(/^file:/, '')).split('/').map(encodeURIComponent).join('/')
 }
+
+/** Whether a link points at a file attached to a note (`[[file:plano_attachments/orçamento.pdf][orçamento.pdf]]`). */
+export const isAttachment = (target: string) => /^(file:)?[^:]*_attachments\/[^/]+$/.test(target)
+
+/** The links to the attachments in a text, as [target, name]. */
+export const attachmentsIn = (text: string) =>
+  [...text.matchAll(/\[\[([^\]]+)\](?:\[([^\]]*)\])?\]/g)].filter((m) => isAttachment(m[1])).map((m) => [m[1], m[2] ?? m[1].split('/').pop()!] as const)

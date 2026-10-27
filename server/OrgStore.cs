@@ -51,16 +51,20 @@ public class OrgStore(string root)
         Directory.Exists(_root)
             ? Directory.EnumerateDirectories(_root, "*", SearchOption.AllDirectories)
                 .Select(d => Path.GetRelativePath(_root, d).Replace('\\', '/'))
-                .Where(d => !d.Split('/').Any(s => s.StartsWith('.')) && !IsImagesFolder(d))
+                .Where(d => !d.Split('/').Any(s => s.StartsWith('.')) && !IsNoteFolder(d))
                 .Order(StringComparer.OrdinalIgnoreCase)
             : [];
 
     /// <summary>The folder for a note's images, next to it: `projetos/plano.org` → `projetos/plano_images`.</summary>
     public string? ImagesFolder(string orgPath) => Resolve(orgPath) is null ? null : orgPath[..^4] + "_images";
 
-    /// <summary>A note's images folder belongs with the note, so it is not listed as a folder of its own.</summary>
-    private bool IsImagesFolder(string folder) =>
-        folder.EndsWith("_images", StringComparison.Ordinal) && File.Exists(Path.Combine(_root, folder[..^7] + ".org"));
+    /// <summary>The folder for a note's attached files, next to it: `projetos/plano.org` → `projetos/plano_attachments`.</summary>
+    public string? AttachmentsFolder(string orgPath) => Resolve(orgPath) is null ? null : orgPath[..^4] + "_attachments";
+
+    /// <summary>A note's images and attachments folders belong with the note, so they are not listed as folders of their own.</summary>
+    private bool IsNoteFolder(string folder) =>
+        new[] { "_images", "_attachments" }.Any(suffix =>
+            folder.EndsWith(suffix, StringComparison.Ordinal) && File.Exists(Path.Combine(_root, folder[..^suffix.Length] + ".org")));
 
     public bool CreateFolder(string path)
     {

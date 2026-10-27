@@ -378,4 +378,10 @@ export const fr: Record<string, string> = {
   'Editar ficha (ficheiros com formulário)': 'Modifier la fiche (fichiers avec formulaire)',
   'Editar «{name}»': 'Modifier « {name} »',
   'A entrada já não existe': 'L’entrée n’existe plus',
+  'Anexar um ou vários ficheiros': 'Joindre un ou plusieurs fichiers',
+  'Anexo': 'Pièce jointe',
+  'Cola um endereço web para criar um link, ou cola / arrasta imagens e ficheiros.': 'Collez une adresse web pour créer un lien, ou collez / glissez des images et des fichiers.',
+  'Anexos': 'Pièces jointes',
+  'Anexar ficheiros': 'Joindre des fichiers',
+  'Anexar ficheiros (a)': 'Joindre des fichiers (a)',
 }

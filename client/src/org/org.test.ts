@@ -365,3 +365,12 @@ describe('site build', () => {
     expect(buildOf('<html><body>login</body></html>')).toBeUndefined()
   })
 })
+
+describe('attachments', () => {
+  it('finds the attachment links in a text, with their names', async () => {
+    const { attachmentsIn, isAttachment } = await import('./links')
+    const text = 'Ver [[file:plano_attachments/orçamento.pdf][orçamento.pdf]] e [[https://a.pt][site]]\n[[file:../x_attachments/a b.zip]] [[file:plano_images/1.png]]'
+    expect(attachmentsIn(text)).toEqual([['file:plano_attachments/orçamento.pdf', 'orçamento.pdf'], ['file:../x_attachments/a b.zip', 'a b.zip']])
+    expect(isAttachment('file:plano.org')).toBe(false)
+  })
+})

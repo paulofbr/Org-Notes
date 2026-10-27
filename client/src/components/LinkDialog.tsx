@@ -10,6 +10,21 @@ export type LinkTab = 'external' | 'internal' | 'image'
 const fold = (s: string) => s.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase()
 
 /** Uploads an image and returns the org link to it, written relative to file `from`. */
+/** Lets the user choose one or more files of their computer. */
+export function pickFiles(onPick: (files: File[]) => void) {
+  const input = document.createElement('input')
+  input.type = 'file'
+  input.multiple = true
+  input.onchange = () => input.files?.length && onPick([...input.files])
+  input.click()
+}
+
+/** Uploads a file as an attachment of note `from` and returns the link to it, described by its name. */
+export async function uploadAttachmentLink(from: string, file: File) {
+  const { path, name } = await api.uploadAttachment(from, file, file.name)
+  return orgLink(`file:${relativePath(from, path)}`, name)
+}
+
 export async function uploadImageLink(from: string, file: Blob) {
   const { path } = await api.uploadImage(from, file)
   return orgLink(`file:${relativePath(from, path)}`)

@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 import { TIMESTAMP_RE, parseTimestamp, toDate } from '../org/timestamp'
 import { locale } from '../i18n'
+import { isAttachment } from '../org/links'
 
 export interface InlineOptions {
   onLink?: (target: string) => void
@@ -72,6 +73,7 @@ function renderToken(kind: string, m: RegExpExecArray, opts: InlineOptions, key:
       return (
         <a
           key={key}
+          className={isAttachment(target) ? 'attachment' : undefined}
           href={external ? target : '#'}
           target={external ? '_blank' : undefined}
           rel="noreferrer"

@@ -10,7 +10,7 @@ import { AiExtractDialog } from './components/AiExtract'
 import { InboxDialog, MailDialog } from './components/MailInbox'
 import { WebReminders } from './components/WebReminders'
 import { saveDrafts } from './org/capture'
-import { resolvePath } from './org/links'
+import { resolvePath, imageSrc, isAttachment } from './org/links'
 import { FileTree } from './components/FileTree'
 import { AccountDialog, CommandPalette, HelpDialog, LoginsDialog, NewFolderDialog, RefileDialog, type Command } from './components/Dialogs'
 import { DocView, fileActions } from './components/DocView'
@@ -124,6 +124,8 @@ export default function App() {
       setSidebar(false)
     },
     openLink: (target, from) => {
+      // An attached file (or another non-note file): opened or downloaded by the browser.
+      if (isAttachment(target) || /^file:(?!.*\.org(::|$))/.test(target)) return void window.open(imageSrc(from, target), '_blank')
       const m = /^(?:file:)?([^:]*?\.org)?(?:::)?(\*.*|#.*)?$/.exec(target)
       if (!m || (!m[1] && !m[2])) return void window.open(target, '_blank')
       // Relative to the linking file (as Emacs writes them), else from the root.

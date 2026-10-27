@@ -28,6 +28,7 @@ public static class Strings
         ["Só se pode apagar uma pasta vazia"] = ("Only an empty folder can be deleted", "Seul un dossier vide peut être supprimé", "Solo se puede eliminar una carpeta vacía"),
         ["O ícone tem de ser um PNG até 256 KB"] = ("The icon must be a PNG up to 256 KB", "L'icône doit être un PNG de 256 Ko maximum", "El icono debe ser un PNG de hasta 256 KB"),
         ["Ficheiro inválido"] = ("Invalid file", "Fichier non valide", "Archivo no válido"),
+        ["O anexo pode ter até 25 MB"] = ("Attachments can be up to 25 MB", "La pièce jointe peut faire jusqu’à 25 Mo", "El adjunto puede tener hasta 25 MB"),
         ["A imagem tem de ser PNG, JPEG, GIF ou WebP, até 10 MB"] = ("The image must be PNG, JPEG, GIF or WebP, up to 10 MB", "L'image doit être en PNG, JPEG, GIF ou WebP, jusqu'à 10 Mo", "La imagen debe ser PNG, JPEG, GIF o WebP, de hasta 10 MB"),
         ["Template não encontrado"] = ("Template not found", "Modèle introuvable", "Plantilla no encontrada"),
         ["Falta o título"] = ("The title is missing", "Le titre manque", "Falta el título"),

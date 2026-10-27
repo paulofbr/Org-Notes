@@ -1,9 +1,9 @@
 import { useEffect, useImperativeHandle, useLayoutEffect, useRef, useState, type FocusEvent, type KeyboardEvent, type PointerEvent as ReactPointerEvent, type Ref } from 'react'
 import { createPortal } from 'react-dom'
 import { alignTable } from '../org/edit'
-import { Crop, ImagePlus, Link2 } from 'lucide-react'
+import { Crop, ImagePlus, Link2, Paperclip } from 'lucide-react'
 import { ITEM_RE } from '../org/parser'
-import { LinkDialog, uploadImageLink, type LinkTab } from './LinkDialog'
+import { LinkDialog, uploadAttachmentLink, uploadImageLink, type LinkTab } from './LinkDialog'
 import * as Rich from './richText'
 import { pastedLink } from '../org/links'
 import { setImageWidth } from '../org/images'
@@ -51,6 +51,7 @@ export function OrgTextarea({ value, onChange, autoGrow, onKeyDown, path, tools,
   const host = useRef<HTMLDivElement>(null)
   const pendingCursor = useRef<number | null>(null)
   const imageInput = useRef<HTMLInputElement>(null)
+  const attachInput = useRef<HTMLInputElement>(null)
   // The image selected in the rich editor, by its offset in the text, and its frame over it.
   const wrap = useRef<HTMLDivElement>(null)
   const [picked, setPicked] = useState<number>()
@@ -161,10 +162,12 @@ export function OrgTextarea({ value, onChange, autoGrow, onKeyDown, path, tools,
     focus()
   }
 
-  const uploadImages = (files: FileList | undefined, at: number) => {
-    const images = [...(files ?? [])].filter((f) => f.type.startsWith('image/'))
-    if (!path || !images.length) return false
-    Promise.all(images.map((f) => uploadImageLink(path, f))).then((links) => insert(links.join('\n'), at), (e) => alert(e.message))
+  // Images are shown in the text; any other file is attached to the note and linked by its name.
+  const uploadImages = (files: FileList | undefined, at: number, asAttachments = false) => {
+    const all = [...(files ?? [])]
+    if (!path || !all.length) return false
+    const isImage = (f: File) => !asAttachments && /^image\/(png|jpeg|gif|webp)$/.test(f.type)
+    Promise.all(all.map((f) => (isImage(f) ? uploadImageLink(path, f) : uploadAttachmentLink(path, f)))).then((links) => insert(links.join('\n'), at), (e) => alert(e.message))
     return true
   }
 
@@ -335,10 +338,12 @@ export function OrgTextarea({ value, onChange, autoGrow, onKeyDown, path, tools,
       )}
       {tools && path && (
         // mousedown would take the focus (and the cursor position) away from the text.
-        <div className="text-tools" onMouseDown={(e) => e.target !== imageInput.current && e.preventDefault()}>
+        <div className="text-tools" onMouseDown={(e) => e.target !== imageInput.current && e.target !== attachInput.current && e.preventDefault()}>
           <button type="button" title={tr('Link para um ficheiro ou título das notas')} onClick={() => setLinking({ ...selection(), only: 'internal' })}><Link2 size={14} /> {tr('Link interno')}</button>
           <button type="button" title={tr('Inserir imagem')} onClick={() => imageInput.current?.click()}><ImagePlus size={14} /> {tr('Imagem')}</button>
-          <span className="hint">{tr('Cola um endereço web para criar um link, ou cola / arrasta uma imagem.')}</span>
+          <button type="button" title={tr('Anexar um ou vários ficheiros')} onClick={() => attachInput.current?.click()}><Paperclip size={14} /> {tr('Anexo')}</button>
+          <span className="hint">{tr('Cola um endereço web para criar um link, ou cola / arrasta imagens e ficheiros.')}</span>
+          <input ref={attachInput} type="file" multiple hidden onChange={(e) => (uploadImages(e.target.files ?? undefined, selection().start, true), (e.target.value = ''))} />
           <input
             ref={imageInput}
             type="file"

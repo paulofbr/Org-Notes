@@ -117,6 +117,8 @@ export const api = {
   },
   uploadImage: async (file: string, image: Blob): Promise<{ path: string }> =>
     (await check(await fetch(`/api/images?file=${encodeURIComponent(file)}`, { method: 'POST', body: image, headers: { 'Content-Type': image.type || 'application/octet-stream' } }))).json(),
+  uploadAttachment: async (file: string, data: Blob, name: string): Promise<{ path: string; name: string }> =>
+    (await check(await fetch(`/api/attachments?file=${encodeURIComponent(file)}&name=${encodeURIComponent(name)}`, { method: 'POST', body: data, headers: { 'Content-Type': 'application/octet-stream' } }))).json(),
   uploadIcon: async (png: Blob): Promise<{ name: string }> =>
     (await check(await fetch('/api/icons', { method: 'POST', body: png, headers: { 'Content-Type': 'image/png' } }))).json(),
   newToken: async (): Promise<{ token: string }> => (await check(await fetch('/api/me/token', { method: 'POST' }))).json(),

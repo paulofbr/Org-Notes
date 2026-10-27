@@ -378,4 +378,10 @@ export const en: Record<string, string> = {
   'Editar ficha (ficheiros com formulário)': 'Edit form (files with a form)',
   'Editar «{name}»': 'Edit “{name}”',
   'A entrada já não existe': 'The entry no longer exists',
+  'Anexar um ou vários ficheiros': 'Attach one or more files',
+  'Anexo': 'Attachment',
+  'Cola um endereço web para criar um link, ou cola / arrasta imagens e ficheiros.': 'Paste a web address to make a link, or paste / drop images and files.',
+  'Anexos': 'Attachments',
+  'Anexar ficheiros': 'Attach files',
+  'Anexar ficheiros (a)': 'Attach files (a)',
 }
