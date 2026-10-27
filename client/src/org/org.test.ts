@@ -5,7 +5,7 @@ import { insertEntry, setKeyword, toggleCheckbox, clockIn, clockOut, moveSubtree
 import { agenda, compileMatch, entries } from './agenda'
 import { captureInto, emptyProps, expand, fieldOptions, hideTemplates, propertyOptions, setPropertyOptions, setTemplates, templatesIn } from './capture'
 import { parseTimestamp } from './timestamp'
-import { clientKey, clientValues, hasValue } from './clients'
+import { addOption, clientKey, clientSource, clientValues, findOption, hasValue, optionText, replaceOption } from './clients'
 import { addTags, cleanTag } from './tags'
 import { attrWidth, setImageWidth } from './images'
 
@@ -302,6 +302,27 @@ describe('client filter', () => {
     const [projeto, herdada, outra, solta] = docs['todo.org'].all
     expect([projeto, herdada, outra, solta].map((h) => hasValue(h, 'CLIENTE', 'Acme'))).toEqual([true, true, false, false])
   })
+  it('knows the file the clients come from', () => expect(clientSource(files)).toEqual({ key: 'CLIENTE', file: 'contacts.org' }))
+})
+
+describe('client combo', () => {
+  const contacts = '#+TITLE: Contactos\n* Acme\n:PROPERTIES:\n:EMAIL: a@acme.pt\n:END:\n\n* Globex\n'
+  it('adds a client with only its name', () => {
+    expect(addOption(contacts, ' Initech ')).toBe(contacts + '* Initech\n')
+    expect(addOption('', 'Initech')).toBe('* Initech\n')
+  })
+  it('finds an existing client by the name in the combo, at the top level only', () => {
+    const doc = parseOrg(contacts)
+    expect(findOption(doc, 'Acme ')?.line).toBe(1)
+    expect(findOption(doc, 'Nada')).toBeUndefined()
+    expect(optionText(doc, findOption(doc, 'Acme')!)).toBe('* Acme\n:PROPERTIES:\n:EMAIL: a@acme.pt\n:END:')
+  })
+  it('saves the edited entry in place, keeping the blank lines around it, and gives the new name', () => {
+    const r = replaceOption(contacts, 'Acme', '* Acme Lda\n:PROPERTIES:\n:EMAIL: geral@acme.pt\n:END:\n')
+    expect(r.title).toBe('Acme Lda')
+    expect(r.text).toBe('#+TITLE: Contactos\n* Acme Lda\n:PROPERTIES:\n:EMAIL: geral@acme.pt\n:END:\n\n* Globex\n')
+    expect(replaceOption(contacts, 'Globex', '* Globex\nNotas').text).toBe(contacts.replace('* Globex\n', '* Globex\nNotas\n'))
+  })
 })
 
 describe('insertEntry', () => {
@@ -322,5 +343,13 @@ describe('diffWords', () => {
       { text: 'era', op: '+' },
       { text: ' preto', op: '=' },
     ])
+  })
+})
+
+describe('site build', () => {
+  it('reads the build a page loads', async () => {
+    const { buildOf } = await import('../freshness')
+    expect(buildOf('<script>x</script><script type="module" crossorigin src="/assets/index-AbC1.js"></script>')).toBe('/assets/index-AbC1.js')
+    expect(buildOf('<html><body>login</body></html>')).toBeUndefined()
   })
 })

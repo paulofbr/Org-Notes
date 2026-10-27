@@ -371,4 +371,7 @@ export const fr: Record<string, string> = {
   '{n} itens': '{n} éléments',
   'Ícone': 'Icône',
   'Última verificação: {when}': 'Dernière vérification : {when}',
+  'Adicionar': 'Ajouter',
+  'Adicionar «{name}» a {file}': 'Ajouter « {name} » à {file}',
+  'Editar «{name}» em {file}': 'Modifier « {name} » dans {file}',
 }

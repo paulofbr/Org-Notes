@@ -371,4 +371,7 @@ export const en: Record<string, string> = {
   '{n} itens': '{n} items',
   'Ícone': 'Icon',
   'Última verificação: {when}': 'Last checked: {when}',
+  'Adicionar': 'Add',
+  'Adicionar «{name}» a {file}': 'Add “{name}” to {file}',
+  'Editar «{name}» em {file}': 'Edit “{name}” in {file}',
 }

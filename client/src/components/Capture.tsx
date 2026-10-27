@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useApp } from '../context'
-import { allTemplates, captureInto, emptyProps, expand, fieldOptions, saveDrafts, templatesIn, usesWhen, type CaptureTemplate, type TemplateDraft } from '../org/capture'
+import { allTemplates, captureInto, emptyProps, expand, saveDrafts, templatesIn, usesWhen, type CaptureTemplate, type TemplateDraft } from '../org/capture'
 import { Modal } from './Dialogs'
 import { OrgTextarea } from './OrgTextarea'
 import { TitleInput } from './TitleInput'
 import { AiExtractDialog } from './AiExtract'
 import { TagPicker } from './TagPicker'
+import { PropCombo } from './PropCombo'
 import { aiEnabled, useAiReview } from './AiReview'
 import { api } from '../api'
 import { tr } from '../i18n'
@@ -70,16 +71,9 @@ export function CaptureDialog({ path, onEntry }: { path?: string; onEntry?: (ent
         </select>
         <div className="hint">{tr('Escolhe o ficheiro na lista')} (<kbd>↑</kbd> <kbd>↓</kbd>) {tr('ou pela tecla do template;')} <kbd>Enter</kbd> {tr('passa ao título.')}</div>
         <TitleInput inputRef={titleRef} path={tpl.file} linkButton placeholder={tr('Título')} value={title} onChange={setTitle} />
-        {emptyProps(tpl).map((k) => {
-          const options = fieldOptions(tpl.file, store.files)[k.toUpperCase()]
-          return (
-            <label key={k}>
-              {k.charAt(0) + k.slice(1).toLowerCase()}
-              <input value={props[k] ?? ''} list={options && `opts-${k}`} onChange={(e) => setProps({ ...props, [k]: e.target.value })} />
-              {options && <datalist id={`opts-${k}`}>{options.map((o) => <option key={o} value={o} />)}</datalist>}
-            </label>
-          )
-        })}
+        {emptyProps(tpl).map((k) => (
+          <PropCombo key={k} file={tpl.file} name={k} value={props[k] ?? ''} onChange={(v) => setProps((p) => ({ ...p, [k]: v }))} />
+        ))}
         <TagPicker value={tags} onChange={setTags} />
         {usesWhen(tpl) && (
           <div className="row">

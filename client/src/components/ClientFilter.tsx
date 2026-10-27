@@ -1,7 +1,7 @@
 import { useMemo } from 'react'
-import { Tag, Users } from 'lucide-react'
+import { Pencil, Tag, Users } from 'lucide-react'
 import { useApp } from '../context'
-import { clientKey, clientValues, hasValue } from '../org/clients'
+import { clientKey, clientSource, clientValues, findOption, hasValue } from '../org/clients'
 import { allTags, type Headline, type OrgDoc } from '../org/parser'
 import { knownTags } from '../org/tags'
 import { tr } from '../i18n'
@@ -42,19 +42,29 @@ export function TagFilter() {
 
 /** Picks the client to show, shared by the notes and the agenda; hidden when no template has a client field. */
 export function ClientFilter() {
-  const { store, client, setClient } = useApp()
+  const { store, client, setClient, open } = useApp()
   const key = useMemo(() => clientKey(store.files), [store.files])
   const values = useMemo(() => (key ? clientValues(key, store.files, store.docs) : []), [key, store.files, store.docs])
+  const source = useMemo(() => clientSource(store.files), [store.files])
   if (!key || (!values.length && !client)) return null
   const label = key.charAt(0) + key.slice(1).toLowerCase()
+  // The chosen client's own entry (e.g. in the contacts), to go and edit it.
+  const entry = client && source?.key === key ? findOption(store.docs[source.file], client) : undefined
   return (
-    <label className={`client-filter ${client ? 'active' : ''}`} title={tr('Mostrar só um {name}', { name: label.toLowerCase() })}>
-      <Users size={15} />
-      <select value={client} onChange={(e) => setClient(e.target.value)}>
-        <option value="">{label}: {tr('todos')}</option>
-        {values.map((v) => <option key={v} value={v}>{v}</option>)}
-        {client && !values.includes(client) && <option value={client}>{client}</option>}
-      </select>
-    </label>
+    <span className="client-filter-wrap">
+      <label className={`client-filter ${client ? 'active' : ''}`} title={tr('Mostrar só um {name}', { name: label.toLowerCase() })}>
+        <Users size={15} />
+        <select value={client} onChange={(e) => setClient(e.target.value)}>
+          <option value="">{label}: {tr('todos')}</option>
+          {values.map((v) => <option key={v} value={v}>{v}</option>)}
+          {client && !values.includes(client) && <option value={client}>{client}</option>}
+        </select>
+      </label>
+      {entry && source && (
+        <button className="icon-btn" title={tr('Editar «{name}» em {file}', { name: client, file: source.file })} onClick={() => open(source.file, entry.line)}>
+          <Pencil size={15} />
+        </button>
+      )}
+    </span>
   )
 }

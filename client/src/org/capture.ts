@@ -138,11 +138,19 @@ export function propertySources(text: string): Record<string, string> {
 export function fieldOptions(file: string, files: Record<string, string>): Record<string, string[]> {
   const text = files[file] ?? ''
   const out = propertyOptions(text)
-  for (const [key, src] of Object.entries(propertySources(text))) {
-    const other = files[resolvePath(file, src)] ?? files[src]
-    if (other !== undefined) out[key] = parseOrg(other).headlines.map((h) => h.title)
+  for (const key of Object.keys(propertySources(text))) {
+    const src = optionSource(file, files, key)
+    if (src) out[key] = parseOrg(files[src]).headlines.map((h) => h.title)
   }
   return out
+}
+
+/** The file whose top-level headlines are the values of `key` in `file` (`#+PROPERTY: KEY_FROM other.org`), if it exists. */
+export function optionSource(file: string, files: Record<string, string>, key: string): string | undefined {
+  const src = propertySources(files[file] ?? '')[key.toUpperCase()]
+  if (!src) return undefined
+  const near = resolvePath(file, src)
+  return files[near] !== undefined ? near : files[src] !== undefined ? src : undefined
 }
 
 /** Sets `#+PROPERTY: KEY_ALL` lines in the preamble, replacing a property's existing line or adding it before the capture blocks. */

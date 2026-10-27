@@ -2,10 +2,11 @@ import { useMemo, useState } from 'react'
 import { Loader2, Sparkles } from 'lucide-react'
 import { useApp } from '../context'
 import { api, type ProposedItem } from '../api'
-import { allTemplates, captureInto, emptyProps, expand, fieldOptions, usesWhen, type CaptureTemplate } from '../org/capture'
+import { allTemplates, captureInto, emptyProps, expand, usesWhen, type CaptureTemplate } from '../org/capture'
 import type { OrgStore } from '../store'
 import { Modal } from './Dialogs'
 import { TagPicker } from './TagPicker'
+import { PropCombo } from './PropCombo'
 import { tr } from '../i18n'
 
 type Row = ProposedItem & { keep: boolean }
@@ -42,7 +43,6 @@ export function ProposalReview({ items, onSave, onCancel, saveLabel, cancelLabel
       {rows.length === 0 && <p className="hint">{tr('A IA não encontrou nada para criar neste texto.')}</p>}
       {rows.map((r, i) => {
         const tpl: CaptureTemplate | undefined = templates.find((t) => t.file === r.file && t.key === r.key)
-        const options = tpl ? fieldOptions(tpl.file, store.files) : {}
         return (
           <fieldset key={i} className={`proposal ${r.keep ? '' : 'skipped'}`}>
             <div className="proposal-head">
@@ -67,17 +67,9 @@ export function ProposalReview({ items, onSave, onCancel, saveLabel, cancelLabel
             )}
             {tpl && emptyProps(tpl).length > 0 && (
               <div className="row">
-                {emptyProps(tpl).map((k) => {
-                  const opts = options[k.toUpperCase()]
-                  const id = `prop-${i}-${k}`
-                  return (
-                    <label key={k}>
-                      {k.charAt(0) + k.slice(1).toLowerCase()}
-                      <input value={r.props[k] ?? ''} list={opts && id} onChange={(e) => change(i, { props: { ...r.props, [k]: e.target.value } })} />
-                      {opts && <datalist id={id}>{opts.map((o) => <option key={o} value={o} />)}</datalist>}
-                    </label>
-                  )
-                })}
+                {emptyProps(tpl).map((k) => (
+                  <PropCombo key={k} file={tpl.file} name={k} value={r.props[k] ?? ''} onChange={(v) => change(i, { props: { ...r.props, [k]: v } })} />
+                ))}
               </div>
             )}
             <TagPicker value={r.tags ?? []} onChange={(tags) => change(i, { tags })} />
