@@ -18,6 +18,8 @@ public static class Program
     public static void Main(string[] args)
     {
         if (TellRunningInstance()) return;
+        AppDomain.CurrentDomain.UnhandledException += (_, e) => Log.Write("crash: " + e.ExceptionObject);
+        TaskScheduler.UnobservedTaskException += (_, e) => Log.Write("task: " + e.Exception);
         if (OperatingSystem.IsLinux()) SetX11Scale(Config.Load().Scale);
         AppBuilder.Configure(() => new App(showOnStart: args.Contains("--show")))
             .UsePlatformDetect()

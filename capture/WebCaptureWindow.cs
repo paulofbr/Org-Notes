@@ -18,6 +18,8 @@ public class WebCaptureWindow : Window
     private bool _discarded;
 
     public event Action<string>? LanguageChanged;
+    /// <summary>The web view could not show the capture (the reason is in the log): the app uses its own window instead.</summary>
+    public event Action? Failed;
 
     public WebCaptureWindow(Config config)
     {
@@ -60,7 +62,11 @@ public class WebCaptureWindow : Window
         {
             if (e.Body == "closed") Hide();
         };
-        _web.NavigationCompleted += (_, e) => _readyFor = e.IsSuccess && e.Request is { } at && SameSite(at) && at.AbsolutePath == "/" ? _config.Server : null;
+        _web.NavigationCompleted += (_, e) =>
+        {
+            if (!e.IsSuccess) Log.Write($"captura do site: falhou a abrir {e.Request?.GetLeftPart(UriPartial.Path)}");
+            _readyFor = e.IsSuccess && e.Request is { } at && SameSite(at) && at.AbsolutePath == "/" && at.Query.StartsWith("?app=") ? _config.Server : null;
+        };
         Closing += (_, e) =>
         {
             if (_discarded) return;
@@ -77,23 +83,46 @@ public class WebCaptureWindow : Window
     /// <summary>Shows the capture ("capture") or the AI extraction ("extract") dialog, fresh.</summary>
     public async void Open(string kind)
     {
-        Show();
-        Activate();
-        _web.Focus();
-        _kind = kind;
-        if (_readyFor == _config.Server)
-        {
-            await _web.InvokeScript($"window.openApp && window.openApp('{kind}')");
-            return;
-        }
-        await SignIn();
+        // async void: anything thrown here would close the app, so it falls back to the app's own window instead.
         try
         {
-            // The tray speaks the user's language, as the site does.
-            var me = await new Api(_config).Me();
-            if (L.Langs.Contains(me.Lang) && me.Lang != L.Lang) LanguageChanged?.Invoke(me.Lang!);
+            Show();
+            Activate();
+            _web.Focus();
+            _kind = kind;
+            if (_readyFor == _config.Server)
+            {
+                await _web.InvokeScript($"window.openApp && window.openApp('{kind}')");
+                return;
+            }
+            await SignIn();
+            _ = Watch();
+            try
+            {
+                // The tray speaks the user's language, as the site does.
+                var me = await new Api(_config).Me();
+                if (L.Langs.Contains(me.Lang) && me.Lang != L.Lang) LanguageChanged?.Invoke(me.Lang!);
+            }
+            catch (Exception e) when (e is HttpRequestException or TaskCanceledException) { }
         }
-        catch (Exception e) when (e is HttpRequestException or TaskCanceledException) { }
+        catch (Exception e)
+        {
+            Fail(e.ToString());
+        }
+    }
+
+    /// <summary>The page loads in a second or two; if it has not in 15 (no WebView2, a blank view…), the app's window takes over.</summary>
+    private async Task Watch()
+    {
+        await Task.Delay(TimeSpan.FromSeconds(15));
+        if (IsVisible && _readyFor == null) Fail("a página não carregou em 15 s");
+    }
+
+    private void Fail(string reason)
+    {
+        Log.Write("captura do site: " + reason);
+        Hide();
+        Failed?.Invoke();
     }
 
     private async Task SignIn()

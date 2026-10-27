@@ -15,6 +15,8 @@ public class App(bool showOnStart) : Application
     private readonly Config _config = Config.Load();
     private CaptureWindow? _capture;
     private WebCaptureWindow? _web;
+    // Set when the web view fails on this machine: until the app restarts, the capture is the app's own window.
+    private bool _webFailed;
     private TrayIcon? _tray;
     private Updater? _updater;
     private ReminderWindow? _reminders;
@@ -57,7 +59,7 @@ public class App(bool showOnStart) : Application
         menu.Add(Item(L.Tr("Capturar"), ShowCapture));
         menu.Add(Item(L.Tr("Criar a partir de texto (IA)"), () =>
         {
-            if (_config.WebCapture) Web().Open("extract");
+            if (_config.WebCapture && !_webFailed) Web().Open("extract");
             else new ExtractWindow(new Api(_config)) { Icon = _icon }.Show();
         }));
         menu.Add(Item(L.Tr("Definições"), ShowSettings));
@@ -85,7 +87,7 @@ public class App(bool showOnStart) : Application
 
     private void ShowCapture()
     {
-        if (_config.WebCapture)
+        if (_config.WebCapture && !_webFailed)
         {
             Web().Open("capture");
             return;
@@ -111,6 +113,12 @@ public class App(bool showOnStart) : Application
                 RenderTray();
                 _capture?.Discard();
                 _capture = null;
+            };
+            _web.Failed += () =>
+            {
+                _webFailed = true;
+                Reminders.Show("Org Notes", L.Tr("A captura do site não abriu neste computador: abre a janela da app. Detalhes em {0}", Log.FilePath));
+                ShowCapture();
             };
         }
         return _web;
