@@ -85,6 +85,7 @@ public static class L
         ["Mostrar os lembretes numa janela por cima das outras"] = ("Show reminders in a window above the others", "Afficher les rappels dans une fenêtre au-dessus des autres", "Mostrar los recordatorios en una ventana encima de las demás"),
         ["Captura igual à do site (desliga para usar a janela antiga da app)"] = ("Capture as on the site (turn off to use the app's older window)", "Capture comme sur le site (désactive pour la fenêtre ancienne de l'app)", "Captura igual que en el sitio (desactiva para usar la ventana antigua de la app)"),
         ["A captura do site não abriu neste computador: abre a janela da app. Detalhes em {0}"] = ("The site's capture did not open on this computer: the app's window opens instead. Details in {0}", "La capture du site ne s'est pas ouverte sur cet ordinateur : la fenêtre de l'app s'ouvre à la place. Détails dans {0}", "La captura del sitio no se abrió en este ordenador: se abre la ventana de la app. Detalles en {0}"),
+        ["Abrir registo de erros"] = ("Open error log", "Ouvrir le journal des erreurs", "Abrir registro de errores"),
         ["Etiquetas"] = ("Tags", "Étiquettes", "Etiquetas"),
         ["Novas etiquetas (separadas por espaços)"] = ("New tags (separated by spaces)", "Nouvelles étiquettes (séparées par des espaces)", "Etiquetas nuevas (separadas por espacios)"),
         ["Recortar"] = ("Crop", "Recadrer", "Recortar"),

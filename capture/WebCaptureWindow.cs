@@ -57,15 +57,18 @@ public class WebCaptureWindow : Window
                 e.Cancel = true;
                 await SignIn();
             }
+            // A new page: ready again only when it says so.
+            else _readyFor = null;
         };
         _web.WebMessageReceived += (_, e) =>
         {
             if (e.Body == "closed") Hide();
+            // The dialog is on screen: the page and the bridge work.
+            else if (e.Body == "ready") _readyFor = _config.Server;
         };
         _web.NavigationCompleted += (_, e) =>
         {
             if (!e.IsSuccess) Log.Write($"captura do site: falhou a abrir {e.Request?.GetLeftPart(UriPartial.Path)}");
-            _readyFor = e.IsSuccess && e.Request is { } at && SameSite(at) && at.AbsolutePath == "/" && at.Query.StartsWith("?app=") ? _config.Server : null;
         };
         Closing += (_, e) =>
         {
@@ -111,11 +114,23 @@ public class WebCaptureWindow : Window
         }
     }
 
-    /// <summary>The page loads in a second or two; if it has not in 15 (no WebView2, a blank view…), the app's window takes over.</summary>
+    /// <summary>The page says "ready" in a second or two; if it has not in 15 (no WebView2, a blank view…), the app's window takes over.</summary>
     private async Task Watch()
     {
         await Task.Delay(TimeSpan.FromSeconds(15));
-        if (IsVisible && _readyFor == null) Fail("a página não carregou em 15 s");
+        if (!IsVisible || _readyFor != null) return;
+        // What the web view shows, for the log.
+        string? page;
+        try
+        {
+            var state = _web.InvokeScript("location.href + ' · ' + document.readyState + ' · ' + document.body.innerText.slice(0, 200)");
+            page = await Task.WhenAny(state, Task.Delay(3000)) == state ? await state : "(o script não respondeu)";
+        }
+        catch (Exception e)
+        {
+            page = e.Message;
+        }
+        Fail($"a captura não ficou pronta em 15 s; página: {page}; motor: {_web.AdapterInfo}");
     }
 
     private void Fail(string reason)

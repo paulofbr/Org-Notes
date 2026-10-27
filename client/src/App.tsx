@@ -221,7 +221,11 @@ export default function App() {
 
   useEffect(() => {
     if (!appWindow || !store.loaded) return
-    window.openApp = (kind) => setDialog(kind === 'extract' ? <AiExtractDialog key={Date.now()} /> : <CaptureDialog key={Date.now()} />)
+    window.openApp = (kind) => {
+      setDialog(kind === 'extract' ? <AiExtractDialog key={Date.now()} /> : <CaptureDialog key={Date.now()} />)
+      // The app waits for this to know the page works (else it falls back to its own window).
+      setTimeout(() => window.invokeCSharpAction?.('ready'))
+    }
     window.openApp(appWindow)
   }, [store.loaded])
 

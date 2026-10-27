@@ -20,6 +20,12 @@ public static class Program
         if (TellRunningInstance()) return;
         AppDomain.CurrentDomain.UnhandledException += (_, e) => Log.Write("crash: " + e.ExceptionObject);
         TaskScheduler.UnobservedTaskException += (_, e) => Log.Write("task: " + e.Exception);
+        // An error in a window (the web view's, say) is logged instead of closing the whole app.
+        Avalonia.Threading.Dispatcher.UIThread.UnhandledException += (_, e) =>
+        {
+            Log.Write("ui: " + e.Exception);
+            e.Handled = true;
+        };
         if (OperatingSystem.IsLinux()) SetX11Scale(Config.Load().Scale);
         AppBuilder.Configure(() => new App(showOnStart: args.Contains("--show")))
             .UsePlatformDetect()

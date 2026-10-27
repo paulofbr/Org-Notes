@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.IO.Pipes;
 using Avalonia;
 using Avalonia.Controls;
@@ -63,6 +64,11 @@ public class App(bool showOnStart) : Application
             else new ExtractWindow(new Api(_config)) { Icon = _icon }.Show();
         }));
         menu.Add(Item(L.Tr("Definições"), ShowSettings));
+        menu.Add(Item(L.Tr("Abrir registo de erros"), () =>
+        {
+            if (!File.Exists(Log.FilePath)) Log.Write("(registo aberto, sem erros)");
+            Process.Start(new ProcessStartInfo(Log.FilePath) { UseShellExecute = true })?.Dispose();
+        }));
         menu.Add(new NativeMenuItemSeparator());
         menu.Add(new NativeMenuItem(Updater.Version is { } v ? L.Tr("Versão {0}", "v" + v) : L.Tr("Versão de desenvolvimento")) { IsEnabled = false });
         if (Updater.Supported)
