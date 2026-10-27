@@ -1,8 +1,9 @@
 import { useMemo } from 'react'
-import { Users } from 'lucide-react'
+import { Tag, Users } from 'lucide-react'
 import { useApp } from '../context'
 import { clientKey, clientValues, hasValue } from '../org/clients'
-import type { Headline } from '../org/parser'
+import { allTags, type Headline, type OrgDoc } from '../org/parser'
+import { knownTags } from '../org/tags'
 import { tr } from '../i18n'
 
 /** The chosen client as a headline test, or undefined when no client is chosen. */
@@ -10,6 +11,33 @@ export function useClientMatch(): ((h: Headline) => boolean) | undefined {
   const { store, client } = useApp()
   const key = useMemo(() => clientKey(store.files), [store.files])
   return useMemo(() => (key && client ? (h: Headline) => hasValue(h, key, client) : undefined), [key, client])
+}
+
+/** The chosen client and tag together, as a test for the lists; undefined when neither is chosen. */
+export function useListMatch(): ((h: Headline, doc: OrgDoc) => boolean) | undefined {
+  const { tag } = useApp()
+  const client = useClientMatch()
+  return useMemo(
+    () => (client || tag ? (h: Headline, doc: OrgDoc) => (!client || client(h)) && (!tag || allTags(h, doc).includes(tag)) : undefined),
+    [client, tag],
+  )
+}
+
+/** Picks the tag to show (inherited ones and #+FILETAGS count, as in org), shared by the notes and the agenda. */
+export function TagFilter() {
+  const { store, tag, setTag } = useApp()
+  const tags = useMemo(() => knownTags(store.docs), [store.docs])
+  if (!tags.length && !tag) return null
+  return (
+    <label className={`client-filter ${tag ? 'active' : ''}`} title={tr('Mostrar só uma etiqueta')}>
+      <Tag size={15} />
+      <select value={tag} onChange={(e) => setTag(e.target.value)}>
+        <option value="">{tr('Etiqueta')}: {tr('todas')}</option>
+        {tags.map((t) => <option key={t} value={t}>{t}</option>)}
+        {tag && !tags.includes(tag) && <option value={tag}>{tag}</option>}
+      </select>
+    </label>
+  )
 }
 
 /** Picks the client to show, shared by the notes and the agenda; hidden when no template has a client field. */

@@ -24,6 +24,9 @@ export interface AppCtx {
   /** The client the notes and the agenda are filtered by ('' for all). */
   client: string
   setClient: (client: string) => void
+  /** The tag the notes and the agenda are filtered by ('' for all). */
+  tag: string
+  setTag: (tag: string) => void
 }
 
 export const Ctx = createContext<AppCtx>(null!)

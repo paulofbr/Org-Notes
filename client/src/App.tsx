@@ -27,6 +27,7 @@ export default function App() {
   const [nav, setNav] = useState<Nav>({ view: 'agenda' })
   const [dialog, setDialog] = useState<ReactNode>(null)
   const [client, setClient] = useState('')
+  const [tag, setTag] = useState('')
   const [sidebar, setSidebar] = useState(false)
   const [collapsed, setCollapsed] = useState(() => {
     try {
@@ -92,6 +93,8 @@ export default function App() {
     running,
     client,
     setClient,
+    tag,
+    setTag,
     edit: (path, fn) => {
       try {
         store.apply(path, fn)

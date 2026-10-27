@@ -9,7 +9,7 @@ import { hideTemplates } from '../org/capture'
 import { TemplateDialog } from './Capture'
 import { FileIcon, IconDialog } from './FileIcon'
 import { tr } from '../i18n'
-import { ClientFilter } from './ClientFilter'
+import { ClientFilter, TagFilter } from './ClientFilter'
 
 const states = new Map<string, OutlineState>()
 const VIS_ORDER: Visibility[] = ['overview', 'contents', 'showall']
@@ -107,6 +107,7 @@ export function DocView({ path, focus, onRemoved }: { path: string; focus?: { li
                 <kbd className="in-input">f</kbd>
               </div>
               <ClientFilter />
+              <TagFilter />
               <button onClick={cycleVisibility} title={tr('Visibilidade global')}><Layers size={15} /> {VIS_LABEL[state.visibility]} <kbd>Shift+Tab</kbd></button>
             </>
           )}
