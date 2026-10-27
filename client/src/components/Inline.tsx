@@ -73,7 +73,7 @@ function renderToken(kind: string, m: RegExpExecArray, opts: InlineOptions, key:
       return (
         <a
           key={key}
-          className={isAttachment(target) ? 'attachment' : undefined}
+          className={isAttachment(target, desc) ? 'attachment' : undefined}
           href={external ? target : '#'}
           target={external ? '_blank' : undefined}
           rel="noreferrer"

@@ -28,6 +28,10 @@ builder.Services.AddSingleton<MailInbox>();
 builder.Services.AddHostedService(sp => sp.GetRequiredService<MailInbox>());
 
 builder.Services.AddSingleton(new Users(root, Path.Combine(AppContext.BaseDirectory, "Seed")));
+// Each note's old `_images` and `_attachments` folders go into its `_Artifacts` folder, links included (once; then a no-op).
+if (Directory.Exists(Path.Combine(root, "users")))
+    foreach (var userDir in Directory.EnumerateDirectories(Path.Combine(root, "users")))
+        Artifacts.Migrate(userDir, Console.Error.WriteLine);
 var windowsInstaller = Path.Combine(AppContext.BaseDirectory, "downloads", "OrgNotes-client-win-x64.zip");
 // The commit the installer was built from, for the app to update itself (see capture/Updater.cs).
 var windowsVersion = Path.ChangeExtension(windowsInstaller, ".version");
@@ -281,12 +285,12 @@ app.MapGet("/api/icons/{name}", (string name, HttpContext ctx, Users users) =>
         ? Results.File(file, "image/png")
         : Results.NotFound());
 
-// Images for notes, saved next to the note in `<note>_images/` (named by content hash) and linked as [[file:<note>_images/<name>]].
+// Images for notes, saved next to the note in `<note>_Artifacts/` (named by content hash) and linked as [[file:<note>_Artifacts/<name>]].
 var imageTypes = new Dictionary<string, string> { [".png"] = "image/png", [".jpg"] = "image/jpeg", [".jpeg"] = "image/jpeg", [".gif"] = "image/gif", [".webp"] = "image/webp" };
 
 app.MapPost("/api/images", async (string file, HttpContext ctx, Users users) =>
 {
-    if (users.For(ctx.User).ImagesFolder(file) is not { } folder) return Results.BadRequest(Strings.Tr(ctx, "Ficheiro inválido"));
+    if (users.For(ctx.User).ArtifactsFolder(file) is not { } folder) return Results.BadRequest(Strings.Tr(ctx, "Ficheiro inválido"));
     using var buffer = new MemoryStream();
     await ctx.Request.Body.CopyToAsync(buffer);
     var data = buffer.ToArray();
@@ -307,21 +311,21 @@ app.MapPost("/api/images", async (string file, HttpContext ctx, Users users) =>
     return Results.Ok(new { path = $"{folder}/{name}" });
 });
 
-// Files attached to an entry, saved next to the note in `<note>_attachments/` under their own name (made unique) and
-// linked as [[file:<note>_attachments/<name>][<name>]].
-const long maxAttachment = 25 * 1024 * 1024;
+// Files attached to an entry, saved with the note's images in `<note>_Artifacts/` under their own name (made unique) and
+// linked as [[file:<note>_Artifacts/<name>][<name>]].
+const long maxAttachment = 100 * 1024 * 1024;
 app.MapPost("/api/attachments", async (string file, string name, HttpContext ctx, Users users) =>
 {
-    if (users.For(ctx.User).AttachmentsFolder(file) is not { } folder) return Results.BadRequest(Strings.Tr(ctx, "Ficheiro inválido"));
-    if (ctx.Request.ContentLength > maxAttachment) return Results.BadRequest(Strings.Tr(ctx, "O anexo pode ter até 25 MB"));
+    if (users.For(ctx.User).ArtifactsFolder(file) is not { } folder) return Results.BadRequest(Strings.Tr(ctx, "Ficheiro inválido"));
+    // Kestrel stops request bodies at 30 MB unless the endpoint says otherwise.
+    if (ctx.Features.Get<Microsoft.AspNetCore.Http.Features.IHttpMaxRequestBodySizeFeature>() is { IsReadOnly: false } limit) limit.MaxRequestBodySize = maxAttachment + 1;
+    if (ctx.Request.ContentLength > maxAttachment) return Results.BadRequest(Strings.Tr(ctx, "O anexo pode ter até 100 MB"));
     // Only the file's own name, without folders or characters Windows or links can't take.
     var clean = string.Concat(Path.GetFileName(name.Replace('\\', '/')).Select(c => Path.GetInvalidFileNameChars().Contains(c) || "[]:*?\"<>|".Contains(c) ? '_' : c)).Trim().TrimStart('.');
     if (clean == "") clean = "anexo";
     var dir = Path.Combine(users.Root(users.Key(ctx.User)), folder);
     Directory.CreateDirectory(dir);
-    var (stem, ext) = (Path.GetFileNameWithoutExtension(clean), Path.GetExtension(clean));
-    var unique = clean;
-    for (var n = 2; File.Exists(Path.Combine(dir, unique)); n++) unique = $"{stem} ({n}){ext}";
+    var unique = Artifacts.Unique(dir, clean);
     var target = Path.Combine(dir, unique);
     try
     {
@@ -340,7 +344,7 @@ app.MapPost("/api/attachments", async (string file, string name, HttpContext ctx
     catch (InvalidDataException)
     {
         File.Delete(target);
-        return Results.BadRequest(Strings.Tr(ctx, "O anexo pode ter até 25 MB"));
+        return Results.BadRequest(Strings.Tr(ctx, "O anexo pode ter até 100 MB"));
     }
     return Results.Ok(new { path = $"{folder}/{unique}", name = unique });
 });
@@ -356,7 +360,7 @@ app.MapGet("/api/raw/{*path}", (string path, HttpContext ctx, Users users) =>
     var ext = Path.GetExtension(full).ToLowerInvariant();
     if (imageTypes.TryGetValue(ext, out var type)) return Results.File(full, type);
     if (ext == ".pdf") return Results.File(full, "application/pdf");
-    if (!full.Contains($"_attachments{Path.DirectorySeparatorChar}", StringComparison.Ordinal)) return Results.NotFound();
+    if (!Artifacts.IsInside(full)) return Results.NotFound();
     return Results.File(full, contentTypes.TryGetContentType(full, out var t) && !t.Contains("html") && !t.Contains("svg") && !t.Contains("javascript") ? t : "application/octet-stream", Path.GetFileName(full));
 });
 

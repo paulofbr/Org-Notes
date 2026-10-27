@@ -42,9 +42,15 @@ export function imageSrc(from: string, target: string) {
   return '/api/raw/' + resolvePath(from, target.replace(/^file:/, '')).split('/').map(encodeURIComponent).join('/')
 }
 
-/** Whether a link points at a file attached to a note (`[[file:plano_attachments/orçamento.pdf][orçamento.pdf]]`). */
-export const isAttachment = (target: string) => /^(file:)?[^:]*_attachments\/[^/]+$/.test(target)
+const IMAGE_EXT = /\.(png|jpe?g|gif|webp)$/i
+
+/**
+ * Whether a link points at a file attached to a note (`[[file:plano_Artifacts/orçamento.pdf][orçamento.pdf]]`): in the
+ * note's artifacts folder (or an older `_attachments` / `_images` one), and not an image shown in the text (those have no description).
+ */
+export const isAttachment = (target: string, desc?: string) =>
+  /^(file:)?[^:]*_(Artifacts|attachments|images)\/[^/]+$/.test(target) && (!!desc || !IMAGE_EXT.test(target))
 
 /** The links to the attachments in a text, as [target, name]. */
 export const attachmentsIn = (text: string) =>
-  [...text.matchAll(/\[\[([^\]]+)\](?:\[([^\]]*)\])?\]/g)].filter((m) => isAttachment(m[1])).map((m) => [m[1], m[2] ?? m[1].split('/').pop()!] as const)
+  [...text.matchAll(/\[\[([^\]]+)\](?:\[([^\]]*)\])?\]/g)].filter((m) => isAttachment(m[1], m[2])).map((m) => [m[1], m[2] ?? m[1].split('/').pop()!] as const)

@@ -384,4 +384,5 @@ export const en: Record<string, string> = {
   'Anexos': 'Attachments',
   'Anexar ficheiros': 'Attach files',
   'Anexar ficheiros (a)': 'Attach files (a)',
+  'Abrir {name}': 'Open {name}',
 }

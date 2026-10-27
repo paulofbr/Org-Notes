@@ -376,11 +376,6 @@ function HeadlineRow({ h, ops, fold }: { h: Headline; ops: NodeOps; fold: Fold }
           {description && fold !== 'subtree' && (
             <button className="badge desc-badge" title={`${tr('Tem descrição')}: ${description.split('\n')[0]} (e)`} onClick={actions.description} tabIndex={-1}><NotebookText size={13} /></button>
           )}
-          {attachments.length > 0 && (
-            <button className="badge desc-badge" title={`${tr('Anexos')}: ${attachments.map(([, n]) => n).join(', ')}`} onClick={() => (attachments.length === 1 ? app.openLink(attachments[0][0], path) : actions.description())} tabIndex={-1}>
-              <Paperclip size={13} /> {attachments.length}
-            </button>
-          )}
           {h.properties.Effort && <span className="badge" title={tr('Esforço estimado')}>≈ {h.properties.Effort}</span>}
           {Object.entries(h.properties).map(([k, v]) => {
             if (!v || !ops.shownProps.has(k.toUpperCase())) return null
@@ -425,6 +420,14 @@ function HeadlineRow({ h, ops, fold }: { h: Headline; ops: NodeOps; fold: Fold }
         </span>
       </div>
       <Planning h={h} onSchedule={actions.schedule} onDeadline={actions.deadline} />
+      {/* The entry's attachments, always at hand (with the text open they are in it too). */}
+      {attachments.length > 0 && fold !== 'subtree' && (
+        <div className="attachments">
+          {attachments.map(([target, name]) => (
+            <a key={target} className="attachment" href={imageSrc(path, target)} target="_blank" rel="noreferrer" tabIndex={-1} title={tr('Abrir {name}', { name })}>{name}</a>
+          ))}
+        </div>
+      )}
     </div>
   )
 }

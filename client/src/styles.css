@@ -508,3 +508,6 @@ button.tag.active .muted { color: rgba(255, 255, 255, 0.75); }
 
 /* A link to a file attached to the entry. */
 a.attachment::before { content: '📎'; margin-right: 0.15rem; font-size: 0.9em; }
+.hl-row .attachments { display: flex; flex-wrap: wrap; gap: 0.25rem 0.75rem; padding-left: 1.6rem; font-size: 0.8rem; }
+.hl-row .attachments a { color: var(--accent); text-decoration: none; max-width: 22rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hl-row .attachments a:hover { text-decoration: underline; }

@@ -369,8 +369,8 @@ describe('site build', () => {
 describe('attachments', () => {
   it('finds the attachment links in a text, with their names', async () => {
     const { attachmentsIn, isAttachment } = await import('./links')
-    const text = 'Ver [[file:plano_attachments/orçamento.pdf][orçamento.pdf]] e [[https://a.pt][site]]\n[[file:../x_attachments/a b.zip]] [[file:plano_images/1.png]]'
-    expect(attachmentsIn(text)).toEqual([['file:plano_attachments/orçamento.pdf', 'orçamento.pdf'], ['file:../x_attachments/a b.zip', 'a b.zip']])
+    const text = 'Ver [[file:plano_Artifacts/orçamento.pdf][orçamento.pdf]] e [[https://a.pt][site]]\n[[file:../x_Artifacts/a b.zip]] [[file:plano_Artifacts/1.png]] [[file:plano_Artifacts/foto.png][foto.png]]'
+    expect(attachmentsIn(text)).toEqual([['file:plano_Artifacts/orçamento.pdf', 'orçamento.pdf'], ['file:../x_Artifacts/a b.zip', 'a b.zip'], ['file:plano_Artifacts/foto.png', 'foto.png']])
     expect(isAttachment('file:plano.org')).toBe(false)
   })
 })
