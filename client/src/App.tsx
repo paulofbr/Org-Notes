@@ -19,6 +19,7 @@ import { isTyping, moveFocus } from './shortcuts'
 import { Inline } from './components/Inline'
 import { LANGS, isLang, lang, rememberLang, tr } from './i18n'
 import { api } from './api'
+import { siteUpdated } from './freshness'
 
 type Nav = { view: 'agenda'; tab?: 'week' | 'search' } | { view: 'doc'; path: string; focus?: { line: number } }
 
@@ -39,6 +40,9 @@ export default function App() {
   const store = useOrgStore()
   const [nav, setNav] = useState<Nav>({ view: 'agenda' })
   const [dialog, setDialog] = useState<ReactNode>(null)
+  // Read by the desktop app's openApp, which keeps the page between captures: only reload it with nothing left to save.
+  const saveState = useRef(store.saveState)
+  saveState.current = store.saveState
   const [client, setClient] = useState('')
   const [tag, setTag] = useState('')
   const [sidebar, setSidebar] = useState(false)
@@ -221,7 +225,9 @@ export default function App() {
 
   useEffect(() => {
     if (!appWindow || !store.loaded) return
-    window.openApp = (kind) => {
+    window.openApp = async (kind) => {
+      // The app keeps this page loaded between captures; after a deploy, load the new version instead (it opens the dialog itself).
+      if (saveState.current === 'saved' && (await siteUpdated())) return location.replace(`/?app=${encodeURIComponent(kind)}`)
       setDialog(kind === 'extract' ? <AiExtractDialog key={Date.now()} /> : <CaptureDialog key={Date.now()} />)
       // The app waits for this to know the page works (else it falls back to its own window).
       setTimeout(() => window.invokeCSharpAction?.('ready'))
