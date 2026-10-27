@@ -348,6 +348,11 @@ hr { border: none; border-top: 1px solid var(--border); margin: 1rem 0; }
 .modal-backdrop { position: fixed; inset: 0; background: rgba(10, 10, 20, 0.4); display: flex; align-items: flex-start; justify-content: center; padding: 10vh 1rem 1rem; z-index: 50; backdrop-filter: blur(2px); }
 .modal { background: var(--bg); border: 1px solid var(--border); border-radius: 14px; box-shadow: var(--shadow); width: 100%; max-width: 480px; padding: 1.25rem; max-height: 80vh; overflow-y: auto; }
 .modal.wide { max-width: 720px; }
+/* In the desktop app's window the dialog is the whole window. */
+.app-window { min-height: 100vh; background: var(--bg); display: grid; }
+.app-window > .spin { place-self: center; color: var(--muted); }
+.app-window .modal-backdrop { position: static; padding: 0; background: none; backdrop-filter: none; }
+.app-window .modal { max-width: none; max-height: none; min-height: 100vh; border: 0; border-radius: 0; box-shadow: none; }
 .modal h3 { margin: 0 0 1rem; }
 .modal form, .modal { display: flex; flex-direction: column; gap: 0.75rem; }
 .modal label, .modal .field { display: flex; flex-direction: column; gap: 0.25rem; font-size: 0.82rem; color: var(--muted); flex: 1; }

@@ -14,6 +14,7 @@ public class App(bool showOnStart) : Application
 {
     private readonly Config _config = Config.Load();
     private CaptureWindow? _capture;
+    private WebCaptureWindow? _web;
     private TrayIcon? _tray;
     private Updater? _updater;
     private ReminderWindow? _reminders;
@@ -41,7 +42,7 @@ public class App(bool showOnStart) : Application
         {
             if (_config.ReminderWindow) (_reminders ??= new ReminderWindow { Icon = _icon }).Add(title, body);
         })).Run();
-        _updater = new Updater(_config, () => _capture?.IsVisible != true, () => Dispatcher.UIThread.Post(() => (ApplicationLifetime as IClassicDesktopStyleApplicationLifetime)?.Shutdown()));
+        _updater = new Updater(_config, () => _capture?.IsVisible != true && _web?.IsVisible != true, () => Dispatcher.UIThread.Post(() => (ApplicationLifetime as IClassicDesktopStyleApplicationLifetime)?.Shutdown()));
         _ = _updater.Run();
         Updater.AnnounceUpdate();
         // The installer may already have written the server's address: the token still has to be pasted in.
@@ -54,7 +55,11 @@ public class App(bool showOnStart) : Application
     {
         var menu = new NativeMenu();
         menu.Add(Item(L.Tr("Capturar"), ShowCapture));
-        menu.Add(Item(L.Tr("Criar a partir de texto (IA)"), () => new ExtractWindow(new Api(_config)) { Icon = _icon }.Show()));
+        menu.Add(Item(L.Tr("Criar a partir de texto (IA)"), () =>
+        {
+            if (_config.WebCapture) Web().Open("extract");
+            else new ExtractWindow(new Api(_config)) { Icon = _icon }.Show();
+        }));
         menu.Add(Item(L.Tr("Definições"), ShowSettings));
         menu.Add(new NativeMenuItemSeparator());
         menu.Add(new NativeMenuItem(Updater.Version is { } v ? L.Tr("Versão {0}", "v" + v) : L.Tr("Versão de desenvolvimento")) { IsEnabled = false });
@@ -80,12 +85,35 @@ public class App(bool showOnStart) : Application
 
     private void ShowCapture()
     {
+        if (_config.WebCapture)
+        {
+            Web().Open("capture");
+            return;
+        }
         if (_capture == null)
         {
             _capture = new CaptureWindow(new Api(_config)) { Icon = _icon };
             _capture.LanguageChanged += ChangeLanguage;
         }
         _capture.ShowForCapture();
+    }
+
+    private WebCaptureWindow Web()
+    {
+        if (_web == null)
+        {
+            _web = new WebCaptureWindow(_config) { Icon = _icon };
+            // The page follows the language by itself; the tray (and the native window) are rebuilt in it.
+            _web.LanguageChanged += lang =>
+            {
+                _config.Lang = L.Lang = lang;
+                _config.Save();
+                RenderTray();
+                _capture?.Discard();
+                _capture = null;
+            };
+        }
+        return _web;
     }
 
     /// <summary>Follows the user's language from the server: remembers it and rebuilds the texts.</summary>

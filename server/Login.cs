@@ -1,3 +1,5 @@
+using System.Collections.Concurrent;
+using System.Security.Cryptography;
 using System.Net;
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authentication;
@@ -39,6 +41,15 @@ public static class Login
             }
             else if (!IsAllowed(email) || !users.CheckPassword(key, password)) return Error("Email ou password errados.");
 
+            var identity = new ClaimsIdentity([new Claim(ClaimTypes.Email, email)], CookieAuthenticationDefaults.AuthenticationScheme);
+            await ctx.SignInAsync(new ClaimsPrincipal(identity), new AuthenticationProperties { IsPersistent = true });
+            return Results.LocalRedirect(Local(returnUrl));
+        }).RequireRateLimiting("login");
+
+        // The desktop app opens the site already signed in: it trades its token for a code (below), used once here.
+        app.MapGet("/login/app", async (string? code, string? returnUrl, HttpContext ctx) =>
+        {
+            if (AppCodes.Take(code) is not { } email || !IsAllowed(email)) return Results.Redirect("/login");
             var identity = new ClaimsIdentity([new Claim(ClaimTypes.Email, email)], CookieAuthenticationDefaults.AuthenticationScheme);
             await ctx.SignInAsync(new ClaimsPrincipal(identity), new AuthenticationProperties { IsPersistent = true });
             return Results.LocalRedirect(Local(returnUrl));
@@ -112,4 +123,22 @@ public static class Login
             """;
         return Results.Content(html, "text/html; charset=utf-8");
     }
+}
+
+/// <summary>One-time codes, valid for a minute, that let the desktop app open a signed-in session in its web view.</summary>
+public static class AppCodes
+{
+    private static readonly ConcurrentDictionary<string, (string Email, DateTime Until)> Codes = new();
+
+    public static string New(string email)
+    {
+        foreach (var (k, v) in Codes)
+            if (v.Until < DateTime.UtcNow) Codes.TryRemove(k, out _);
+        var code = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
+        Codes[code] = (email, DateTime.UtcNow.AddMinutes(1));
+        return code;
+    }
+
+    public static string? Take(string? code) =>
+        code != null && Codes.TryRemove(code, out var v) && v.Until >= DateTime.UtcNow ? v.Email : null;
 }

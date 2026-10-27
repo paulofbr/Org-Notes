@@ -258,6 +258,9 @@ app.MapPut("/api/me/notify", (NotifyRequest req, HttpContext ctx, Users users) =
 });
 
 app.MapPost("/api/me/token", (HttpContext ctx, Users users) => new { token = users.NewToken(users.Key(ctx.User)) });
+// Only for the desktop app, with its token: a code to open the site signed in (see /login/app).
+app.MapPost("/api/app/code", (HttpContext ctx) =>
+    ctx.User.Identity?.AuthenticationType == "token" ? Results.Ok(new { code = AppCodes.New(ctx.User.FindFirstValue(ClaimTypes.Email)!) }) : Results.StatusCode(403));
 
 // File icons: small PNGs (the client resizes uploads), named by their content hash.
 app.MapPost("/api/icons", async (HttpContext ctx, Users users) =>

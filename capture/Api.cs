@@ -37,6 +37,15 @@ public class Api(Config config)
         return await response.Content.ReadFromJsonAsync<List<Template>>(Json) ?? [];
     }
 
+    /// <summary>A one-time code that opens the site signed in, for the web capture window.</summary>
+    public async Task<string> AppCode()
+    {
+        using var response = await Http.SendAsync(Request(HttpMethod.Post, "/api/app/code"));
+        await Check(response);
+        using var doc = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        return doc.RootElement.GetProperty("code").GetString()!;
+    }
+
     /// <summary>Whether the server has AI proofreading configured, and the user's interface language.</summary>
     public async Task<Me> Me()
     {

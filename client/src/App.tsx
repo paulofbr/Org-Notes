@@ -22,6 +22,19 @@ import { api } from './api'
 
 type Nav = { view: 'agenda'; tab?: 'week' | 'search' } | { view: 'doc'; path: string; focus?: { line: number } }
 
+/**
+ * Inside the desktop app's window (?app=capture or ?app=extract): only that dialog, filling the window. Closing it
+ * tells the app to hide the window (through the web view's message bridge, so the page stays and its saves finish;
+ * without it, by going to /app/closed), and window.openApp opens the dialog again.
+ */
+const appWindow = new URLSearchParams(location.search).get('app')
+declare global {
+  interface Window {
+    openApp?: (kind: string) => void
+    invokeCSharpAction?: (message: string) => void
+  }
+}
+
 export default function App() {
   const store = useOrgStore()
   const [nav, setNav] = useState<Nav>({ view: 'agenda' })
@@ -147,6 +160,7 @@ export default function App() {
     },
     closeDialog: () => {
       setDialog(null)
+      if (appWindow) return window.invokeCSharpAction ? window.invokeCSharpAction('closed') : location.assign('/app/closed')
       // Give focus back to where the user was (e.g. the headline), unless an edit already moved it.
       setTimeout(() => {
         if (document.activeElement === document.body && lastFocus.current?.isConnected) lastFocus.current.focus()
@@ -205,6 +219,12 @@ export default function App() {
     return () => window.removeEventListener('keydown', onKey)
   })
 
+  useEffect(() => {
+    if (!appWindow || !store.loaded) return
+    window.openApp = (kind) => setDialog(kind === 'extract' ? <AiExtractDialog key={Date.now()} /> : <CaptureDialog key={Date.now()} />)
+    window.openApp(appWindow)
+  }, [store.loaded])
+
   const newFileText = (path: string) => `#+TITLE: ${path.replace(/\.org$/, '').split('/').pop()}\n\n* `
 
   function newFile(dir?: string) {
@@ -231,6 +251,13 @@ export default function App() {
       }} />,
     )
   }
+
+  if (appWindow)
+    return (
+      <Ctx.Provider value={ctx}>
+        <div className="app-window">{store.loaded ? dialog : <Loader2 size={20} className="spin" />}</div>
+      </Ctx.Provider>
+    )
 
   return (
     <Ctx.Provider value={ctx}>

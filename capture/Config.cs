@@ -17,6 +17,8 @@ public class Config
     public bool Reminders { get; set; } = true;
     /// <summary>Whether the reminders also open a window above all the others (besides the notification).</summary>
     public bool ReminderWindow { get; set; } = true;
+    /// <summary>Whether the capture is the site's own (in a web view) rather than the app's older native window.</summary>
+    public bool WebCapture { get; set; } = true;
 
     public static string Dir => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "orgnotes");
     private static string FilePath => Path.Combine(Dir, "capture.json");
