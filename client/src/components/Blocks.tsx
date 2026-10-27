@@ -1,6 +1,7 @@
 import { useState, type ReactNode } from 'react'
 import { parseBlocks, type Block, type ListItem } from '../org/parser'
 import { Inline, type InlineOptions } from './Inline'
+import { attrWidth } from '../org/images'
 import { tr } from '../i18n'
 
 export interface BlockOptions extends InlineOptions {
@@ -10,9 +11,12 @@ export interface BlockOptions extends InlineOptions {
 export function Blocks({ blocks, opts = {} }: { blocks: Block[]; opts?: BlockOptions }) {
   return (
     <>
-      {blocks.map((b) => (
-        <BlockView key={b.line} b={b} opts={opts} />
-      ))}
+      {blocks.map((b, i) => {
+        // An #+ATTR_ORG: / #+ATTR_HTML: :width line sizes the images of the paragraph after it.
+        const prev = blocks[i - 1]
+        const imageWidth = prev?.type === 'keyword' && b.type === 'paragraph' ? attrWidth(`#+${prev.key}: ${prev.value}`) : undefined
+        return <BlockView key={b.line} b={b} opts={imageWidth ? { ...opts, imageWidth } : opts} />
+      })}
     </>
   )
 }

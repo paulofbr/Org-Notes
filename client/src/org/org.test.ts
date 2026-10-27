@@ -7,6 +7,7 @@ import { captureInto, emptyProps, expand, fieldOptions, hideTemplates, propertyO
 import { parseTimestamp } from './timestamp'
 import { clientKey, clientValues, hasValue } from './clients'
 import { addTags, cleanTag } from './tags'
+import { attrWidth, setImageWidth } from './images'
 
 const SAMPLE = `#+TODO: TODO NEXT | DONE
 #+FILETAGS: :f:
@@ -239,6 +240,23 @@ describe('capture', () => {
       '#+TITLE: C\n#+PROPERTY: COMPANY_ALL Acme "Initech Lda"\n#+PROPERTY: TIPO_ALL A\n#+BEGIN_CAPTURE k C\n,* %{title}\n#+END_CAPTURE\n\n* x',
     )
     expect(setPropertyOptions('#+TITLE: C\n\n* x', { A: ['1'] })).toBe('#+TITLE: C\n#+PROPERTY: A_ALL 1\n\n* x')
+  })
+})
+
+describe('image width', () => {
+  it('reads the width an attribute line gives', () => {
+    expect(attrWidth('#+ATTR_ORG: :width 400')).toBe('400px')
+    expect(attrWidth('  #+attr_html: :alt x :width 50%')).toBe('50%')
+    expect(attrWidth('#+CAPTION: x')).toBeUndefined()
+  })
+  it('sets, changes and removes the width line before the image', () => {
+    const text = 'Texto\n  [[file:a.png]]\nfim'
+    const at = text.indexOf('[[')
+    const set = setImageWidth(text, at, 300)
+    expect(set).toBe('Texto\n  #+ATTR_ORG: :width 300\n  [[file:a.png]]\nfim')
+    expect(setImageWidth(set, set.indexOf('[['), 120)).toBe('Texto\n  #+ATTR_ORG: :width 120\n  [[file:a.png]]\nfim')
+    expect(setImageWidth(set, set.indexOf('[['))).toBe(text)
+    expect(setImageWidth('#+ATTR_ORG: :align left\n[[a.png]]', 24, 80)).toBe('#+ATTR_ORG: :width 80 :align left\n[[a.png]]')
   })
 })
 

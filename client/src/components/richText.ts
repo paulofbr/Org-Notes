@@ -3,11 +3,13 @@
 // so turning it back into text is exact and the rest of the org syntax is never reinterpreted.
 
 import { imageSrc } from '../org/links'
+import { attrWidth } from '../org/images'
+import { tr } from '../i18n'
 
 const LINK_RE = /\[\[([^\]]+)\](?:\[([^\]]+)\])?\]/g
 const IMAGE = /\.(png|jpe?g|gif|webp)$/i
 
-function chip(raw: string, target: string, desc: string | undefined, path: string | undefined): HTMLElement {
+function chip(raw: string, target: string, desc: string | undefined, path: string | undefined, width?: string): HTMLElement {
   const web = /^https?:/.test(target)
   const local = !/^[a-z][\w+.-]*:/i.test(target) || target.startsWith('file:')
   let el: HTMLElement
@@ -16,13 +18,18 @@ function chip(raw: string, target: string, desc: string | undefined, path: strin
     img.src = web ? target : imageSrc(path!, target)
     img.alt = ''
     img.className = 'rt-img'
+    if (width) {
+      img.style.width = width
+      img.style.maxHeight = 'none'
+    }
+    img.title = tr('Arrasta para mudar o tamanho · duplo clique para recortar')
     el = img
   } else {
     el = document.createElement('span')
     el.className = 'rt-link'
     el.textContent = desc ?? target.replace(/^file:/, '')
   }
-  el.title = target
+  if (!el.title) el.title = target
   el.contentEditable = 'false'
   el.dataset.org = raw
   return el
@@ -36,7 +43,10 @@ export function render(host: HTMLElement, value: string, path: string | undefine
   let last = 0
   for (const m of value.matchAll(LINK_RE)) {
     nodes.push(document.createTextNode(value.slice(last, m.index)))
-    nodes.push(chip(m[0], m[1], m[2], path))
+    // An #+ATTR_ORG: line just before the image's line gives its width, as in the view.
+    const lineStart = value.lastIndexOf('\n', m.index - 1) + 1
+    const prevLine = lineStart > 0 ? value.slice(value.lastIndexOf('\n', lineStart - 2) + 1, lineStart - 1) : undefined
+    nodes.push(chip(m[0], m[1], m[2], path, attrWidth(prevLine)))
     last = m.index + m[0].length
   }
   nodes.push(document.createTextNode(value.slice(last)))
@@ -47,6 +57,16 @@ export function render(host: HTMLElement, value: string, path: string | undefine
     nodes.push(tail)
   }
   host.replaceChildren(...nodes)
+}
+
+/** Where a chip (or any child of the host) starts in the org text. */
+export function offsetOf(host: HTMLElement, node: Node): number {
+  let n = 0
+  for (const c of host.childNodes) {
+    if (c === node) return n
+    n += c instanceof Text ? c.length : c instanceof HTMLElement && c.dataset.org !== undefined ? c.dataset.org.length : 0
+  }
+  return n
 }
 
 /** The org text of a node, including what the browser may have added while editing (line breaks, divs). */

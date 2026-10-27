@@ -6,6 +6,8 @@ import { ITEM_RE } from '../org/parser'
 import { LinkDialog, uploadImageLink, type LinkTab } from './LinkDialog'
 import * as Rich from './richText'
 import { pastedLink } from '../org/links'
+import { setImageWidth } from '../org/images'
+import { ImageEditDialog } from './ImageEdit'
 import { tr } from '../i18n'
 
 interface Props {
@@ -46,6 +48,7 @@ export function OrgTextarea({ value, onChange, autoGrow, onKeyDown, path, tools,
   const host = useRef<HTMLDivElement>(null)
   const pendingCursor = useRef<number | null>(null)
   const imageInput = useRef<HTMLInputElement>(null)
+  const [editingImage, setEditingImage] = useState<{ offset: number; raw: string; src: string; sized: boolean }>()
   const [linking, setLinking] = useState<{ start: number; end: number; only?: LinkTab }>()
   // Uploads finish later, so they insert into the latest text, not the text from when they started.
   const latest = useRef({ value, onChange })
@@ -216,6 +219,30 @@ export function OrgTextarea({ value, onChange, autoGrow, onKeyDown, path, tools,
           onKeyDown={keyDown}
           onBlur={onBlur}
           onFocus={onFocus}
+          onPointerDown={(e) => {
+            // Dragging an image sideways resizes it; the width is saved in an #+ATTR_ORG: line when dropped.
+            const img = (e.target as HTMLElement).closest('img.rt-img') as HTMLImageElement | null
+            if (!img || e.button !== 0) return
+            e.preventDefault()
+            const startX = e.clientX
+            const startWidth = img.getBoundingClientRect().width
+            const widthAt = (x: number) => Math.max(40, Math.round(startWidth + x - startX))
+            const move = (ev: PointerEvent) => ((img.style.width = `${widthAt(ev.clientX)}px`), (img.style.maxHeight = 'none'))
+            const up = (ev: PointerEvent) => {
+              window.removeEventListener('pointermove', move)
+              window.removeEventListener('pointerup', up)
+              if (Math.abs(ev.clientX - startX) < 3) return
+              const { value: v, onChange: change } = latest.current
+              change(setImageWidth(v, Rich.offsetOf(host.current!, img), widthAt(ev.clientX)))
+            }
+            window.addEventListener('pointermove', move)
+            window.addEventListener('pointerup', up)
+          }}
+          onDoubleClick={(e) => {
+            const img = (e.target as HTMLElement).closest('img.rt-img') as HTMLImageElement | null
+            if (!img || !path) return
+            setEditingImage({ offset: Rich.offsetOf(host.current!, img), raw: img.dataset.org!, src: img.src, sized: !!img.style.width })
+          }}
         />
       ) : (
         <textarea
@@ -256,6 +283,17 @@ export function OrgTextarea({ value, onChange, autoGrow, onKeyDown, path, tools,
         </div>
       )}
       {/* In <body>, so its forms are never nested in a form around this editor. */}
+      {editingImage && path && createPortal(
+        <ImageEditDialog
+          src={editingImage.src}
+          path={path}
+          sized={editingImage.sized}
+          onCrop={(link) => insert(link, editingImage.offset, editingImage.offset + editingImage.raw.length)}
+          onOriginalSize={() => latest.current.onChange(setImageWidth(latest.current.value, editingImage.offset))}
+          onClose={() => setEditingImage(undefined)}
+        />,
+        document.body,
+      )}
       {linking && path && createPortal(
         <LinkDialog
           path={path}
