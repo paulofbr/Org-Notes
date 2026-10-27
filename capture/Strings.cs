@@ -61,6 +61,7 @@ public static class L
         ["ou cola / arrasta uma imagem para as notas"] = ("or paste / drop an image on the notes", "ou colle / glisse une image dans les notes", "o pega / arrastra una imagen a las notas"),
         ["A carregar imagem…"] = ("Uploading image…", "Envoi de l'image…", "Subiendo imagen…"),
         ["Versão {0}"] = ("Version {0}", "Version {0}", "Versión {0}"),
+        ["Atualizada para v{0}"] = ("Updated to v{0}", "Mise à jour vers v{0}", "Actualizada a v{0}"),
         ["Versão de desenvolvimento"] = ("Development version", "Version de développement", "Versión de desarrollo"),
         ["Procurar atualizações"] = ("Check for updates", "Rechercher des mises à jour", "Buscar actualizaciones"),
         ["Falta configurar o servidor e o token."] = ("The server and token are not set up yet.", "Le serveur et le jeton ne sont pas encore configurés.", "Falta configurar el servidor y el token."),

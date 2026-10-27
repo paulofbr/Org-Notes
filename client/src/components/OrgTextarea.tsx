@@ -242,58 +242,65 @@ export function OrgTextarea({ value, onChange, autoGrow, onKeyDown, path, tools,
     }
   }
 
+  const richEditor = rich && (
+    <div
+      ref={host}
+      className={`rich-text ${singleLine ? 'single-line' : ''} ${className ?? ''}`}
+      contentEditable
+      suppressContentEditableWarning
+      spellCheck={false}
+      role="textbox"
+      aria-multiline={!singleLine}
+      data-placeholder={placeholder}
+      style={rows ? { minHeight: `${rows * 1.6}em` } : undefined}
+      onInput={(e) => {
+        const el = e.currentTarget
+        const text = Rich.serialize(el)
+        // Undo or typing can leave browser-made nodes; put the DOM back in its simple form.
+        if (!Rich.isCanonical(el)) {
+          const { start } = Rich.getSelection(el)
+          Rich.render(el, text, path)
+          Rich.setCaret(el, start)
+        }
+        onChange(text)
+      }}
+      onPaste={(e) => {
+        e.preventDefault()
+        const { start, end } = selection()
+        if (!singleLine && uploadImages(e.clipboardData.files, start)) return
+        const pasted = e.clipboardData.getData('text/plain').replace(/\r\n?/g, '\n').replace(singleLine ? /\s*\n\s*/g : /(?!)/, ' ')
+        const text = pastedLink(pasted, value.slice(start, end), value.slice(0, start)) ?? pasted
+        set(value.slice(0, start) + text + value.slice(end), start + text.length)
+      }}
+      onDragOver={(e) => path && e.dataTransfer.types.includes('Files') && e.preventDefault()}
+      onDrop={(e) => (e.preventDefault(), !singleLine && uploadImages(e.dataTransfer.files, selection().start))}
+      onKeyDown={keyDown}
+      onBlur={onBlur}
+      onFocus={onFocus}
+      onPointerDown={(e) => {
+        // A click on an image selects it, showing its frame with resize handles.
+        const img = (e.target as HTMLElement).closest('img.rt-img') as HTMLImageElement | null
+        if (!img || e.button !== 0) return setPicked(undefined)
+        e.preventDefault()
+        setPicked(Rich.offsetOf(host.current!, img))
+      }}
+      onScroll={() => picked !== undefined && placeFrame()}
+      onDoubleClick={(e) => {
+        const img = (e.target as HTMLElement).closest('img.rt-img') as HTMLImageElement | null
+        if (!img || !path) return
+        setEditingImage({ offset: Rich.offsetOf(host.current!, img), raw: img.dataset.org!, src: img.src, sized: !!img.style.width })
+      }}
+    />
+  )
+
   return (
     <>
       {rich ? (
-        <div className="rich-wrap" ref={wrap}>
-        <div
-          ref={host}
-          className={`rich-text ${singleLine ? 'single-line' : ''} ${className ?? ''}`}
-          contentEditable
-          suppressContentEditableWarning
-          spellCheck={false}
-          role="textbox"
-          aria-multiline={!singleLine}
-          data-placeholder={placeholder}
-          style={rows ? { minHeight: `${rows * 1.6}em` } : undefined}
-          onInput={(e) => {
-            const el = e.currentTarget
-            const text = Rich.serialize(el)
-            // Undo or typing can leave browser-made nodes; put the DOM back in its simple form.
-            if (!Rich.isCanonical(el)) {
-              const { start } = Rich.getSelection(el)
-              Rich.render(el, text, path)
-              Rich.setCaret(el, start)
-            }
-            onChange(text)
-          }}
-          onPaste={(e) => {
-            e.preventDefault()
-            const { start, end } = selection()
-            if (!singleLine && uploadImages(e.clipboardData.files, start)) return
-            const pasted = e.clipboardData.getData('text/plain').replace(/\r\n?/g, '\n').replace(singleLine ? /\s*\n\s*/g : /(?!)/, ' ')
-            const text = pastedLink(pasted, value.slice(start, end), value.slice(0, start)) ?? pasted
-            set(value.slice(0, start) + text + value.slice(end), start + text.length)
-          }}
-          onDragOver={(e) => path && e.dataTransfer.types.includes('Files') && e.preventDefault()}
-          onDrop={(e) => (e.preventDefault(), !singleLine && uploadImages(e.dataTransfer.files, selection().start))}
-          onKeyDown={keyDown}
-          onBlur={onBlur}
-          onFocus={onFocus}
-          onPointerDown={(e) => {
-            // A click on an image selects it, showing its frame with resize handles.
-            const img = (e.target as HTMLElement).closest('img.rt-img') as HTMLImageElement | null
-            if (!img || e.button !== 0) return setPicked(undefined)
-            e.preventDefault()
-            setPicked(Rich.offsetOf(host.current!, img))
-          }}
-          onScroll={() => picked !== undefined && placeFrame()}
-          onDoubleClick={(e) => {
-            const img = (e.target as HTMLElement).closest('img.rt-img') as HTMLImageElement | null
-            if (!img || !path) return
-            setEditingImage({ offset: Rich.offsetOf(host.current!, img), raw: img.dataset.org!, src: img.src, sized: !!img.style.width })
-          }}
-        />
+        singleLine ? (
+          richEditor
+        ) : (
+          <div className="rich-wrap" ref={wrap}>
+            {richEditor}
         {frame && (
           <div className="img-frame" style={frame}>
             {HANDLES.map((h) => <span key={h} className={`h h-${h}`} onPointerDown={resizeFrom(h)} />)}
@@ -302,7 +309,8 @@ export function OrgTextarea({ value, onChange, autoGrow, onKeyDown, path, tools,
             </button>
           </div>
         )}
-        </div>
+          </div>
+        )
       ) : (
         <textarea
           ref={ref}

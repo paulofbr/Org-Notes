@@ -8,9 +8,10 @@ server=$out/OrgNotes-server-linux-x64
 client=$out/OrgNotes-client-win-x64
 rm -rf "$server" "$client" "$server.zip" "$client.zip"
 
-# The app compares its commit with the server's to update itself.
+# The app compares its version (1.0.<number of commits>) with the server's to update itself.
 rev=$(git -C "$root" rev-parse --short HEAD)
-(cd "$root/capture" && dotnet publish -c Release -r win-x64 --self-contained -p:SourceRevisionId="$rev" -o "$client/capture")
+version=1.0.$(git -C "$root" rev-list --count HEAD)
+(cd "$root/capture" && dotnet publish -c Release -r win-x64 --self-contained -p:Version="$version" -p:SourceRevisionId="$rev" -o "$client/capture")
 cp "$root/deploy/windows-client/"{install.ps1,install.cmd,LEIA-ME.txt} "$client/"
 find "$client" -name '*.pdb' -delete
 (cd "$out" && zip -qr9 "$(basename "$client").zip" "$(basename "$client")")
@@ -21,7 +22,7 @@ find "$client" -name '*.pdb' -delete
 rm -rf "$server/server/data"
 mkdir -p "$server/server/downloads"
 cp "$client.zip" "$server/server/downloads/"
-echo "$rev" > "$server/server/downloads/$(basename "$client").version"
+echo "$version" > "$server/server/downloads/$(basename "$client").version"
 cp "$root/deploy/linux-server/install.sh" "$root/deploy/linux-server/LEIA-ME.txt" "$server/"
 chmod +x "$server/install.sh"
 find "$server" -name '*.pdb' -delete

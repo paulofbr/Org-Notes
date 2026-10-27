@@ -43,6 +43,7 @@ public class App(bool showOnStart) : Application
         })).Run();
         _updater = new Updater(_config, () => _capture?.IsVisible != true, () => Dispatcher.UIThread.Post(() => (ApplicationLifetime as IClassicDesktopStyleApplicationLifetime)?.Shutdown()));
         _ = _updater.Run();
+        Updater.AnnounceUpdate();
         // The installer may already have written the server's address: the token still has to be pasted in.
         if (!Config.Exists || _config.Token == "") ShowSettings();
         else if (showOnStart) ShowCapture();
@@ -56,7 +57,7 @@ public class App(bool showOnStart) : Application
         menu.Add(Item(L.Tr("Criar a partir de texto (IA)"), () => new ExtractWindow(new Api(_config)) { Icon = _icon }.Show()));
         menu.Add(Item(L.Tr("Definições"), ShowSettings));
         menu.Add(new NativeMenuItemSeparator());
-        menu.Add(new NativeMenuItem(Updater.Version is { } v ? L.Tr("Versão {0}", v) : L.Tr("Versão de desenvolvimento")) { IsEnabled = false });
+        menu.Add(new NativeMenuItem(Updater.Version is { } v ? L.Tr("Versão {0}", "v" + v) : L.Tr("Versão de desenvolvimento")) { IsEnabled = false });
         if (Updater.Supported)
             menu.Add(Item(L.Tr("Procurar atualizações"), async () =>
             {

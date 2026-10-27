@@ -12,9 +12,29 @@ namespace OrgNotes.Capture;
 /// </summary>
 public class Updater(Config config, Func<bool> idle, Action quit)
 {
-    /// <summary>The commit this build comes from (set by deploy/package.sh), or null for a development build.</summary>
+    /// <summary>This build's version (1.0.&lt;commits&gt;, set by deploy/package.sh with the commit), or null for a development build.</summary>
     public static string? Version =>
-        Assembly.GetEntryAssembly()?.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion.Split('+') is [_, var rev] ? rev : null;
+        Assembly.GetEntryAssembly()?.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion.Split('+') is [var version, _] ? version : null;
+
+    private static string LastRun => Path.Combine(Config.Dir, "version");
+
+    /// <summary>Tells the user, once, that the app now runs a new version (after an update or a new install over an old one).</summary>
+    public static void AnnounceUpdate()
+    {
+        if (Version is not { } version) return;
+        try
+        {
+            var last = File.Exists(LastRun) ? File.ReadAllText(LastRun).Trim() : null;
+            if (last == version) return;
+            Directory.CreateDirectory(Config.Dir);
+            File.WriteAllText(LastRun, version);
+            if (last != null) Reminders.Show("Org Notes", L.Tr("Atualizada para v{0}", version));
+        }
+        catch (IOException)
+        {
+            // Not worth more than a missed message.
+        }
+    }
 
     /// <summary>Whether this build can update itself: an installed Windows build, not a development one.</summary>
     public static bool Supported => OperatingSystem.IsWindows() && Version != null;
@@ -42,7 +62,7 @@ public class Updater(Config config, Func<bool> idle, Action quit)
         {
             var offered = (await new Api(config).Me()).WindowsVersion;
             if (offered == null) return L.Tr("O servidor não tem instalador.");
-            if (offered == Version) return L.Tr("Já tens a versão mais recente ({0}).", Version!);
+            if (offered == Version) return L.Tr("Já tens a versão mais recente ({0}).", "v" + Version);
             if (manual || idle()) await Apply();
             return "";
         }
