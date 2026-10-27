@@ -77,6 +77,9 @@ public class Updater(Config config, Func<bool> idle, Action quit)
         }
     }
 
+    /// <summary>A path as a PowerShell single-quoted string, where nothing is expanded.</summary>
+    private static string Quote(string path) => "'" + path.Replace("'", "''") + "'";
+
     private async Task Apply()
     {
         var work = Path.Combine(Path.GetTempPath(), "orgnotes-update");
@@ -89,12 +92,15 @@ public class Updater(Config config, Func<bool> idle, Action quit)
         if (!File.Exists(Path.Combine(source, "OrgNotes.Capture.exe"))) return;
 
         // A running program cannot replace its own files on Windows, so this waits for the app to quit first.
+        // Windows PowerShell reads a script without a BOM in the system's legacy code page: written as plain UTF-8, a
+        // folder like "Serviços" became "ServiÃ§os" and the update went to a new folder with that name. With a BOM it
+        // reads as UTF-8; single quotes keep a "$" or spaces in the paths as they are.
         var script = Path.Combine(work, "update.ps1");
         File.WriteAllText(script, $"""
             Wait-Process -Id {Environment.ProcessId} -ErrorAction SilentlyContinue
-            robocopy "{source}" "{AppContext.BaseDirectory.TrimEnd('\\')}" /MIR /NFL /NDL /NJH /NJS /NP | Out-Null
-            Start-Process "{Environment.ProcessPath}"
-            """);
+            robocopy {Quote(source)} {Quote(AppContext.BaseDirectory.TrimEnd('\\'))} /MIR /NFL /NDL /NJH /NJS /NP | Out-Null
+            Start-Process -FilePath {Quote(Environment.ProcessPath!)}
+            """, new System.Text.UTF8Encoding(encoderShouldEmitUTF8Identifier: true));
         Process.Start(new ProcessStartInfo("powershell.exe")
         {
             ArgumentList = { "-NoProfile", "-WindowStyle", "Hidden", "-ExecutionPolicy", "Bypass", "-File", script },
