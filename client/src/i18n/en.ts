@@ -374,4 +374,8 @@ export const en: Record<string, string> = {
   'Adicionar': 'Add',
   'Adicionar «{name}» a {file}': 'Add “{name}” to {file}',
   'Editar «{name}» em {file}': 'Edit “{name}” in {file}',
+  'Editar ficha': 'Edit form',
+  'Editar ficha (ficheiros com formulário)': 'Edit form (files with a form)',
+  'Editar «{name}»': 'Edit “{name}”',
+  'A entrada já não existe': 'The entry no longer exists',
 }

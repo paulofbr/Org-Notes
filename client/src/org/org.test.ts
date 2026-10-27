@@ -5,7 +5,8 @@ import { insertEntry, setKeyword, toggleCheckbox, clockIn, clockOut, moveSubtree
 import { agenda, compileMatch, entries } from './agenda'
 import { captureInto, emptyProps, expand, fieldOptions, hideTemplates, propertyOptions, setPropertyOptions, setTemplates, templatesIn } from './capture'
 import { parseTimestamp } from './timestamp'
-import { addOption, clientKey, clientSource, clientValues, findOption, hasValue, optionText, replaceOption } from './clients'
+import { addOption, clientKey, clientSource, clientValues, findOption, hasValue } from './clients'
+import { formFields, formValues, saveForm, templateFor } from './entryForm'
 import { addTags, cleanTag } from './tags'
 import { attrWidth, setImageWidth } from './images'
 
@@ -315,13 +316,24 @@ describe('client combo', () => {
     const doc = parseOrg(contacts)
     expect(findOption(doc, 'Acme ')?.line).toBe(1)
     expect(findOption(doc, 'Nada')).toBeUndefined()
-    expect(optionText(doc, findOption(doc, 'Acme')!)).toBe('* Acme\n:PROPERTIES:\n:EMAIL: a@acme.pt\n:END:')
   })
-  it('saves the edited entry in place, keeping the blank lines around it, and gives the new name', () => {
-    const r = replaceOption(contacts, 'Acme', '* Acme Lda\n:PROPERTIES:\n:EMAIL: geral@acme.pt\n:END:\n')
-    expect(r.title).toBe('Acme Lda')
-    expect(r.text).toBe('#+TITLE: Contactos\n* Acme Lda\n:PROPERTIES:\n:EMAIL: geral@acme.pt\n:END:\n\n* Globex\n')
-    expect(replaceOption(contacts, 'Globex', '* Globex\nNotas').text).toBe(contacts.replace('* Globex\n', '* Globex\nNotas\n'))
+})
+
+describe('entry form', () => {
+  const text = '#+BEGIN_CAPTURE c Contacto\n,* %{title}\n:PROPERTIES:\n:EMAIL:\n:PHONE:\n:END:\n%{body}\n#+END_CAPTURE\n* Acme :cliente:\n:PROPERTIES:\n:EMAIL: a@acme.pt\n:NIF: 500\n:ID: x1\n:END:\nNotas\n\n* Globex\n'
+  const doc = parseOrg(text)
+  const acme = doc.headlines[0]
+  const fields = formFields(templateFor('c.org', text, acme), acme)
+  it('asks for the template fields, then the other ones the entry has', () => expect(fields).toEqual(['EMAIL', 'PHONE', 'NIF']))
+  it('fills the form with the entry', () =>
+    expect(formValues(doc, acme, fields)).toEqual({ title: 'Acme', props: { EMAIL: 'a@acme.pt', PHONE: '', NIF: '500' }, tags: ['cliente'], body: 'Notas' }))
+  it('saves only what changed', () => {
+    const v = formValues(doc, acme, fields)
+    expect(saveForm(text, acme.line, v)).toBe(text)
+    const out = saveForm(text, acme.line, { ...v, title: 'Acme Lda', props: { ...v.props, PHONE: '234 000 000', NIF: '' }, body: 'Notas novas' })
+    const h = parseOrg(out).headlines[0]
+    expect([h.title, h.properties.PHONE, h.properties.NIF, h.properties.ID, h.tags.join()]).toEqual(['Acme Lda', '234 000 000', undefined, 'x1', 'cliente'])
+    expect(out).toContain('Notas novas\n\n* Globex\n')
   })
 })
 

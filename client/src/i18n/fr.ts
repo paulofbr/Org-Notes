@@ -374,4 +374,8 @@ export const fr: Record<string, string> = {
   'Adicionar': 'Ajouter',
   'Adicionar «{name}» a {file}': 'Ajouter « {name} » à {file}',
   'Editar «{name}» em {file}': 'Modifier « {name} » dans {file}',
+  'Editar ficha': 'Modifier la fiche',
+  'Editar ficha (ficheiros com formulário)': 'Modifier la fiche (fichiers avec formulaire)',
+  'Editar «{name}»': 'Modifier « {name} »',
+  'A entrada já não existe': 'L’entrée n’existe plus',
 }

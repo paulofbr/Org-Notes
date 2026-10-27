@@ -1,14 +1,16 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
 import {
   AlarmClock, Archive, ArrowDown, ArrowLeft, ArrowRight, ArrowUp, CalendarClock, ChevronRight, CornerDownRight, Focus,
-  CheckCircle2, Link2, MoreHorizontal, NotebookText, Pencil, Play, Plus, Repeat, Settings2, Square, Tag, Trash2,
+  CheckCircle2, ClipboardList, Link2, MoreHorizontal, NotebookText, Pencil, Play, Plus, Repeat, Settings2, Square, Tag, Trash2,
 } from 'lucide-react'
 import { useApp } from '../context'
 import { sectionBlocks, type Headline, type OrgDoc } from '../org/parser'
 import * as E from '../org/edit'
 import { compileMatch, textMatch } from '../org/agenda'
 import { imageSrc } from '../org/links'
-import { captureInto, propertyOptions, propertySources, templatesIn } from '../org/capture'
+import { captureInto, emptyProps, optionSource, propertyOptions, propertySources, templatesIn } from '../org/capture'
+import { findOption } from '../org/clients'
+import { EntryFormDialog } from './EntryForm'
 import { LinkDialog } from './LinkDialog'
 import { dateKey, daysBetween, formatDuration, warningDays, type Timestamp } from '../org/timestamp'
 import { Blocks, Drawer } from './Blocks'
@@ -119,7 +121,9 @@ export function Outline({ path, doc, state, setState, filter, narrow, setNarrow,
     const text = doc.lines.join('\n')
     return new Set([...Object.keys(propertyOptions(text)), ...Object.keys(propertySources(text))])
   }, [doc])
-  const ops: NodeOps = { path, doc, foldOf, cycle, edit, editing, setEditing, matcher, setNarrow, narrowed: !!narrow, focusLater, shownProps }
+  // A file whose capture asks for fields (e.g. the contacts) edits its entries with that same form, filled in.
+  const hasForm = useMemo(() => templatesIn(path, doc.lines.join('\n')).some((t) => emptyProps(t).length > 0), [path, doc])
+  const ops: NodeOps = { path, doc, foldOf, cycle, edit, editing, setEditing, matcher, setNarrow, narrowed: !!narrow, focusLater, shownProps, hasForm }
   const narrowed = narrow ? doc.all.find((h) => h.key === narrow) : undefined
   const tops = narrowed ? [narrowed] : doc.headlines
 
@@ -179,6 +183,7 @@ interface NodeOps {
   setNarrow: (key?: string) => void
   narrowed: boolean
   shownProps: Set<string>
+  hasForm: boolean
   focusLater: (h: Headline) => void
 }
 
@@ -256,6 +261,7 @@ function HeadlineRow({ h, ops, fold }: { h: Headline; ops: NodeOps; fold: Fold }
     tags: () => app.showDialog(<TagsDialog initial={h.tags} onSubmit={(tags) => edit((t) => E.setTags(t, h.line, tags), h)} />),
     link: () => app.showDialog(<LinkDialog path={path} onClose={app.closeDialog} onInsert={(link) => edit((t) => E.setDescription(t, h.line, [description, link].filter(Boolean).join('\n')), h)} />),
     description: () => app.showDialog(<DescriptionDialog path={path} title={h.title} initial={description} onSubmit={(v) => edit((t) => E.setDescription(t, h.line, v), h)} />),
+    form: () => app.showDialog(<EntryFormDialog path={path} line={h.line} />),
     props: () => app.showDialog(<PropertyDialog properties={h.properties} onSubmit={(k, v) => edit((t) => E.setProperty(t, h.line, k, v), h)} />),
     clock: () => (running ? app.clockOut() : app.clockIn(path, h.line)),
     child: () => newEntry('child'),
@@ -295,6 +301,7 @@ function HeadlineRow({ h, ops, fold }: { h: Headline; ops: NodeOps; fold: Fold }
     else if (k === 'd') (handled(), actions.deadline())
     else if (k === 'q') (handled(), actions.tags())
     else if (k === 'p') (handled(), actions.props())
+    else if (k === 'r' && ops.hasForm) (handled(), actions.form())
     else if (k === 'e') (handled(), actions.description())
     else if (k === 'l') (handled(), actions.link())
     else if (k === 'i') (handled(), app.clockIn(path, h.line))
@@ -355,7 +362,17 @@ function HeadlineRow({ h, ops, fold }: { h: Headline; ops: NodeOps; fold: Fold }
             <button className="badge desc-badge" title={`${tr('Tem descrição')}: ${description.split('\n')[0]} (e)`} onClick={actions.description} tabIndex={-1}><NotebookText size={13} /></button>
           )}
           {h.properties.Effort && <span className="badge" title={tr('Esforço estimado')}>≈ {h.properties.Effort}</span>}
-          {Object.entries(h.properties).map(([k, v]) => v && ops.shownProps.has(k.toUpperCase()) && <span key={k} className="badge" title={k}>{v}</span>)}
+          {Object.entries(h.properties).map(([k, v]) => {
+            if (!v || !ops.shownProps.has(k.toUpperCase())) return null
+            // A value from another file (a client from the contacts…) opens that entry's form.
+            const src = optionSource(path, app.store.files, k)
+            const entry = src ? findOption(app.store.docs[src], v) : undefined
+            return src && entry ? (
+              <button key={k} className="badge badge-link" title={`${k} · ${tr('Editar «{name}» em {file}', { name: v, file: src })}`} tabIndex={-1} onClick={() => app.showDialog(<EntryFormDialog path={src} line={entry.line} />)}>{v}</button>
+            ) : (
+              <span key={k} className="badge" title={k}>{v}</span>
+            )
+          })}
           {clocked > 0 && <span className="badge" title={tr('Tempo registado')}>⏱ {formatDuration(clocked)}</span>}
           {h.tags.map((t) => <span key={t} className="tag">{t}</span>)}
         </span>
@@ -366,6 +383,7 @@ function HeadlineRow({ h, ops, fold }: { h: Headline; ops: NodeOps; fold: Fold }
           <IconBtn title={running ? tr('Parar relógio (o)') : tr('Iniciar relógio (i)')} onClick={actions.clock}>{running ? <Square size={16} /> : <Play size={16} />}</IconBtn>
           <IconBtn title={tr('Adicionar subtítulo (Ctrl+Shift+Enter)')} onClick={actions.child}><Plus size={16} /></IconBtn>
           <Menu>
+            {ops.hasForm && <MenuItem icon={<ClipboardList size={15} />} label={tr('Editar ficha')} hint="r" onClick={actions.form} />}
             <MenuItem icon={<Pencil size={15} />} label={tr('Editar texto')} hint="Enter" onClick={() => ops.setEditing(h.line)} />
             <MenuItem icon={<Pencil size={15} />} label={tr('Editar título')} hint="F2" onClick={() => setTitleEdit(h.title)} />
             <MenuItem icon={<NotebookText size={15} />} label={description ? tr('Editar descrição') : tr('Adicionar descrição')} hint="e" onClick={actions.description} />

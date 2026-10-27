@@ -1,5 +1,5 @@
 import { fieldOptions, optionSource, propertySources } from './capture'
-import { parseOrg, type Headline, type OrgDoc } from './parser'
+import type { Headline, OrgDoc } from './parser'
 
 /** The property to filter by: the first one any file fills from another file (`#+PROPERTY: CLIENTE_FROM contacts.org`). */
 export function clientKey(files: Record<string, string>): string | undefined {
@@ -41,9 +41,6 @@ export function clientSource(files: Record<string, string>): { key: string; file
   return undefined
 }
 
-/** The entry's text, without the blank lines after it, to edit it. */
-export const optionText = (doc: OrgDoc, h: Headline) => doc.lines.slice(h.line, h.end).join('\n').replace(/\s+$/, '')
-
 /** The top-level headline of the options file named `name` (as offered in the combo), if there is one. */
 export const findOption = (doc: OrgDoc | undefined, name: string) => doc?.headlines.find((h) => h.title === name.trim())
 
@@ -51,20 +48,4 @@ export const findOption = (doc: OrgDoc | undefined, name: string) => doc?.headli
 export function addOption(text: string, name: string): string {
   const lines = text ? text.replace(/\n+$/, '').split('\n') : []
   return [...lines, `* ${name.trim()}`, ''].join('\n')
-}
-
-/** The text with the subtree of the top-level headline `name` replaced by `entry`; also returns the new title. */
-export function replaceOption(text: string, name: string, entry: string): { text: string; title?: string } {
-  const doc = parseOrg(text)
-  const h = findOption(doc, name)
-  if (!h) throw new Error(`«${name}» não existe`)
-  const lines = [...doc.lines]
-  const old = lines.slice(h.line, h.end)
-  // Keep the blank lines that ended the entry (before the next one, or the file's last newline).
-  let blanks = 0
-  while (blanks < old.length - 1 && old[old.length - 1 - blanks].trim() === '') blanks++
-  const body = entry.replace(/\s+$/, '').split('\n')
-  lines.splice(h.line, h.end - h.line, ...body, ...Array<string>(blanks).fill(''))
-  const title = parseOrg(body.join('\n')).headlines[0]?.title
-  return { text: lines.join('\n'), title }
 }

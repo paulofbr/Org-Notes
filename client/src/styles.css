@@ -419,9 +419,11 @@ table.props th { width: 40%; background: none; }
 .combo { display: flex; gap: 0.4rem; align-items: stretch; }
 .combo input { flex: 1; min-width: 0; color: var(--text); }
 .combo button { display: inline-flex; align-items: center; gap: 0.3rem; white-space: nowrap; font-size: 0.82rem; }
-.combo button.active { border-color: var(--accent); color: var(--accent); }
-.combo-edit { display: flex; flex-direction: column; gap: 0.5rem; padding: 0.6rem; border: 1px solid var(--border); border-radius: 10px; background: var(--bg-hover); color: var(--text); }
-.combo-edit .actions { margin: 0; }
+/* The client badge opens the client's form. */
+button.badge-link { border: none; font-family: inherit; cursor: pointer; }
+button.badge-link:hover { text-decoration: underline; }
+/* A form opened over another dialog (a client's form over the capture). */
+.stacked-dialog .modal-backdrop { z-index: 60; }
 .range-nav { display: flex; align-items: center; gap: 0.3rem; margin-bottom: 1rem; flex-wrap: wrap; }
 .range-label { margin-left: 0.5rem; font-weight: 600; text-transform: capitalize; }
 .day { margin-bottom: 1.25rem; }
