@@ -76,7 +76,7 @@ export function EntryFormDialog({ path, line, onClose, onSaved, readOnly, canOpe
           {viewing ? (
             // Keyed, so "Editar" is not reused as "Guardar" in the middle of its own click (which would submit).
             <div className="actions" key="view">
-              {canOpen && <button type="button" onClick={() => (close(), open(path, line))}>{tr('Abrir no ficheiro')}</button>}
+              {canOpen && <button type="button" onClick={() => (close(), closeDialog(), open(path, line))}>{tr('Abrir no ficheiro')}</button>}
               <button type="button" onClick={() => setViewing(false)}>{tr('Editar')}</button>
               <button type="button" className="primary" autoFocus onClick={close}>OK</button>
             </div>

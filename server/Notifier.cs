@@ -5,7 +5,8 @@ namespace OrgNotes.Server;
 
 /// <summary>
 /// A reminder to show between <see cref="From"/> and <see cref="Until"/> (the user's wall-clock time). <see cref="View"/>
-/// names its entry (`path=…&amp;line=…&amp;title=…`), for the site to show it: `/?view=` plus it, escaped.
+/// names what it is about, for the site to list it (`/?view=` plus it, escaped): its entry (`path=…&amp;line=…&amp;title=…`)
+/// or, for the daily summary, the day (`list=yyyy-MM-dd`).
 /// </summary>
 public record Reminder(string Id, DateTime From, DateTime Until, string Title, string Body, string? View = null);
 
@@ -61,7 +62,7 @@ public class Notifier(Users users, IConfiguration config, IHttpClientFactory htt
                 $"{T(it.Kind == "deadline" ? "Prazo" : "Agenda")} {it.Time:HH\\:mm} · {when}", it.Title, View(path, it)));
         }
 
-        if (Summary(items, lang) is { } body) reminders.Add(new("summary", summaryAt, endOfDay, T("Agenda de hoje"), body));
+        if (Summary(items, lang) is { } body) reminders.Add(new("summary", summaryAt, endOfDay, T("Agenda de hoje"), body, $"list={today:yyyy-MM-dd}"));
         // A reminder of its own for each deadline that is N days away (by default 7, 3, 1 and 0 days).
         foreach (var (path, it) in found.Where(x => x.Item.Kind is "deadline" or "upcoming"))
         {

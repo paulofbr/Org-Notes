@@ -325,6 +325,8 @@ code.verbatim { color: var(--accent); }
 .reminder-item.linked { cursor: pointer; }
 .reminder-item.linked:hover b { text-decoration: underline; }
 .form-fields { display: contents; }
+.reminder-list { display: flex; flex-direction: column; gap: 0.2rem; }
+.reminder-list .agenda-row { background: none; text-align: left; width: 100%; font: inherit; color: inherit; }
 .rich-text.read-only { background: var(--bg-soft); }
 .ts.wrong-day { outline: 1px dashed var(--danger); }
 .cookie { font: 600 0.75rem var(--mono); color: var(--muted); background: var(--bg-hover); border-radius: 4px; padding: 0 0.3rem; }

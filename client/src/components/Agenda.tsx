@@ -78,7 +78,7 @@ function Calendar({ span }: { span: number }) {
   )
 }
 
-const KIND_LABEL = (it: AgendaItem) => {
+export const KIND_LABEL = (it: AgendaItem) => {
   switch (it.kind) {
     case 'scheduled': return tr('Agendado')
     case 'deadline': return tr('Prazo')

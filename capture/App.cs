@@ -104,7 +104,7 @@ public class App(bool showOnStart) : Application
         _capture.ShowForCapture();
     }
 
-    /// <summary>A reminder's entry, read only: in the site's window, or in the browser when that is not in use.</summary>
+    /// <summary>What a reminder is about, listed (each entry read only): in the site's window, or in the browser when that is not in use.</summary>
     private void ShowView(string view)
     {
         if (_config.WebCapture && !_webFailed) Web().Open("view:" + view);

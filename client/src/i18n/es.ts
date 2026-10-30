@@ -1,4 +1,5 @@
 export const es: Record<string, string> = {
+  'Nada na agenda deste dia.': 'Nada en la agenda ese día.',
   'Ver o evento': 'Ver el evento',
   'Abrir no ficheiro': 'Abrir en su archivo',
   'Este evento já não existe.': 'Este evento ya no existe.',
