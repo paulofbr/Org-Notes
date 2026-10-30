@@ -240,7 +240,7 @@ export default function App() {
       // The app keeps this page loaded between captures; after a deploy, load the new version instead (it opens the dialog itself).
       if (saveState.current === 'saved' && (await siteUpdated())) return location.replace(`/?app=${encodeURIComponent(kind)}`)
       // "view:" plus a reminder's entry (from the app's reminders) shows that entry.
-      setDialog(kind.startsWith('view:') ? <EventDialog key={Date.now()} view={kind.slice(5)} canOpen={false} />
+      setDialog(kind.startsWith('view:') ? <EventDialog key={Date.now()} view={kind.slice(5)} canOpen={false} direct />
         : kind === 'extract' ? <AiExtractDialog key={Date.now()} /> : <CaptureDialog key={Date.now()} />)
       // The app waits for this to know the page works (else it falls back to its own window).
       setTimeout(() => window.invokeCSharpAction?.('ready'))

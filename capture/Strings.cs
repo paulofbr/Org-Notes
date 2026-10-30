@@ -83,7 +83,6 @@ public static class L
         ["Lembretes · Org Notes"] = ("Reminders · Org Notes", "Rappels · Org Notes", "Recordatorios · Org Notes"),
         ["Adiar 5 min"] = ("Snooze 5 min", "Reporter de 5 min", "Posponer 5 min"),
         ["Ver"] = ("View", "Voir", "Ver"),
-        ["No site"] = ("On the site", "Sur le site", "En el sitio"),
         ["Mostrar os lembretes numa janela por cima das outras"] = ("Show reminders in a window above the others", "Afficher les rappels dans une fenêtre au-dessus des autres", "Mostrar los recordatorios en una ventana encima de las demás"),
         ["Captura igual à do site (desliga para usar a janela antiga da app)"] = ("Capture as on the site (turn off to use the app's older window)", "Capture comme sur le site (désactive pour la fenêtre ancienne de l'app)", "Captura igual que en el sitio (desactiva para usar la ventana antigua de la app)"),
         ["A captura do site não abriu neste computador: abre a janela da app. Detalhes em {0}"] = ("The site's capture did not open on this computer: the app's window opens instead. Details in {0}", "La capture du site ne s'est pas ouverte sur cet ordinateur : la fenêtre de l'app s'ouvre à la place. Détails dans {0}", "La captura del sitio no se abrió en este ordenador: se abre la ventana de la app. Detalles en {0}"),

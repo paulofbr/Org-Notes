@@ -16,7 +16,7 @@ public partial class ReminderWindow : Window
     private readonly List<Reminder> _items = [];
     /// <summary>Shows what a reminder is about ("Ver"), given its <see cref="Reminder.View"/>, in the app's window.</summary>
     public required Action<string> OnView { get; init; }
-    /// <summary>The same, on the site in the browser ("No site").</summary>
+    /// <summary>The reminder's list on the site, in the browser ("Org Notes").</summary>
     public required Action<string> OnSite { get; init; }
 
     public ReminderWindow()
@@ -62,7 +62,7 @@ public partial class ReminderWindow : Window
         _items.Add(r);
         var view = new Button { Content = L.Tr("Ver"), HorizontalAlignment = HorizontalAlignment.Stretch };
         view.Click += (_, _) => OnView(r.View!);
-        var site = new Button { Content = L.Tr("No site"), HorizontalAlignment = HorizontalAlignment.Stretch };
+        var site = new Button { Content = "Org Notes", HorizontalAlignment = HorizontalAlignment.Stretch };
         site.Click += (_, _) => OnSite(r.View!);
         var buttons = new StackPanel { Spacing = 4, Margin = new Thickness(8, 0, 0, 0), IsVisible = r.View != null, VerticalAlignment = VerticalAlignment.Top, Children = { view, site } };
         var text = new StackPanel

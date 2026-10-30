@@ -12,8 +12,9 @@ import { tr } from '../i18n'
  * What a reminder is about (its `view`, see the server's Reminder.View): the day's agenda (`list=yyyy-MM-dd`, the daily
  * summary) or one entry (`path=…&line=…&title=…`). Listed; each one opens in its edit form, read only, over the list.
  * `canOpen` lets that form go to the entry in its file (not in the desktop app's window, which shows only this).
+ * `direct` (the app's "Ver") shows a single entry's form at once, without the list.
  */
-export function EventDialog({ view, canOpen = true }: { view: string; canOpen?: boolean }) {
+export function EventDialog({ view, canOpen = true, direct }: { view: string; canOpen?: boolean; direct?: boolean }) {
   const app = useApp()
   const [opened, setOpened] = useState<Entry>()
   const q = new URLSearchParams(view)
@@ -30,6 +31,7 @@ export function EventDialog({ view, canOpen = true }: { view: string; canOpen?: 
     const h = atLine && (atLine.title.includes(title) || !byTitle) ? atLine : byTitle
     return doc && h ? [{ path, doc, h }] : []
   }, [view, app.store.docs])
+  if (direct && !day && rows.length === 1) return <EntryFormDialog path={rows[0].path} line={rows[0].h.line} readOnly canOpen={canOpen} />
   return (
     <Modal title={day ? `${tr('Agenda')} · ${formatDate(day, { weekday: 'long', day: 'numeric', month: 'long' })}` : tr('Evento')}>
       {rows.length ? (
