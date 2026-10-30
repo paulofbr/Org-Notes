@@ -42,9 +42,7 @@ public class App(bool showOnStart) : Application
 
         _ = ListenForShow();
         _ = new Reminders(_config, r => Dispatcher.UIThread.Post(() =>
-        {
-            if (_config.ReminderWindow) (_reminders ??= new ReminderWindow { Icon = _icon, OnView = ShowView }).Add(r);
-        })).Run();
+            (_reminders ??= new ReminderWindow { Icon = _icon, OnView = ShowView }).Add(r))).Run();
         _updater = new Updater(_config, () => _capture?.IsVisible != true && _web?.IsVisible != true, () => Dispatcher.UIThread.Post(() => (ApplicationLifetime as IClassicDesktopStyleApplicationLifetime)?.Shutdown()));
         _ = _updater.Run();
         Updater.AnnounceUpdate();

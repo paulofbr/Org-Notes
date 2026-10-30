@@ -15,7 +15,7 @@ public class Config
     public string Lang { get; set; } = "";
     /// <summary>Whether to show the agenda reminders on this machine.</summary>
     public bool Reminders { get; set; } = true;
-    /// <summary>Whether the reminders also open a window above all the others (besides the notification).</summary>
+    /// <summary>Whether the reminders show in a window above all the others (with a sound) instead of as a notification.</summary>
     public bool ReminderWindow { get; set; } = true;
     /// <summary>Whether the capture is the site's own (in a web view) rather than the app's older native window.</summary>
     public bool WebCapture { get; set; } = true;

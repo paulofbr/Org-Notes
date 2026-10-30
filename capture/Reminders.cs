@@ -6,8 +6,9 @@ using System.Text.Json;
 namespace OrgNotes.Capture;
 
 /// <summary>
-/// Shows the user's agenda reminders on this machine, each once when it is due: as a notification that stays on screen
-/// with a sound (notify-send / Windows reminder toast) and through <paramref name="onDue"/> (the reminder window).
+/// Shows the user's agenda reminders on this machine, each once when it is due: through <paramref name="onDue"/> (the
+/// reminder window, which plays the reminder sound) or, with that window turned off, as a notification that stays on
+/// screen with a sound (notify-send / Windows reminder toast) — one of the two, not both.
 /// The server works them out from the notes; this only asks for them through the API. Clicking the Windows toast
 /// opens the reminder's entry on the site.
 /// </summary>
@@ -50,8 +51,8 @@ public class Reminders(Config config, Action<Reminder> onDue)
         if (due.Count == 0) return;
         foreach (var r in due)
         {
-            Show(r.Title, r.Body, alert: true, r.View is { } view ? ViewUrl(config, view) : null);
-            onDue(r);
+            if (config.ReminderWindow) onDue(r);
+            else Show(r.Title, r.Body, alert: true, r.View is { } view ? ViewUrl(config, view) : null);
             shown.Ids.Add(r.Id);
         }
         Directory.CreateDirectory(Config.Dir);

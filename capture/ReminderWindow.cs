@@ -10,7 +10,7 @@ namespace OrgNotes.Capture;
 /// The agenda reminders in a small window that stays above every other one, in the corner of the screen, until OK or
 /// "Adiar 5 min" (which brings them back five minutes later). Reminders that arrive meanwhile join the list.
 /// </summary>
-public class ReminderWindow : Window
+public partial class ReminderWindow : Window
 {
     private readonly StackPanel _list = new() { Spacing = 10 };
     private readonly List<Reminder> _items = [];
@@ -73,7 +73,15 @@ public class ReminderWindow : Window
         DockPanel.SetDock(view, Dock.Right);
         Show();
         PlaceInCorner();
+        // The Windows reminder sound (the window replaces the toast that used to play it).
+        if (OperatingSystem.IsWindows()) PlaySound("Notification.Reminder", IntPtr.Zero, SndAlias | SndAsync);
     }
+
+    private const uint SndAsync = 0x1, SndAlias = 0x10000;
+
+    [System.Runtime.InteropServices.LibraryImport("winmm.dll", EntryPoint = "PlaySoundW", StringMarshalling = System.Runtime.InteropServices.StringMarshalling.Utf16)]
+    [return: System.Runtime.InteropServices.MarshalAs(System.Runtime.InteropServices.UnmanagedType.Bool)]
+    private static partial bool PlaySound(string sound, IntPtr module, uint flags);
 
     private void PlaceInCorner()
     {
