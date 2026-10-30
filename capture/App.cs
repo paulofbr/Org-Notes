@@ -42,7 +42,7 @@ public class App(bool showOnStart) : Application
 
         _ = ListenForShow();
         _ = new Reminders(_config, r => Dispatcher.UIThread.Post(() =>
-            (_reminders ??= new ReminderWindow { Icon = _icon, OnView = ShowView }).Add(r))).Run();
+            (_reminders ??= new ReminderWindow { Icon = _icon, OnView = ShowView, OnSite = ShowOnSite }).Add(r))).Run();
         _updater = new Updater(_config, () => _capture?.IsVisible != true && _web?.IsVisible != true, () => Dispatcher.UIThread.Post(() => (ApplicationLifetime as IClassicDesktopStyleApplicationLifetime)?.Shutdown()));
         _ = _updater.Run();
         Updater.AnnounceUpdate();
@@ -108,8 +108,12 @@ public class App(bool showOnStart) : Application
     private void ShowView(string view)
     {
         if (_config.WebCapture && !_webFailed) Web().Open("view:" + view);
-        else Process.Start(new ProcessStartInfo(Reminders.ViewUrl(_config, view)) { UseShellExecute = true })?.Dispose();
+        else ShowOnSite(view);
     }
+
+    /// <summary>What a reminder is about, listed on the site in the browser.</summary>
+    private void ShowOnSite(string view) =>
+        Process.Start(new ProcessStartInfo(Reminders.ViewUrl(_config, view)) { UseShellExecute = true })?.Dispose();
 
     private WebCaptureWindow Web()
     {

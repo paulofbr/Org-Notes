@@ -14,8 +14,10 @@ public partial class ReminderWindow : Window
 {
     private readonly StackPanel _list = new() { Spacing = 10 };
     private readonly List<Reminder> _items = [];
-    /// <summary>Shows a reminder's entry ("Ver"), given its <see cref="Reminder.View"/>.</summary>
+    /// <summary>Shows what a reminder is about ("Ver"), given its <see cref="Reminder.View"/>, in the app's window.</summary>
     public required Action<string> OnView { get; init; }
+    /// <summary>The same, on the site in the browser ("No site").</summary>
+    public required Action<string> OnSite { get; init; }
 
     public ReminderWindow()
     {
@@ -58,8 +60,11 @@ public partial class ReminderWindow : Window
     public void Add(Reminder r)
     {
         _items.Add(r);
-        var view = new Button { Content = L.Tr("Ver"), IsVisible = r.View != null, VerticalAlignment = VerticalAlignment.Top };
+        var view = new Button { Content = L.Tr("Ver"), HorizontalAlignment = HorizontalAlignment.Stretch };
         view.Click += (_, _) => OnView(r.View!);
+        var site = new Button { Content = L.Tr("No site"), HorizontalAlignment = HorizontalAlignment.Stretch };
+        site.Click += (_, _) => OnSite(r.View!);
+        var buttons = new StackPanel { Spacing = 4, Margin = new Thickness(8, 0, 0, 0), IsVisible = r.View != null, VerticalAlignment = VerticalAlignment.Top, Children = { view, site } };
         var text = new StackPanel
         {
             Spacing = 2,
@@ -69,8 +74,8 @@ public partial class ReminderWindow : Window
                 new TextBlock { Text = r.Body, TextWrapping = TextWrapping.Wrap, Opacity = 0.8, IsVisible = r.Body != "" },
             },
         };
-        _list.Children.Add(new DockPanel { Children = { view, text } });
-        DockPanel.SetDock(view, Dock.Right);
+        _list.Children.Add(new DockPanel { Children = { buttons, text } });
+        DockPanel.SetDock(buttons, Dock.Right);
         Show();
         PlaceInCorner();
         // The Windows reminder sound (the window replaces the toast that used to play it).
