@@ -14,7 +14,9 @@ public partial class ReminderWindow : Window
 {
     private readonly StackPanel _list = new() { Spacing = 10 };
     private readonly List<Reminder> _items = [];
-    /// <summary>Shows what a reminder is about ("Ver"), given its <see cref="Reminder.View"/>, in the app's window.</summary>
+    private readonly Button _view = new() { Content = L.Tr("Ver") };
+    private readonly Button _site = new() { Content = "Org Notes" };
+    /// <summary>Shows what the reminders are about ("Ver"), given a <see cref="Reminder.View"/>, in the app's window.</summary>
     public required Action<string> OnView { get; init; }
     /// <summary>The reminder's list on the site, in the browser ("Org Notes").</summary>
     public required Action<string> OnSite { get; init; }
@@ -22,7 +24,7 @@ public partial class ReminderWindow : Window
     public ReminderWindow()
     {
         Title = L.Tr("Lembretes · Org Notes");
-        Width = 380;
+        Width = 420;
         SizeToContent = SizeToContent.Height;
         CanResize = false;
         Topmost = true;
@@ -33,6 +35,8 @@ public partial class ReminderWindow : Window
         snooze.Click += (_, _) => Snooze(TimeSpan.FromMinutes(5));
         var ok = new Button { Content = "OK", Classes = { "accent" } };
         ok.Click += (_, _) => Dismiss();
+        _view.Click += (_, _) => { if (Subject() is { } v) OnView(v); };
+        _site.Click += (_, _) => { if (Subject() is { } v) OnSite(v); };
         Content = new Border
         {
             BorderBrush = new SolidColorBrush(Color.Parse("#6d4aff")),
@@ -44,7 +48,7 @@ public partial class ReminderWindow : Window
                 Children =
                 {
                     _list,
-                    new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Spacing = 8, Children = { snooze, ok } },
+                    new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Spacing = 8, Children = { _view, _site, snooze, ok } },
                 },
             },
         };
@@ -60,12 +64,7 @@ public partial class ReminderWindow : Window
     public void Add(Reminder r)
     {
         _items.Add(r);
-        var view = new Button { Content = L.Tr("Ver"), HorizontalAlignment = HorizontalAlignment.Stretch };
-        view.Click += (_, _) => OnView(r.View!);
-        var site = new Button { Content = "Org Notes", HorizontalAlignment = HorizontalAlignment.Stretch };
-        site.Click += (_, _) => OnSite(r.View!);
-        var buttons = new StackPanel { Spacing = 4, Margin = new Thickness(8, 0, 0, 0), IsVisible = r.View != null, VerticalAlignment = VerticalAlignment.Top, Children = { view, site } };
-        var text = new StackPanel
+        _list.Children.Add(new StackPanel
         {
             Spacing = 2,
             Children =
@@ -73,14 +72,16 @@ public partial class ReminderWindow : Window
                 new TextBlock { Text = r.Title, FontWeight = FontWeight.Bold, FontSize = 15, TextWrapping = TextWrapping.Wrap },
                 new TextBlock { Text = r.Body, TextWrapping = TextWrapping.Wrap, Opacity = 0.8, IsVisible = r.Body != "" },
             },
-        };
-        _list.Children.Add(new DockPanel { Children = { buttons, text } });
-        DockPanel.SetDock(buttons, Dock.Right);
+        });
+        _view.IsVisible = _site.IsVisible = Subject() != null;
         Show();
         PlaceInCorner();
         // The Windows reminder sound (the window replaces the toast that used to play it).
         if (OperatingSystem.IsWindows()) PlaySound("Notification.Reminder", IntPtr.Zero, SndAlias | SndAsync);
     }
+
+    /// <summary>What "Ver" and "Org Notes" open: the one reminder's, or with several, the day's list (which has them all).</summary>
+    private string? Subject() => _items.Count == 1 ? _items[0].View : _items.Count > 1 ? $"list={DateTime.Now:yyyy-MM-dd}" : null;
 
     private const uint SndAsync = 0x1, SndAlias = 0x10000;
 
