@@ -7,6 +7,8 @@ import { useApp } from '../context'
 import { EventDialog } from './EventView'
 
 const SHOWN = 'reminders-shown'
+// Opened from a reminder's link (the app's "Org Notes", the phone): the reminders due now were already seen there.
+const fromReminder = new URLSearchParams(location.search).has('view')
 
 /**
  * The reminders already shown today in this browser, so a reload does not show them again. On a new day it keeps that
@@ -59,14 +61,18 @@ export function WebReminders() {
   const [cards, setCards] = useState<Reminder[]>([])
   const view = (r: Reminder) => r.view && app.showDialog(<EventDialog view={r.view} />)
   useEffect(() => {
+    let first = true
     const check = () =>
       api.reminders().then((all) => {
         const now = new Date()
         const shown = shownToday()
         const due = all.filter((r) => new Date(r.from) <= now && now < new Date(r.until) && !shown.has(r.id))
+        const quiet = first && fromReminder
+        first = false
         if (!due.length) return
         due.forEach((r) => shown.add(r.id))
         remember(shown)
+        if (quiet) return
         setCards((c) => [...c, ...due])
         chime()
         if ('Notification' in window && Notification.permission === 'granted')
