@@ -324,9 +324,8 @@ code.verbatim { color: var(--accent); }
 .ts.inactive { color: var(--muted); }
 .reminder-item.linked { cursor: pointer; }
 .reminder-item.linked:hover b { text-decoration: underline; }
-.event-view { display: flex; flex-direction: column; gap: 0.35rem; }
-.event-view h3 { margin: 0 0 0.3rem; }
-.event-view .body { margin-top: 0.4rem; }
+.form-fields { display: contents; }
+.rich-text.read-only { background: var(--bg-soft); }
 .ts.wrong-day { outline: 1px dashed var(--danger); }
 .cookie { font: 600 0.75rem var(--mono); color: var(--muted); background: var(--bg-hover); border-radius: 4px; padding: 0 0.3rem; }
 .cookie.complete { color: var(--done); background: var(--done-soft); }

@@ -34,6 +34,8 @@ interface Props {
   singleLine?: boolean
   /** For the caller to focus the editor or open its internal link dialog (e.g. from its own button). */
   editorRef?: Ref<EditorHandle>
+  /** Shown, not edited (no tools either). */
+  readOnly?: boolean
 }
 
 export interface EditorHandle {
@@ -46,7 +48,7 @@ export interface EditorHandle {
  * Ctrl+L inserts a link or image, and pasting or dropping an image uploads it and links it.
  * Plain textarea by default; with `rich`, an editable surface that shows links and images (see richText.ts).
  */
-export function OrgTextarea({ value, onChange, autoGrow, onKeyDown, path, tools, rich, className, placeholder, autoFocus, rows, onBlur, onFocus, singleLine, editorRef }: Props) {
+export function OrgTextarea({ value, onChange, autoGrow, onKeyDown, path, tools, rich, className, placeholder, autoFocus, rows, onBlur, onFocus, singleLine, editorRef, readOnly }: Props) {
   const ref = useRef<HTMLTextAreaElement>(null)
   const host = useRef<HTMLDivElement>(null)
   const pendingCursor = useRef<number | null>(null)
@@ -248,8 +250,8 @@ export function OrgTextarea({ value, onChange, autoGrow, onKeyDown, path, tools,
   const richEditor = rich && (
     <div
       ref={host}
-      className={`rich-text ${singleLine ? 'single-line' : ''} ${className ?? ''}`}
-      contentEditable
+      className={`rich-text ${singleLine ? 'single-line' : ''} ${readOnly ? 'read-only' : ''} ${className ?? ''}`}
+      contentEditable={!readOnly}
       suppressContentEditableWarning
       spellCheck={false}
       role="textbox"
@@ -322,6 +324,7 @@ export function OrgTextarea({ value, onChange, autoGrow, onKeyDown, path, tools,
           autoFocus={autoFocus}
           rows={rows}
           spellCheck={false}
+          readOnly={readOnly}
           value={value}
           onChange={(e) => onChange(e.target.value)}
           onPaste={(e) => {
@@ -336,7 +339,7 @@ export function OrgTextarea({ value, onChange, autoGrow, onKeyDown, path, tools,
           onBlur={onBlur}
         />
       )}
-      {tools && path && (
+      {tools && path && !readOnly && (
         // mousedown would take the focus (and the cursor position) away from the text.
         <div className="text-tools" onMouseDown={(e) => e.target !== imageInput.current && e.target !== attachInput.current && e.preventDefault()}>
           <button type="button" title={tr('Link para um ficheiro ou título das notas')} onClick={() => setLinking({ ...selection(), only: 'internal' })}><Link2 size={14} /> {tr('Link interno')}</button>
