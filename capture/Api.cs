@@ -15,7 +15,8 @@ public record ProposedItem(string File, string Key, string Template, string Titl
 
 public record LinkTargets(string File, List<string> Headings);
 
-public record Reminder(string Id, DateTime From, DateTime Until, string Title, string Body);
+/// <summary>A reminder; <see cref="View"/> names its entry, for the site to show it (none for the daily summary).</summary>
+public record Reminder(string Id, DateTime From, DateTime Until, string Title, string Body, string? View = null);
 
 /// <summary>The Org Notes server's capture endpoints, authenticated with the user's personal token.</summary>
 public class Api(Config config)

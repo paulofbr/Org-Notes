@@ -41,9 +41,9 @@ public class App(bool showOnStart) : Application
         RenderTray();
 
         _ = ListenForShow();
-        _ = new Reminders(_config, (title, body) => Dispatcher.UIThread.Post(() =>
+        _ = new Reminders(_config, r => Dispatcher.UIThread.Post(() =>
         {
-            if (_config.ReminderWindow) (_reminders ??= new ReminderWindow { Icon = _icon }).Add(title, body);
+            if (_config.ReminderWindow) (_reminders ??= new ReminderWindow { Icon = _icon, OnView = ShowView }).Add(r);
         })).Run();
         _updater = new Updater(_config, () => _capture?.IsVisible != true && _web?.IsVisible != true, () => Dispatcher.UIThread.Post(() => (ApplicationLifetime as IClassicDesktopStyleApplicationLifetime)?.Shutdown()));
         _ = _updater.Run();
@@ -104,6 +104,13 @@ public class App(bool showOnStart) : Application
             _capture.LanguageChanged += ChangeLanguage;
         }
         _capture.ShowForCapture();
+    }
+
+    /// <summary>A reminder's entry, read only: in the site's window, or in the browser when that is not in use.</summary>
+    private void ShowView(string view)
+    {
+        if (_config.WebCapture && !_webFailed) Web().Open("view:" + view);
+        else Process.Start(new ProcessStartInfo(Reminders.ViewUrl(_config, view)) { UseShellExecute = true })?.Dispose();
     }
 
     private WebCaptureWindow Web()

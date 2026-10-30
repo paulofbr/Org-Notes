@@ -2,7 +2,8 @@ using System.Text.RegularExpressions;
 
 namespace OrgNotes.Server;
 
-public record AgendaItem(string Title, string Kind, DateOnly Date, TimeOnly? Time, int Days);
+/// <summary>An agenda item; <see cref="Line"/> is its headline's line in the file.</summary>
+public record AgendaItem(string Title, string Kind, DateOnly Date, TimeOnly? Time, int Days, int Line);
 
 /// <summary>
 /// Minimal port of the client's org parsing and agenda rules (client/src/org), enough to know what is due today.
@@ -40,7 +41,7 @@ public static partial class OrgAgenda
             if (first != null && todo.Contains(first)) rest = rest.TrimStart()[first.Length..];
             rest = Regex.Replace(rest.Trim(), @"^\[#[A-Z0-9]\]\s*", "");
             var title = LinkRe().Replace(TimestampRe().Replace(rest, ""), m => m.Groups[2].Success ? m.Groups[2].Value : m.Groups[1].Value).Trim();
-            void Add(string kind, Ts ts, DateOnly date, int days = 0) => items.Add(new(title, kind, date, ts.Time, days));
+            void Add(string kind, Ts ts, DateOnly date, int days = 0) => items.Add(new(title, kind, date, ts.Time, days, line));
 
             var body = line + 1;
             if (body < end && PlanningRe().IsMatch(lines[body]))

@@ -81,6 +81,7 @@ export const SHORTCUTS: Record<ShortcutContext, { title: string; keys: [string, 
     title: tr('Item da agenda'),
     keys: [
       ['Enter', tr('Abrir')],
+      ['e', tr('Editar')],
       ['t', tr('Estado')],
       ['Shift+← →', tr('Estado anterior/seguinte')],
       ['j k / ↑ ↓', tr('Navegar')],

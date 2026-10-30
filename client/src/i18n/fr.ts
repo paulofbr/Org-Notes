@@ -1,4 +1,7 @@
 export const fr: Record<string, string> = {
+  'Ver o evento': 'Voir l’événement',
+  'Abrir no ficheiro': 'Ouvrir dans son fichier',
+  'Este evento já não existe.': 'Cet événement n’existe plus.',
   '(guardada)': '(enregistré)',
   '(sem assunto)': '(sans objet)',
   '+1 semana': '+1 semaine',
@@ -52,6 +55,7 @@ export const fr: Record<string, string> = {
   'As notificações do browser estão bloqueadas: permite-as nas definições deste site no browser.': 'Les notifications du navigateur sont bloquées : autorise-les dans les paramètres de ce site.',
   'Atalhos de teclado': 'Raccourcis clavier',
   'Ativar notificações do browser': 'Activer les notifications du navigateur',
+  'O dia da semana escrito não condiz com a data; conta a data': 'Le jour de la semaine écrit ne correspond pas à la date ; c’est la date qui compte',
   'Atrasado {n}d': 'En retard de {n} j',
   'Até': "Jusqu'à",
   'Aviso antecipado': 'Avertissement anticipé',

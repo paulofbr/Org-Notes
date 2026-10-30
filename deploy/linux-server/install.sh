@@ -22,6 +22,8 @@ chmod +x "$app/OrgNotes.Server"
 [ -f "$app/appsettings.Local.json" ] && chown root:org-notes "$app/appsettings.Local.json" && chmod 640 "$app/appsettings.Local.json"
 
 if [ -n "$domain" ]; then urls=http://localhost:5080; else urls=http://0.0.0.0:5080; fi
+# The address the phone's reminders open (without a domain the server cannot know its own; they then have no link).
+public=${domain:+https://$domain}
 cat > /etc/systemd/system/org-notes.service <<UNIT
 [Unit]
 Description=Org Notes (site and API)
@@ -33,6 +35,7 @@ WorkingDirectory=$app
 ExecStart=$app/OrgNotes.Server
 Environment=OrgDirectory=$data
 Environment=Urls=$urls
+Environment=PublicUrl=$public
 Restart=always
 
 [Install]

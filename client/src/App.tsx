@@ -9,6 +9,7 @@ import { CaptureDialog, NewFileDialog } from './components/Capture'
 import { AiExtractDialog } from './components/AiExtract'
 import { InboxDialog, MailDialog } from './components/MailInbox'
 import { WebReminders } from './components/WebReminders'
+import { EventDialog } from './components/EventView'
 import { saveDrafts } from './org/capture'
 import { resolvePath, imageSrc, isAttachment } from './org/links'
 import { FileTree } from './components/FileTree'
@@ -225,12 +226,22 @@ export default function App() {
     return () => window.removeEventListener('keydown', onKey)
   })
 
+  // A reminder's link (`/?view=…`, from the phone or the desktop app's notification) shows its entry.
+  useEffect(() => {
+    const view = new URLSearchParams(location.search).get('view')
+    if (appWindow || !store.loaded || !view) return
+    history.replaceState(null, '', '/')
+    ctx.showDialog(<EventDialog view={view} />)
+  }, [store.loaded])
+
   useEffect(() => {
     if (!appWindow || !store.loaded) return
     window.openApp = async (kind) => {
       // The app keeps this page loaded between captures; after a deploy, load the new version instead (it opens the dialog itself).
       if (saveState.current === 'saved' && (await siteUpdated())) return location.replace(`/?app=${encodeURIComponent(kind)}`)
-      setDialog(kind === 'extract' ? <AiExtractDialog key={Date.now()} /> : <CaptureDialog key={Date.now()} />)
+      // "view:" plus a reminder's entry (from the app's reminders) shows that entry.
+      setDialog(kind.startsWith('view:') ? <EventDialog key={Date.now()} view={kind.slice(5)} canOpen={false} />
+        : kind === 'extract' ? <AiExtractDialog key={Date.now()} /> : <CaptureDialog key={Date.now()} />)
       // The app waits for this to know the page works (else it falls back to its own window).
       setTimeout(() => window.invokeCSharpAction?.('ready'))
     }

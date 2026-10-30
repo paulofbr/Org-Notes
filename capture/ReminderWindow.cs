@@ -13,7 +13,9 @@ namespace OrgNotes.Capture;
 public class ReminderWindow : Window
 {
     private readonly StackPanel _list = new() { Spacing = 10 };
-    private readonly List<(string Title, string Body)> _items = [];
+    private readonly List<Reminder> _items = [];
+    /// <summary>Shows a reminder's entry ("Ver"), given its <see cref="Reminder.View"/>.</summary>
+    public required Action<string> OnView { get; init; }
 
     public ReminderWindow()
     {
@@ -53,18 +55,22 @@ public class ReminderWindow : Window
         SizeChanged += (_, _) => PlaceInCorner();
     }
 
-    public void Add(string title, string body)
+    public void Add(Reminder r)
     {
-        _items.Add((title, body));
-        _list.Children.Add(new StackPanel
+        _items.Add(r);
+        var view = new Button { Content = L.Tr("Ver"), IsVisible = r.View != null, VerticalAlignment = VerticalAlignment.Top };
+        view.Click += (_, _) => OnView(r.View!);
+        var text = new StackPanel
         {
             Spacing = 2,
             Children =
             {
-                new TextBlock { Text = title, FontWeight = FontWeight.Bold, FontSize = 15, TextWrapping = TextWrapping.Wrap },
-                new TextBlock { Text = body, TextWrapping = TextWrapping.Wrap, Opacity = 0.8, IsVisible = body != "" },
+                new TextBlock { Text = r.Title, FontWeight = FontWeight.Bold, FontSize = 15, TextWrapping = TextWrapping.Wrap },
+                new TextBlock { Text = r.Body, TextWrapping = TextWrapping.Wrap, Opacity = 0.8, IsVisible = r.Body != "" },
             },
-        });
+        };
+        _list.Children.Add(new DockPanel { Children = { view, text } });
+        DockPanel.SetDock(view, Dock.Right);
         Show();
         PlaceInCorner();
     }
@@ -89,6 +95,6 @@ public class ReminderWindow : Window
     {
         var later = _items.ToList();
         Dismiss();
-        DispatcherTimer.RunOnce(() => later.ForEach(i => Add(i.Title, i.Body)), delay);
+        DispatcherTimer.RunOnce(() => later.ForEach(Add), delay);
     }
 }

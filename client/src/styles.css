@@ -164,7 +164,7 @@ a:hover { text-decoration: underline; }
 .folder-row .chevron { flex: none; color: var(--muted); margin-left: -0.9rem; }
 .files .folder-action { opacity: 0; flex: none; width: auto; padding: 0.3rem; color: var(--muted); }
 .folder-row:hover .folder-action, .folder-action:focus-visible { opacity: 1; }
-@media (hover: none) { .files .folder-action { opacity: 1; } }
+@media (hover: none) { .files .folder-action { opacity: 1; } .agenda-row .row-edit { visibility: visible; } }
 .files .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .files .count { margin-left: auto; font-size: 0.75rem; background: var(--bg-hover); border-radius: 99px; padding: 0 0.45rem; color: var(--muted); }
 .sidebar-foot { display: flex; align-items: center; gap: 0.25rem; border-top: 1px solid var(--border); padding-top: 0.5rem; }
@@ -322,6 +322,12 @@ code.verbatim { color: var(--accent); }
 .ts { font-size: 0.85em; border-radius: 4px; padding: 0 0.3rem; white-space: nowrap; }
 .ts.active { background: var(--next-soft); color: var(--next); }
 .ts.inactive { color: var(--muted); }
+.reminder-item.linked { cursor: pointer; }
+.reminder-item.linked:hover b { text-decoration: underline; }
+.event-view { display: flex; flex-direction: column; gap: 0.35rem; }
+.event-view h3 { margin: 0 0 0.3rem; }
+.event-view .body { margin-top: 0.4rem; }
+.ts.wrong-day { outline: 1px dashed var(--danger); }
 .cookie { font: 600 0.75rem var(--mono); color: var(--muted); background: var(--bg-hover); border-radius: 4px; padding: 0 0.3rem; }
 .cookie.complete { color: var(--done); background: var(--done-soft); }
 .footnote { font-size: 0.88rem; color: var(--muted); }
@@ -444,6 +450,11 @@ button.badge-link:hover { text-decoration: underline; }
 .agenda-row.done .title { color: var(--muted); text-decoration: line-through; }
 .agenda-row .tags { display: flex; gap: 0.25rem; }
 .agenda-row button.kw { font-size: 0.68rem; }
+.agenda-row .row-edit { visibility: hidden; padding: 0.15rem 0.3rem; flex: none; }
+.agenda-row:hover .row-edit, .agenda-row:focus .row-edit { visibility: visible; }
+.agenda-edit { display: flex; align-items: center; gap: 0.5rem; padding: 0.3rem 0.6rem; border-radius: 8px; border: 1px solid var(--accent); background: var(--accent-soft); }
+.agenda-edit > :first-child { flex: 1; min-width: 0; }
+.agenda-edit input[type=date], .agenda-edit input[type=time] { flex: none; width: auto; }
 .crumb { font-size: 0.75rem; color: var(--muted); margin: -0.3rem 0 0.4rem 0.6rem; }
 .search-bar { display: flex; gap: 0.5rem; align-items: center; margin-bottom: 0.75rem; flex-wrap: wrap; }
 .search-bar select { width: auto; }

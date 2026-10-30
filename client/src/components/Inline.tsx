@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
-import { TIMESTAMP_RE, parseTimestamp, toDate } from '../org/timestamp'
-import { locale } from '../i18n'
+import { TIMESTAMP_RE, parseTimestamp, toDate, wrongWeekday } from '../org/timestamp'
+import { locale, tr } from '../i18n'
 import { isAttachment } from '../org/links'
 
 export interface InlineOptions {
@@ -92,8 +92,10 @@ function renderToken(kind: string, m: RegExpExecArray, opts: InlineOptions, key:
       return <a key={key} href={m[0]} target="_blank" rel="noreferrer">{m[0]}</a>
     case 'timestamp': {
       const ts = parseTimestamp(m[0])
+      const wrong = wrongWeekday(m[0])
       return (
-        <span key={key} className={`ts ${ts?.active ? 'active' : 'inactive'}`} title={m[0]}>
+        <span key={key} className={`ts ${ts?.active ? 'active' : 'inactive'} ${wrong ? 'wrong-day' : ''}`} title={wrong ? `${m[0]} · ${tr('O dia da semana escrito não condiz com a data; conta a data')}` : m[0]}>
+          {wrong && '⚠ '}
           {ts ? `${formatDate(ts.date)}${ts.time ? ' ' + ts.time : ''}${ts.endTime ? '–' + ts.endTime : ''}${ts.end ? ' → ' + formatDate(ts.end.date) : ''}${ts.repeater ? ` (${ts.repeater.type}${ts.repeater.n}${ts.repeater.unit})` : ''}` : m[0]}
         </span>
       )

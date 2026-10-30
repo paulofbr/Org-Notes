@@ -42,6 +42,8 @@ export interface Reminder {
   until: string
   title: string
   body: string
+  /** Its entry, for EventDialog (none for the daily summary). */
+  view?: string
 }
 
 export interface MailAccount {

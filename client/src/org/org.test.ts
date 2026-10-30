@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import { parseOrg, sectionBlocks } from './parser'
 import { imageSrc, orgLink, pastedLink, relativePath, resolvePath } from './links'
-import { insertEntry, setKeyword, toggleCheckbox, clockIn, clockOut, moveSubtree, shiftLevel, refile, archive, alignTable, setPlanning, setProperty, setFileKeyword, setDescription, descriptionOf, insertHeadline } from './edit'
+import { insertEntry, moveTimestamp, setKeyword, toggleCheckbox, clockIn, clockOut, moveSubtree, shiftLevel, refile, archive, alignTable, setPlanning, setProperty, setFileKeyword, setDescription, descriptionOf, insertHeadline } from './edit'
 import { agenda, compileMatch, entries } from './agenda'
 import { captureInto, emptyProps, expand, fieldOptions, hideTemplates, propertyOptions, setPropertyOptions, setTemplates, templatesIn } from './capture'
-import { parseTimestamp } from './timestamp'
+import { parseTimestamp, wrongWeekday } from './timestamp'
 import { addOption, clientKey, clientSource, clientValues, findOption, hasValue } from './clients'
 import { formFields, formValues, saveForm, templateFor } from './entryForm'
 import { addTags, cleanTag } from './tags'
@@ -372,5 +372,30 @@ describe('attachments', () => {
     const text = 'Ver [[file:plano_Artifacts/orçamento.pdf][orçamento.pdf]] e [[https://a.pt][site]]\n[[file:../x_Artifacts/a b.zip]] [[file:plano_Artifacts/1.png]] [[file:plano_Artifacts/foto.png][foto.png]]'
     expect(attachmentsIn(text)).toEqual([['file:plano_Artifacts/orçamento.pdf', 'orçamento.pdf'], ['file:../x_Artifacts/a b.zip', 'a b.zip'], ['file:plano_Artifacts/foto.png', 'foto.png']])
     expect(isAttachment('file:plano.org')).toBe(false)
+  })
+})
+
+describe('wrongWeekday', () => {
+  it('flags a weekday that is not the date\'s', () => {
+    expect(wrongWeekday('<2026-10-30 Wed 18:00>')).toBe(true)
+    expect(wrongWeekday('<2026-10-30 Fri 18:00>')).toBe(false)
+    expect(wrongWeekday('<2026-10-30 18:00>')).toBe(false)
+    expect(wrongWeekday('<2026-10-30 sex 18:00>')).toBe(false) // another language's name: not judged
+  })
+})
+
+describe('moveTimestamp', () => {
+  const text = '* Reunião\nSCHEDULED: <2026-10-28 Wed 10:00-11:00 +1w>\n* Evento\nTexto <2026-10-30 Wed 18:00> fim\n'
+  it('moves a SCHEDULED date, keeping the repeater', () => {
+    const ts = parseTimestamp('<2026-10-28 Wed 10:00-11:00 +1w>')!
+    expect(moveTimestamp(text, 0, 'scheduled', ts, '2026-10-29', '09:30').split('\n')[1]).toBe('SCHEDULED: <2026-10-29 Thu 09:30-11:00 +1w>')
+  })
+  it('moves a timestamp in the body, writing the right weekday', () => {
+    const ts = parseTimestamp('<2026-10-30 Wed 18:00>')!
+    expect(moveTimestamp(text, 2, 'timestamp', ts, '2026-10-28', '18:00').split('\n')[3]).toBe('Texto <2026-10-28 Wed 18:00> fim')
+  })
+  it('drops the time and its end', () => {
+    const ts = parseTimestamp('<2026-10-28 Wed 10:00-11:00 +1w>')!
+    expect(moveTimestamp(text, 0, 'scheduled', ts, '2026-10-28').split('\n')[1]).toBe('SCHEDULED: <2026-10-28 Wed +1w>')
   })
 })

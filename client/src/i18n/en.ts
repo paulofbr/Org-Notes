@@ -1,4 +1,7 @@
 export const en: Record<string, string> = {
+  'Ver o evento': 'View the event',
+  'Abrir no ficheiro': 'Open in its file',
+  'Este evento já não existe.': 'This event no longer exists.',
   '(guardada)': '(saved)',
   '(sem assunto)': '(no subject)',
   '+1 semana': '+1 week',
@@ -52,6 +55,7 @@ export const en: Record<string, string> = {
   'As notificações do browser estão bloqueadas: permite-as nas definições deste site no browser.': "Browser notifications are blocked: allow them in this site's settings in your browser.",
   'Atalhos de teclado': 'Keyboard shortcuts',
   'Ativar notificações do browser': 'Turn on browser notifications',
+  'O dia da semana escrito não condiz com a data; conta a data': 'The weekday written does not match the date; the date is what counts',
   'Atrasado {n}d': 'Overdue {n}d',
   'Até': 'Until',
   'Aviso antecipado': 'Advance warning',

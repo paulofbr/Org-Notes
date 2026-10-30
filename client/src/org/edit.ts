@@ -96,6 +96,20 @@ export function setPlanning(text: string, line: number, kind: 'scheduled' | 'dea
   })
 }
 
+/**
+ * Moves one of an entry's dates (its SCHEDULED, its DEADLINE, or a timestamp in its title or body) to another day and
+ * time, keeping its repeater, warning and range; without a time, the end time goes too.
+ */
+export function moveTimestamp(text: string, line: number, kind: 'scheduled' | 'deadline' | 'timestamp', ts: Timestamp, date: string, time?: string) {
+  const moved = { ...ts, date, time, endTime: time ? ts.endTime : undefined }
+  if (kind !== 'timestamp') return setPlanning(text, line, kind, moved)
+  return withLines(text, (lines, doc) => {
+    const h = at(doc, line)
+    const i = lines.findIndex((l, k) => k >= h.line && k < h.contentEnd && l.includes(ts.raw))
+    if (i >= 0) lines[i] = lines[i].replace(ts.raw, formatTimestamp(moved))
+  })
+}
+
 function setPropertyIn(lines: string[], doc: OrgDoc, line: number, key: string, value: string | undefined) {
   const h = at(doc, line)
   if (h.propertiesRange) {

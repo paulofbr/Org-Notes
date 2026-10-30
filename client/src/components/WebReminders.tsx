@@ -3,14 +3,20 @@ import { BellRing } from 'lucide-react'
 import { api, type Reminder } from '../api'
 import { dateKey } from '../org/timestamp'
 import { tr } from '../i18n'
+import { useApp } from '../context'
+import { EventDialog } from './EventView'
 
 const SHOWN = 'reminders-shown'
 
-/** The reminders already shown today in this browser, so a reload does not show them again. */
+/**
+ * The reminders already shown today in this browser, so a reload does not show them again. On a new day it keeps that
+ * day's ones (their id carries the date), shown just before midnight.
+ */
 function shownToday(): Set<string> {
   try {
     const saved = JSON.parse(localStorage.getItem(SHOWN) ?? 'null') as { date: string; ids: string[] } | null
-    return new Set(saved?.date === dateKey(new Date()) ? saved.ids : [])
+    const today = dateKey(new Date())
+    return new Set(saved?.date === today ? saved.ids : (saved?.ids ?? []).filter((id) => id.includes(`|${today}|`)))
   } catch {
     return new Set()
   }
@@ -49,7 +55,9 @@ function chime() {
  * OK (or comes back after "Adiar 5 min"), a chime, and a browser notification when the user allowed them.
  */
 export function WebReminders() {
+  const app = useApp()
   const [cards, setCards] = useState<Reminder[]>([])
+  const view = (r: Reminder) => r.view && app.showDialog(<EventDialog view={r.view} />)
   useEffect(() => {
     const check = () =>
       api.reminders().then((all) => {
@@ -62,7 +70,10 @@ export function WebReminders() {
         setCards((c) => [...c, ...due])
         chime()
         if ('Notification' in window && Notification.permission === 'granted')
-          for (const r of due) new Notification(r.title, { body: r.body, tag: r.id, requireInteraction: true, icon: '/apple-touch-icon.png' })
+          for (const r of due) {
+            const n = new Notification(r.title, { body: r.body, tag: r.id, requireInteraction: true, icon: '/apple-touch-icon.png' })
+            n.onclick = () => (window.focus(), view(r), n.close())
+          }
       }, () => {})
     check()
     const t = setInterval(check, 30000)
@@ -79,7 +90,7 @@ export function WebReminders() {
       <div className="reminder-card">
         <div className="reminder-head"><BellRing size={16} /> {tr('Lembretes')}</div>
         {cards.map((r) => (
-          <div key={r.id + r.title} className="reminder-item">
+          <div key={r.id + r.title} className={`reminder-item ${r.view ? 'linked' : ''}`} onClick={() => view(r)} title={r.view ? tr('Ver o evento') : undefined}>
             <b>{r.title}</b>
             {r.body && <div className="muted">{r.body}</div>}
           </div>

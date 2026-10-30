@@ -3,8 +3,11 @@ using System.Text.Json;
 
 namespace OrgNotes.Server;
 
-/// <summary>A reminder to show between <see cref="From"/> and <see cref="Until"/> (the user's wall-clock time).</summary>
-public record Reminder(string Id, DateTime From, DateTime Until, string Title, string Body);
+/// <summary>
+/// A reminder to show between <see cref="From"/> and <see cref="Until"/> (the user's wall-clock time). <see cref="View"/>
+/// names its entry (`path=…&amp;line=…&amp;title=…`), for the site to show it: `/?view=` plus it, escaped.
+/// </summary>
+public record Reminder(string Id, DateTime From, DateTime Until, string Title, string Body, string? View = null);
 
 /// <summary>
 /// Works out each user's reminders for the day: before each timed agenda item, a daily summary and a reminder for
@@ -23,8 +26,10 @@ public class Notifier(Users users, IConfiguration config, IHttpClientFactory htt
     private int[] DeadlineDays => (Section["DeadlineReminders"] ?? "7,3,1,0").Split(',', StringSplitOptions.TrimEntries)
         .Select(d => int.TryParse(d, out var n) ? n : -1).Where(n => n >= 0).ToArray();
     public string NtfyServer => (Section["NtfyServer"] ?? "https://ntfy.sh").TrimEnd('/');
+    // The site's public address (set by the installer from its domain), for the phone to open the reminder's entry.
+    private string? PublicUrl => config["PublicUrl"]?.TrimEnd('/') is { Length: > 0 } u ? u : null;
 
-    /// <summary>The user's reminders for the day of <paramref name="now"/>, in their language.</summary>
+    /// <summary>The user's reminders for the day of <paramref name="now"/> (and those of just after midnight), in their language.</summary>
     public List<Reminder> Reminders(string key, DateTime now)
     {
         if (!Enabled) return [];
@@ -32,25 +37,33 @@ public class Notifier(Users users, IConfiguration config, IHttpClientFactory htt
         string T(string pt, params object[] args) => Strings.Tr(lang, pt, args);
         var today = DateOnly.FromDateTime(now);
         var store = users.Store(key);
-        var items = store.List()
-            .SelectMany(f => store.Read(f.Path) is { } text ? OrgAgenda.Today(text, today) : [])
+        List<(string Path, AgendaItem Item)> On(DateOnly day) => store.List()
+            .SelectMany(f => store.Read(f.Path) is { } text ? OrgAgenda.Today(text, day).Select(i => (f.Path, i)) : [])
             .ToList();
+        static string View(string path, AgendaItem it) =>
+            $"path={Uri.EscapeDataString(path)}&line={it.Line}&title={Uri.EscapeDataString(it.Title)}";
+        var found = On(today);
+        var items = found.Select(x => x.Item).ToList();
         var reminders = new List<Reminder>();
-
-        foreach (var it in items.Where(i => i.Time != null && i.Kind is "scheduled" or "deadline" or "timestamp"))
-        {
-            var at = today.ToDateTime(it.Time!.Value);
-            var minutes = (int)Math.Ceiling((now < at - Lead ? Lead : at - now).TotalMinutes);
-            var when = minutes > 0 ? T("em {0} min", minutes) : T("agora");
-            reminders.Add(new($"{it.Kind}|{it.Time:HH\\:mm}|{it.Title}", at - Lead, at + TimeSpan.FromMinutes(1),
-                $"{T(it.Kind == "deadline" ? "Prazo" : "Agenda")} {it.Time:HH\\:mm} · {when}", it.Title));
-        }
-
         var summaryAt = today.ToDateTime(SummaryAt);
         var endOfDay = today.ToDateTime(TimeOnly.MinValue).AddDays(1);
+
+        // Tomorrow's items too, for those just after midnight whose reminder starts today. The id carries the date,
+        // so the reminder is not shown again once that day begins.
+        var timed = found.Select(x => (Day: today, x.Path, x.Item)).Concat(On(today.AddDays(1)).Select(x => (Day: today.AddDays(1), x.Path, x.Item)));
+        foreach (var (day, path, it) in timed.Where(x => x.Item.Time != null && x.Item.Kind is "scheduled" or "deadline" or "timestamp"))
+        {
+            var at = day.ToDateTime(it.Time!.Value);
+            if (at - Lead >= endOfDay) continue;
+            var minutes = (int)Math.Ceiling((now < at - Lead ? Lead : at - now).TotalMinutes);
+            var when = minutes > 0 ? T("em {0} min", minutes) : T("agora");
+            reminders.Add(new($"{it.Kind}|{day:yyyy-MM-dd}|{it.Time:HH\\:mm}|{it.Title}", at - Lead, at + TimeSpan.FromMinutes(1),
+                $"{T(it.Kind == "deadline" ? "Prazo" : "Agenda")} {it.Time:HH\\:mm} · {when}", it.Title, View(path, it)));
+        }
+
         if (Summary(items, lang) is { } body) reminders.Add(new("summary", summaryAt, endOfDay, T("Agenda de hoje"), body));
         // A reminder of its own for each deadline that is N days away (by default 7, 3, 1 and 0 days).
-        foreach (var it in items.Where(i => i.Kind is "deadline" or "upcoming"))
+        foreach (var (path, it) in found.Where(x => x.Item.Kind is "deadline" or "upcoming"))
         {
             var days = it.Kind == "deadline" ? 0 : it.Days;
             if (!DeadlineDays.Contains(days)) continue;
@@ -58,7 +71,7 @@ public class Notifier(Users users, IConfiguration config, IHttpClientFactory htt
             var until = days == 0 && it.Time is { } at ? today.ToDateTime(at) - TimeSpan.FromHours(1) : endOfDay;
             var when = days switch { 0 => T("Prazo hoje"), 1 => T("Prazo amanhã"), _ => T("Prazo em {0} dias", days) };
             reminders.Add(new($"deadline|{days}|{it.Title}", summaryAt, until,
-                it.Time is { } t ? T("{0} às {1}", when, t.ToString("HH\\:mm")) : when, it.Title));
+                it.Time is { } t ? T("{0} às {1}", when, t.ToString("HH\\:mm")) : when, it.Title, View(path, it)));
         }
         return reminders;
     }
@@ -73,7 +86,8 @@ public class Notifier(Users users, IConfiguration config, IHttpClientFactory htt
             if (DateOnly.FromDateTime(now) != _day)
             {
                 _day = DateOnly.FromDateTime(now);
-                _sent.Clear();
+                // Keeps today's, already sent just before midnight.
+                _sent.RemoveWhere(id => !id.Contains($"|{_day:yyyy-MM-dd}|"));
             }
             foreach (var key in users.All())
             {
@@ -94,10 +108,10 @@ public class Notifier(Users users, IConfiguration config, IHttpClientFactory htt
         if (daily.Count > 0 && settings.SummarySent != today)
         {
             users.Save(key, users.Settings(key) with { SummarySent = today });
-            foreach (var r in daily) await Ntfy(settings.NtfyTopic, r.Title, r.Body, stop);
+            foreach (var r in daily) await Ntfy(settings.NtfyTopic, r, stop);
         }
         foreach (var r in due.Except(daily).Where(r => _sent.Add($"{key}|{r.Id}")))
-            await Ntfy(settings.NtfyTopic, r.Title, r.Body, stop);
+            await Ntfy(settings.NtfyTopic, r, stop);
     }
 
     /// <summary>The morning ones: the summary and the deadline reminders.</summary>
@@ -121,12 +135,14 @@ public class Notifier(Users users, IConfiguration config, IHttpClientFactory htt
         return string.Join('\n', lines.Take(8)) + (lines.Count > 8 ? "\n" + T("… e mais {0}", lines.Count - 8) : "");
     }
 
-    private async Task Ntfy(string topic, string title, string body, CancellationToken stop)
+    private async Task Ntfy(string topic, Reminder r, CancellationToken stop)
     {
-        log.LogInformation("ntfy {Topic}: {Title}", topic, title);
+        log.LogInformation("ntfy {Topic}: {Title}", topic, r.Title);
         // JSON publishing keeps non-ASCII titles intact (HTTP headers would not). High priority (4) makes the phone
-        // vibrate and ring, so the reminder is not missed; the tag shows as an alarm clock.
-        var json = JsonSerializer.Serialize(new { topic, title, message = body, priority = 4, tags = new[] { "alarm_clock" } });
+        // vibrate and ring, so the reminder is not missed; the tag shows as an alarm clock. Tapping it opens the entry.
+        var click = PublicUrl is { } site && r.View is { } view ? $"{site}/?view={Uri.EscapeDataString(view)}" : null;
+        var json = JsonSerializer.Serialize(new { topic, title = r.Title, message = r.Body, priority = 4, tags = new[] { "alarm_clock" }, click },
+            new JsonSerializerOptions { DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull });
         var res = await http.CreateClient().PostAsync(NtfyServer, new StringContent(json, Encoding.UTF8, "application/json"), stop);
         if (!res.IsSuccessStatusCode) log.LogWarning("ntfy returned {Status}", (int)res.StatusCode);
     }

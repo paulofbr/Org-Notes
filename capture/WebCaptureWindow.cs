@@ -83,7 +83,7 @@ public class WebCaptureWindow : Window
 
     private bool SameSite(Uri u) => u.Scheme == Server.Scheme && u.Host == Server.Host && u.Port == Server.Port;
 
-    /// <summary>Shows the capture ("capture") or the AI extraction ("extract") dialog, fresh.</summary>
+    /// <summary>Shows the capture ("capture"), the AI extraction ("extract") or a reminder's entry ("view:…") dialog, fresh.</summary>
     public async void Open(string kind)
     {
         // async void: anything thrown here would close the app, so it falls back to the app's own window instead.
@@ -146,7 +146,7 @@ public class WebCaptureWindow : Window
         try
         {
             var code = await new Api(_config).AppCode();
-            _web.Navigate(new Uri(Server, $"login/app?code={code}&returnUrl={Uri.EscapeDataString($"/?app={_kind}")}"));
+            _web.Navigate(new Uri(Server, $"login/app?code={code}&returnUrl={Uri.EscapeDataString($"/?app={Uri.EscapeDataString(_kind)}")}"));
         }
         catch (Exception e) when (e is HttpRequestException or TaskCanceledException)
         {

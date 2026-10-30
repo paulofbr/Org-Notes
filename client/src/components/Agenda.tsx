@@ -1,14 +1,15 @@
-import { useMemo, useState } from 'react'
-import { ChevronLeft, ChevronRight } from 'lucide-react'
+import { useMemo, useRef, useState } from 'react'
+import { ChevronLeft, ChevronRight, Pencil } from 'lucide-react'
 import { useApp } from '../context'
 import { agenda, clockReport, compileMatch, entries, textMatch, type AgendaItem, type Entry } from '../org/agenda'
 import { allTags, outlinePath } from '../org/parser'
-import { nextKeyword, setKeyword } from '../org/edit'
+import { moveTimestamp, nextKeyword, setKeyword, setTitle } from '../org/edit'
 import { useKeys, moveFocus } from '../shortcuts'
 import { KeywordDialog } from './Dialogs'
 import { addDays, dateKey, formatDuration, toDate } from '../org/timestamp'
 import { Inline, formatDate } from './Inline'
 import { tr } from '../i18n'
+import { TitleInput } from './TitleInput'
 import { ClientFilter, TagFilter, useListMatch } from './ClientFilter'
 
 type Tab = 'day' | 'week' | 'todo' | 'search' | 'clock'
@@ -88,9 +89,14 @@ const KIND_LABEL = (it: AgendaItem) => {
   }
 }
 
+// The date an agenda item comes from, for editing it.
+const SOURCE = { scheduled: 'scheduled', 'sched-past': 'scheduled', deadline: 'deadline', overdue: 'deadline', upcoming: 'deadline', timestamp: 'timestamp' } as const
+
 function AgendaRow({ e, item, extra }: { e: Entry; item?: AgendaItem; extra?: string }) {
   const app = useApp()
   const { h, doc, path } = e
+  const [editing, setEditing] = useState(false)
+  if (editing) return <RowEditor e={e} item={item} onDone={() => setEditing(false)} />
   const category = h.properties.CATEGORY ?? doc.keywords.CATEGORY ?? path.replace(/\.org$/, '').split('/').pop()
   const pickKeyword = () =>
     app.showDialog(<KeywordDialog keywords={[...doc.todo.todo, ...doc.todo.done]} current={h.keyword} onSubmit={(kw) => app.edit(path, (t) => setKeyword(t, h.line, kw))} />)
@@ -103,6 +109,7 @@ function AgendaRow({ e, item, extra }: { e: Entry; item?: AgendaItem; extra?: st
       onKeyDown={(ev) => {
         const stop = () => (ev.preventDefault(), ev.stopPropagation())
         if (ev.key === 'Enter') (stop(), app.open(path, h.line))
+        else if (ev.key === 'e' || ev.key === 'F2') (stop(), setEditing(true))
         else if (ev.key === 't') (stop(), pickKeyword())
         else if (ev.shiftKey && (ev.key === 'ArrowRight' || ev.key === 'ArrowLeft'))
           (stop(), app.edit(path, (t) => setKeyword(t, h.line, nextKeyword(doc, h.keyword, ev.key === 'ArrowRight' ? 1 : -1))))
@@ -128,7 +135,57 @@ function AgendaRow({ e, item, extra }: { e: Entry; item?: AgendaItem; extra?: st
       <span className="title"><Inline text={h.title} /></span>
       {extra && <span className="badge">{extra}</span>}
       <span className="tags">{allTags(h, doc).map((t) => <span key={t} className="tag">{t}</span>)}</span>
+      <button className="row-edit" title={`${tr('Editar')} (e)`} tabIndex={-1} onClick={(ev) => (ev.stopPropagation(), setEditing(true))}>
+        <Pencil size={14} />
+      </button>
     </div>
+  )
+}
+
+/**
+ * An agenda row edited in place: its title and, for a dated item, the day and time it is on (its SCHEDULED, DEADLINE
+ * or timestamp). Enter or leaving the row saves, Esc cancels.
+ */
+function RowEditor({ e, item, onDone }: { e: Entry; item?: AgendaItem; onDone: () => void }) {
+  const app = useApp()
+  const { h, path } = e
+  const [title, setTitleText] = useState(h.title)
+  const [date, setDate] = useState(item?.ts.date ?? '')
+  const [time, setTime] = useState(item?.ts.time ?? '')
+  const done = useRef(false)
+  const finish = (save: boolean) => {
+    if (done.current) return
+    done.current = true
+    onDone()
+    const moved = item && date && (date !== item.ts.date || (time || undefined) !== item.ts.time)
+    if (!save || (title.trim() === h.title && !moved)) return
+    app.edit(path, (t) => {
+      if (moved) t = moveTimestamp(t, h.line, SOURCE[item.kind], item.ts, date, time || undefined)
+      return title.trim() !== h.title ? setTitle(t, h.line, title.trim()) : t
+    })
+  }
+  return (
+    <form
+      className="agenda-edit"
+      onSubmit={(ev) => (ev.preventDefault(), finish(true))}
+      onKeyDown={(ev) => {
+        ev.stopPropagation()
+        if (ev.key === 'Escape') (ev.preventDefault(), finish(false))
+      }}
+      onBlur={(ev) => {
+        // Moving between its fields, or into the link dialog (Ctrl+L), is not leaving the row.
+        const to = ev.relatedTarget as HTMLElement | null
+        if (!ev.currentTarget.contains(to) && !to?.closest('.modal')) finish(true)
+      }}
+    >
+      <TitleInput className="title" autoFocus path={path} value={title} onChange={setTitleText} />
+      {item && (
+        <>
+          <input type="date" value={date} onChange={(ev) => setDate(ev.target.value)} required aria-label={tr('Data')} />
+          <input type="time" value={time} onChange={(ev) => setTime(ev.target.value)} aria-label={tr('Hora')} />
+        </>
+      )}
+    </form>
   )
 }
 

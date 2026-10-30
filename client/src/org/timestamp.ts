@@ -51,6 +51,12 @@ export function formatTimestamp(ts: Omit<Timestamp, 'raw'>): string {
   return ts.end ? `${single}--${formatTimestamp(ts.end)}` : single
 }
 
+/** Whether the weekday written in a timestamp (e.g. `Wed`) is not the date's: org goes by the date and ignores it. */
+export function wrongWeekday(raw: string): boolean {
+  const m = /^[<[](\d{4}-\d{2}-\d{2}) +([A-Za-z]{3})\b/.exec(raw)
+  return !!m && DAY_NAMES.includes(m[2]) && DAY_NAMES[toDate(m[1]).getDay()] !== m[2]
+}
+
 /** Inactive timestamp for "now", as used by CLOSED, CLOCK and capture. */
 export function nowStamp(withTime = true, active = false, now = new Date()): string {
   return formatTimestamp({ active, date: dateKey(now), time: withTime ? `${pad(now.getHours())}:${pad(now.getMinutes())}` : undefined })
