@@ -6,7 +6,8 @@ namespace OrgNotes.Capture;
 
 public class SettingsWindow : Window
 {
-    public SettingsWindow(Config config)
+    /// <param name="testReminder">Shows a sample reminder, as the settings are now (window or notification).</param>
+    public SettingsWindow(Config config, Action testReminder)
     {
         Title = L.Tr("Definições · Org Notes Capture");
         Width = 480;
@@ -28,6 +29,15 @@ public class SettingsWindow : Window
         var webCapture = new CheckBox { Content = L.Tr("Captura igual à do site (desliga para usar a janela antiga da app)"), IsChecked = config.WebCapture };
         var status = new TextBlock { Opacity = 0.7, TextWrapping = Avalonia.Media.TextWrapping.Wrap };
         var test = new Button { Content = L.Tr("Testar ligação") };
+        var testReminderButton = new Button { Content = L.Tr("Testar lembrete") };
+        // As ticked now, before saving.
+        testReminderButton.Click += (_, _) =>
+        {
+            var saved = config.ReminderWindow;
+            config.ReminderWindow = reminderWindow.IsChecked == true;
+            testReminder();
+            config.ReminderWindow = saved;
+        };
         var save = new Button { Content = L.Tr("Guardar"), Classes = { "accent" } };
 
         Config Edited() => new() { Server = server.Text?.Trim() ?? "", Token = token.Text?.Trim() ?? "", Hotkey = hotkey.Text?.Trim() ?? config.Hotkey };
@@ -74,7 +84,7 @@ public class SettingsWindow : Window
                     TextWrapping = Avalonia.Media.TextWrapping.Wrap,
                 },
                 status,
-                new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Spacing = 8, Children = { test, save } },
+                new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Spacing = 8, Children = { testReminderButton, test, save } },
             },
         };
     }

@@ -10,27 +10,27 @@ const SHOWN = 'reminders-shown'
 // Opened from a reminder's link (the app's "Org Notes", the phone): the reminders due now were already seen there.
 const fromReminder = new URLSearchParams(location.search).has('view')
 
-/**
- * The reminders already shown today in this browser, so a reload does not show them again. On a new day it keeps that
- * day's ones (their id carries the date), shown just before midnight.
- */
-function shownToday(): Set<string> {
+/** The reminders already shown in this browser, each until it is no longer due, so a reload does not show them again. */
+function shownNow(): Map<string, string> {
   try {
-    const saved = JSON.parse(localStorage.getItem(SHOWN) ?? 'null') as { date: string; ids: string[] } | null
-    const today = dateKey(new Date())
-    return new Set(saved?.date === today ? saved.ids : (saved?.ids ?? []).filter((id) => id.includes(`|${today}|`)))
+    const saved = JSON.parse(localStorage.getItem(SHOWN) ?? 'null') as { until?: Record<string, string> } | null
+    const now = new Date()
+    return new Map(Object.entries(saved?.until ?? {}).filter(([, until]) => new Date(until) > now))
   } catch {
-    return new Set()
+    return new Map()
   }
 }
 
-function remember(ids: Set<string>) {
+function remember(shown: Map<string, string>) {
   try {
-    localStorage.setItem(SHOWN, JSON.stringify({ date: dateKey(new Date()), ids: [...ids] }))
+    localStorage.setItem(SHOWN, JSON.stringify({ until: Object.fromEntries(shown) }))
   } catch {
     /* only means it could show again after a reload */
   }
 }
+
+/** Shows a sample reminder here (Conta e notificações → Testar lembrete), to check how they look and sound. */
+export const testReminder = () => window.dispatchEvent(new Event('test-reminder'))
 
 /** Two short tones, so a reminder is heard as well as seen. */
 function chime() {
@@ -65,12 +65,12 @@ export function WebReminders() {
     const check = () =>
       api.reminders().then((all) => {
         const now = new Date()
-        const shown = shownToday()
+        const shown = shownNow()
         const due = all.filter((r) => new Date(r.from) <= now && now < new Date(r.until) && !shown.has(r.id))
         const quiet = first && fromReminder
         first = false
         if (!due.length) return
-        due.forEach((r) => shown.add(r.id))
+        due.forEach((r) => shown.set(r.id, r.until))
         remember(shown)
         if (quiet) return
         setCards((c) => [...c, ...due])
@@ -83,13 +83,19 @@ export function WebReminders() {
       }, () => {})
     check()
     const t = setInterval(check, 30000)
-    return () => clearInterval(t)
+    const test = () => {
+      setCards((c) => [...c, { id: `test|${Date.now()}`, from: '', until: '', title: tr('Teste de lembrete'), body: tr('Assim vais ver os lembretes da agenda.'), view: `list=${dateKey(new Date())}` }])
+      chime()
+    }
+    window.addEventListener('test-reminder', test)
+    return () => (clearInterval(t), window.removeEventListener('test-reminder', test))
   }, [])
+  const [minutes, setMinutes] = useState(5)
   if (!cards.length) return null
   const snooze = () => {
     const later = cards
     setCards([])
-    setTimeout(() => (setCards((c) => [...c, ...later]), chime()), 5 * 60000)
+    setTimeout(() => (setCards((c) => [...c, ...later]), chime()), minutes * 60000)
   }
   return (
     <div className="reminder-cards" role="alert">
@@ -102,7 +108,12 @@ export function WebReminders() {
           </div>
         ))}
         <div className="actions">
-          <button type="button" onClick={snooze}>{tr('Adiar 5 min')}</button>
+          <select value={minutes} onChange={(e) => setMinutes(+e.target.value)} aria-label={tr('Adiar por')}>
+            <option value={5}>5 min</option>
+            <option value={15}>15 min</option>
+            <option value={60}>1 h</option>
+          </select>
+          <button type="button" onClick={snooze}>{tr('Adiar')}</button>
           <button type="button" className="primary" onClick={() => setCards([])}>OK</button>
         </div>
       </div>

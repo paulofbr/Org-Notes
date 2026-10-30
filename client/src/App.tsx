@@ -89,7 +89,15 @@ export default function App() {
   const refreshInbox = () => api.me().then((me) => setInbox(me.inbox), () => {})
   useEffect(() => {
     api.me().then(
-      (me) => void (setInbox(me.inbox), setAdmin(me.admin), isLang(me.lang) ? rememberLang(me.lang) : api.setLang(lang)),
+      (me) => {
+        setInbox(me.inbox)
+        setAdmin(me.admin)
+        if (isLang(me.lang)) rememberLang(me.lang)
+        else api.setLang(lang)
+        // The phone's reminders go out on this time zone.
+        const zone = Intl.DateTimeFormat().resolvedOptions().timeZone
+        if (zone && zone !== me.timeZone) api.setTimeZone(zone).catch(() => {})
+      },
       () => {},
     )
   }, [])

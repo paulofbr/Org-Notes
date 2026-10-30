@@ -183,6 +183,7 @@ function RowEditor({ e, item, onDone }: { e: Entry; item?: AgendaItem; onDone: (
         <>
           <input type="date" value={date} onChange={(ev) => setDate(ev.target.value)} required aria-label={tr('Data')} />
           <input type="time" value={time} onChange={(ev) => setTime(ev.target.value)} aria-label={tr('Hora')} />
+          {item.ts.repeater && <span className="hint" title={tr('A data é a da primeira vez; mudá-la muda todas as repetições')}>↻ {tr('todas')}</span>}
         </>
       )}
     </form>

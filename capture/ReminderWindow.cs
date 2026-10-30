@@ -31,7 +31,12 @@ public partial class ReminderWindow : Window
         // Visible without taking the keyboard from whatever the user is typing in.
         ShowActivated = false;
 
-        var snooze = new Button { Content = L.Tr("Adiar 5 min") };
+        // "Adiar 5 min", or from its menu 15 min or 1 h.
+        var later15 = new MenuItem { Header = L.Tr("Adiar 15 min") };
+        later15.Click += (_, _) => Snooze(TimeSpan.FromMinutes(15));
+        var later60 = new MenuItem { Header = L.Tr("Adiar 1 h") };
+        later60.Click += (_, _) => Snooze(TimeSpan.FromHours(1));
+        var snooze = new SplitButton { Content = L.Tr("Adiar 5 min"), Flyout = new MenuFlyout { Items = { later15, later60 } } };
         snooze.Click += (_, _) => Snooze(TimeSpan.FromMinutes(5));
         var ok = new Button { Content = "OK", Classes = { "accent" } };
         ok.Click += (_, _) => Dismiss();

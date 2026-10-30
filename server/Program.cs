@@ -88,7 +88,9 @@ app.Use(async (ctx, next) =>
 {
     // The login page and its icons are open to everyone.
     if (ctx.Request.Path.StartsWithSegments("/login") || ctx.Request.Path == "/logout"
-        || ctx.Request.Path == "/favicon.svg" || ctx.Request.Path == "/apple-touch-icon.png")
+        || ctx.Request.Path == "/favicon.svg" || ctx.Request.Path == "/apple-touch-icon.png"
+        // The phone's "Adiar" button: signed per reminder instead (see Notifier.Snooze).
+        || ctx.Request.Path == "/api/ntfy/snooze")
     {
         await next();
         return;
@@ -186,7 +188,10 @@ app.MapGet("/api/link-targets", (HttpContext ctx, Users users) =>
 // The user's reminders for the day, for the capture app to show natively. `now` is the user's wall-clock time,
 // since the server may be in another time zone.
 app.MapGet("/api/reminders", (DateTime? now, HttpContext ctx, Users users, Notifier notifier) =>
-    notifier.Reminders(users.Key(ctx.User), now ?? DateTime.Now));
+    notifier.Reminders(users.Key(ctx.User), now ?? notifier.Now(users.Key(ctx.User))));
+
+app.MapPost("/api/ntfy/snooze", (string u, string id, string sig, Notifier notifier) =>
+    notifier.Snooze(u, id, sig) ? Results.NoContent() : Results.NotFound());
 
 // The mailbox the AI reads for items (password never sent back), and the emails waiting for review.
 app.MapGet("/api/mail", (HttpContext ctx, Users users) =>
@@ -237,7 +242,7 @@ app.MapDelete("/api/inbox/{id}", (string id, HttpContext ctx, Users users, MailI
 app.MapGet("/api/me", (HttpContext ctx, Users users, Notifier notifier, AiAssistant ai, MailInbox inbox) =>
 {
     var s = users.Settings(users.Key(ctx.User));
-    return new { email = ctx.User.FindFirstValue(ClaimTypes.Email), ai = ai.Enabled, token = users.Token(users.Key(ctx.User)), ntfy = new { server = notifier.NtfyServer, topic = s.NtfyTopic, enabled = s.Notify }, lang = s.Lang, inbox = inbox.Inbox(users.Key(ctx.User)).Count, admin = access.IsAdmin(ctx.User.FindFirstValue(ClaimTypes.Email) ?? ""), windowsInstaller = File.Exists(windowsInstaller),
+    return new { email = ctx.User.FindFirstValue(ClaimTypes.Email), ai = ai.Enabled, token = users.Token(users.Key(ctx.User)), ntfy = new { server = notifier.NtfyServer, topic = s.NtfyTopic, enabled = s.Notify }, lang = s.Lang, timeZone = s.TimeZone, inbox = inbox.Inbox(users.Key(ctx.User)).Count, admin = access.IsAdmin(ctx.User.FindFirstValue(ClaimTypes.Email) ?? ""), windowsInstaller = File.Exists(windowsInstaller),
         windowsVersion = File.Exists(windowsVersion) ? File.ReadAllText(windowsVersion).Trim() : null };
 });
 
@@ -258,6 +263,21 @@ app.MapPut("/api/me/notify", (NotifyRequest req, HttpContext ctx, Users users) =
 {
     var key = users.Key(ctx.User);
     users.Save(key, users.Settings(key) with { Notify = req.Enabled });
+    return Results.NoContent();
+});
+
+// The browser's time zone, so the phone's reminders go out on the user's time (the server's may differ).
+app.MapPut("/api/me/timezone", (TimeZoneRequest req, HttpContext ctx, Users users) =>
+{
+    if (!TimeZoneInfo.TryFindSystemTimeZoneById(req.TimeZone, out _)) return Results.BadRequest();
+    var key = users.Key(ctx.User);
+    users.Save(key, users.Settings(key) with { TimeZone = req.TimeZone });
+    return Results.NoContent();
+});
+
+app.MapPost("/api/me/test-ntfy", async (HttpContext ctx, Users users, Notifier notifier) =>
+{
+    await notifier.Test(users.Key(ctx.User), ctx.RequestAborted);
     return Results.NoContent();
 });
 
@@ -449,6 +469,7 @@ record NotifyRequest(bool Enabled);
 record ImproveRequest(Dictionary<string, string> Fields, string? Mode);
 record TemplateRequest(string Description);
 record LangRequest(string Lang);
+record TimeZoneRequest(string TimeZone);
 record LoginRequest(string Email);
 record ExtractRequest(string Text, DateTime? Now);
 record MailRequest(string Host, int Port, string User, string? Password, string Folder, bool Enabled);

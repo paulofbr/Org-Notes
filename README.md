@@ -88,17 +88,28 @@ gh variable set GCE_NAME --body <vm>; gh variable set GCE_ZONE --body <zone>; gh
 ## Agenda notifications
 
 Reminders arrive even with the site closed: N minutes before each timed item (`SCHEDULED`, `DEADLINE`,
-active timestamps, repeats included), a daily summary (today, overdue, upcoming deadlines) and, at summary time,
-one reminder per deadline (`DEADLINE`) 7, 3, 1 and 0 days ahead (`DeadlineReminders`). Two channels:
+active timestamps, repeats included), a morning summary (today, overdue, upcoming deadlines; until noon) and, at
+summary time, one reminder per deadline (`DEADLINE`) 7, 3, 1 and 0 days ahead (`DeadlineReminders`).
+
+An item can have its own reminders with a `:REMINDER:` property: minutes, hours or days before, e.g. `:REMINDER: 1d 15m`
+(a bare number is minutes; up to 7 days). A reminder stays due for an hour after its time, so a computer that was asleep
+still shows it, marked "há N min". Each reminder links to what it is about: clicking it lists that item (the summary,
+the day's), and each item opens in its form, read only until *Editar*. An item with an `:ID:` is found by it even after
+moving. The phone's reminders go out on the user's time zone, taken from their browser. Channels:
 
 - **ntfy**: each user has a secret topic, shown and switched on or off in *Conta e notificações* (Account and
   notifications, bell icon in the menu). Receive it in the ntfy app (Android/iOS) or on a PC with `ntfy subscribe <url>`.
-  Off by default.
-- **Native** (`notify-send` on Linux, a toast on Windows): shown by the local app on each computer it runs on. It gets
-  the day's reminders from `/api/reminders`, already worked out and translated by the server, and shows each once
-  when it is due. On by default; *Mostrar lembretes da agenda neste computador* in its settings turns it off.
+  Tapping it, or *Ver*, opens the site there; *Adiar 15 min* brings it back (both need the server's domain, `PublicUrl`).
+  Off by default. *Testar no telemóvel* sends a sample.
+- **Site**: while it is open, a card with a chime (and a browser notification, if allowed). *Testar lembrete aqui*
+  shows a sample.
+- **Local app**: on each computer it runs on, a window above the others with the reminder sound, *Ver* (the item, read
+  only), *Org Notes* (the site) and *Adiar* (5 min, 15 min, 1 h); with that window turned off in its settings, a
+  native notification instead (`notify-send` on Linux, a toast on Windows). It gets the reminders from
+  `/api/reminders`, already worked out and translated by the server, and shows each once. *Testar lembrete* in its
+  settings shows a sample.
 
-Settings are in the server's `appsettings.json` → `Notifications` (`MinutesBefore`, `DailySummaryAt`, `DeadlineReminders`, `NtfyServer`, `Enabled`).
+Settings are in the server's `appsettings.json` → `Notifications` (`MinutesBefore`, `DailySummaryAt`, `DailySummaryUntil`, `DeadlineReminders`, `NtfyServer`, `Enabled`).
 
 ## Capture templates
 

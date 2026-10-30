@@ -31,6 +31,7 @@ jobs:
         run: |
           cd client && npm ci && npm test
           cd ../server && dotnet build
+          cd ../server.Tests && dotnet test
 
       - uses: google-github-actions/auth@v2
         with:

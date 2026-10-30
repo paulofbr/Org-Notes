@@ -21,6 +21,7 @@ public class App(bool showOnStart) : Application
     private TrayIcon? _tray;
     private Updater? _updater;
     private ReminderWindow? _reminders;
+    private Reminders? _reminderChecks;
     private bool _hotkey;
     private WindowIcon? _icon;
 
@@ -41,8 +42,9 @@ public class App(bool showOnStart) : Application
         RenderTray();
 
         _ = ListenForShow();
-        _ = new Reminders(_config, r => Dispatcher.UIThread.Post(() =>
-            (_reminders ??= new ReminderWindow { Icon = _icon, OnView = ShowView, OnSite = ShowOnSite }).Add(r))).Run();
+        _reminderChecks = new Reminders(_config, r => Dispatcher.UIThread.Post(() =>
+            (_reminders ??= new ReminderWindow { Icon = _icon, OnView = ShowView, OnSite = ShowOnSite }).Add(r)));
+        _ = _reminderChecks.Run();
         _updater = new Updater(_config, () => _capture?.IsVisible != true && _web?.IsVisible != true, () => Dispatcher.UIThread.Post(() => (ApplicationLifetime as IClassicDesktopStyleApplicationLifetime)?.Shutdown()));
         _ = _updater.Run();
         Updater.AnnounceUpdate();
@@ -150,7 +152,7 @@ public class App(bool showOnStart) : Application
         ShowCapture();
     }
 
-    private void ShowSettings() => new SettingsWindow(_config) { Icon = _icon }.Show();
+    private void ShowSettings() => new SettingsWindow(_config, () => _reminderChecks?.Test()) { Icon = _icon }.Show();
 
     /// <summary>Each connection from a second instance means "show the capture window".</summary>
     private async Task ListenForShow()

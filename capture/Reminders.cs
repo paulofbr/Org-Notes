@@ -14,7 +14,8 @@ namespace OrgNotes.Capture;
 /// </summary>
 public class Reminders(Config config, Action<Reminder> onDue)
 {
-    private record Shown(DateOnly Date, HashSet<string> Ids);
+    // The reminders already shown, each until it is no longer due (so a restart, or the day changing, does not show it again).
+    private record Shown(Dictionary<string, DateTime>? Until);
 
     private static string ShownPath => Path.Combine(Config.Dir, "shown.json");
 
@@ -43,21 +44,29 @@ public class Reminders(Config config, Action<Reminder> onDue)
 
     private async Task Check(DateTime now)
     {
-        var today = DateOnly.FromDateTime(now);
-        // On a new day, keeps that day's reminders (their id carries the date), shown just before midnight.
-        var saved = Load();
-        var shown = saved?.Date == today ? saved : new Shown(today, [.. saved?.Ids.Where(id => id.Contains($"|{today:yyyy-MM-dd}|")) ?? []]);
-        var due = (await new Api(config).Reminders(now)).Where(r => r.From <= now && now < r.Until && !shown.Ids.Contains(r.Id)).ToList();
+        var shown = (Load()?.Until ?? []).Where(x => x.Value > now).ToDictionary();
+        // A reminder stays due for an hour after its time, so one missed while the computer slept still shows, as late.
+        var due = (await new Api(config).Reminders(now)).Where(r => r.From <= now && now < r.Until && !shown.ContainsKey(r.Id)).ToList();
         if (due.Count == 0) return;
         foreach (var r in due)
         {
-            if (config.ReminderWindow) onDue(r);
-            else Show(r.Title, r.Body, alert: true, r.View is { } view ? ViewUrl(config, view) : null);
-            shown.Ids.Add(r.Id);
+            Present(r);
+            shown[r.Id] = r.Until;
         }
         Directory.CreateDirectory(Config.Dir);
-        await File.WriteAllTextAsync(ShownPath, JsonSerializer.Serialize(shown));
+        await File.WriteAllTextAsync(ShownPath, JsonSerializer.Serialize(new Shown(shown)));
     }
+
+    /// <summary>Shows a reminder: in the reminder window, or with that turned off as a notification.</summary>
+    public void Present(Reminder r)
+    {
+        if (config.ReminderWindow) onDue(r);
+        else Show(r.Title, r.Body, alert: true, r.View is { } view ? ViewUrl(config, view) : null);
+    }
+
+    /// <summary>A sample reminder (Definições → Testar lembrete), to check how they look and sound here.</summary>
+    public void Test() =>
+        Present(new($"test|{DateTime.Now:O}", DateTime.Now, DateTime.Now, L.Tr("Teste de lembrete"), L.Tr("Assim vais ver os lembretes da agenda."), $"list={DateTime.Now:yyyy-MM-dd}"));
 
     private static Shown? Load()
     {

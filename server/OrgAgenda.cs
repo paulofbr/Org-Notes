@@ -2,8 +2,11 @@ using System.Text.RegularExpressions;
 
 namespace OrgNotes.Server;
 
-/// <summary>An agenda item; <see cref="Line"/> is its headline's line in the file.</summary>
-public record AgendaItem(string Title, string Kind, DateOnly Date, TimeOnly? Time, int Days, int Line);
+/// <summary>
+/// An agenda item; <see cref="Line"/> is its headline's line in the file, <see cref="Id"/> its `:ID:` property and
+/// <see cref="Leads"/> how long before it to remind, from its `:REMINDER:` property (e.g. `1d 15m`; none: the default).
+/// </summary>
+public record AgendaItem(string Title, string Kind, DateOnly Date, TimeOnly? Time, int Days, int Line, string? Id = null, TimeSpan[]? Leads = null);
 
 /// <summary>
 /// Minimal port of the client's org parsing and agenda rules (client/src/org), enough to know what is due today.
@@ -20,6 +23,8 @@ public static partial class OrgAgenda
     [GeneratedRegex(@"(?:^|[ \t]+)(:(?:[\w@#%]+:)+)[ \t]*$")] private static partial Regex TagsRe();
     [GeneratedRegex(@"^\s*#\+(?:SEQ_|TYP_)?TODO:\s*(.*)$", RegexOptions.IgnoreCase)] private static partial Regex TodoSpecRe();
     [GeneratedRegex(@"\[\[([^\]]+)\](?:\[([^\]]+)\])?\]")] private static partial Regex LinkRe();
+    [GeneratedRegex(@"^\s*:([\w-]+):\s*(.*?)\s*$")] private static partial Regex PropertyRe();
+    [GeneratedRegex(@"^(\d+)([mhd]?)$")] private static partial Regex LeadRe();
 
     private record Ts(DateOnly Date, TimeOnly? Time, char? RepUnit, int RepN, int WarnDays, DateOnly? End);
 
@@ -41,7 +46,8 @@ public static partial class OrgAgenda
             if (first != null && todo.Contains(first)) rest = rest.TrimStart()[first.Length..];
             rest = Regex.Replace(rest.Trim(), @"^\[#[A-Z0-9]\]\s*", "");
             var title = LinkRe().Replace(TimestampRe().Replace(rest, ""), m => m.Groups[2].Success ? m.Groups[2].Value : m.Groups[1].Value).Trim();
-            void Add(string kind, Ts ts, DateOnly date, int days = 0) => items.Add(new(title, kind, date, ts.Time, days, line));
+            var (id, leads) = Properties(lines, line + 1, end);
+            void Add(string kind, Ts ts, DateOnly date, int days = 0) => items.Add(new(title, kind, date, ts.Time, days, line, id, leads));
 
             var body = line + 1;
             if (body < end && PlanningRe().IsMatch(lines[body]))
@@ -67,6 +73,29 @@ public static partial class OrgAgenda
                     if (m.Value[0] == '<' && Parse(m.Value) is { } ts && Occurs(ts, today)) Add("timestamp", ts, today);
         }
         return items;
+    }
+
+    /// <summary>The entry's `:ID:` and `:REMINDER:` (minutes, hours or days before: `15m 1h 1d`; a bare number is minutes).</summary>
+    private static (string? Id, TimeSpan[]? Leads) Properties(string[] lines, int from, int end)
+    {
+        var i = from;
+        if (i < end && PlanningRe().IsMatch(lines[i])) i++;
+        if (i >= end || !lines[i].Trim().Equals(":PROPERTIES:", StringComparison.OrdinalIgnoreCase)) return (null, null);
+        string? id = null;
+        TimeSpan[]? leads = null;
+        for (i++; i < end && !lines[i].Trim().Equals(":END:", StringComparison.OrdinalIgnoreCase); i++)
+        {
+            if (PropertyRe().Match(lines[i]) is not { Success: true } p) continue;
+            var (key, value) = (p.Groups[1].Value.ToUpperInvariant(), p.Groups[2].Value);
+            if (key == "ID" && value != "") id = value;
+            if (key != "REMINDER") continue;
+            var parsed = value.Split([' ', ','], StringSplitOptions.RemoveEmptyEntries).Select(v => LeadRe().Match(v.ToLowerInvariant()))
+                .Where(m => m.Success)
+                .Select(m => m.Groups[2].Value switch { "h" => TimeSpan.FromHours(int.Parse(m.Groups[1].Value)), "d" => TimeSpan.FromDays(int.Parse(m.Groups[1].Value)), _ => TimeSpan.FromMinutes(int.Parse(m.Groups[1].Value)) })
+                .Where(t => t <= TimeSpan.FromDays(7)).Distinct().ToArray();
+            if (parsed.Length > 0) leads = parsed;
+        }
+        return (id, leads);
     }
 
     /// <summary>

@@ -7,6 +7,7 @@ import { SHORTCUTS } from '../shortcuts'
 import { api, type Login, type Me } from '../api'
 import { OrgTextarea } from './OrgTextarea'
 import { TitleInput } from './TitleInput'
+import { testReminder } from './WebReminders'
 import { cleanTag, knownTags } from '../org/tags'
 import { MailDialog } from './MailInbox'
 import { LANGS, isLang, lang, rememberLang, tr, type Lang } from '../i18n'
@@ -433,6 +434,10 @@ export function AccountDialog() {
         <>
           <label className="inline"><input type="checkbox" checked={me.ntfy.enabled} onChange={(e) => toggle(e.target.checked)} /> {tr('Enviar lembretes da agenda pelo ntfy')}</label>
           <BrowserNotifications />
+          <p className="chips">
+            <button type="button" onClick={testReminder}>{tr('Testar lembrete aqui')}</button>
+            <button type="button" disabled={!me.ntfy.enabled} onClick={() => api.testNtfy().then(() => setError(tr('Enviado: deve chegar ao telemóvel em segundos.')), (e) => setError(String(e)))}>{tr('Testar no telemóvel')}</button>
+          </p>
           <p>{tr('Tópico')}: <a href={url} target="_blank" rel="noreferrer"><code>{url}</code></a></p>
           <p className="hint">
             {tr('Subscreve este tópico na app ntfy (Android/iOS) ou no PC com')} <code>ntfy subscribe {url}</code>.{' '}

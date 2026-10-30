@@ -20,6 +20,7 @@ export interface Me {
   inbox: number
   admin: boolean
   windowsInstaller: boolean
+  timeZone?: string
 }
 
 /** An item the AI proposes from free text, for one of the user's templates. */
@@ -132,6 +133,9 @@ export const api = {
   removeLogin: async (email: string) => check(await fetch(`/api/admin/logins/${encodeURIComponent(email)}`, { method: 'DELETE' })),
   setLang: async (lang: string) =>
     check(await fetch('/api/me/lang', { method: 'PUT', body: JSON.stringify({ lang }), headers: { 'Content-Type': 'application/json' } })),
+  setTimeZone: async (timeZone: string) =>
+    check(await fetch('/api/me/timezone', { method: 'PUT', body: JSON.stringify({ timeZone }), headers: { 'Content-Type': 'application/json' } })),
+  testNtfy: async () => check(await fetch('/api/me/test-ntfy', { method: 'POST' })),
   setNotify: async (enabled: boolean) =>
     check(await fetch('/api/me/notify', { method: 'PUT', body: JSON.stringify({ enabled }), headers: { 'Content-Type': 'application/json' } })),
 }

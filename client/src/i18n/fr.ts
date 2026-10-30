@@ -1,4 +1,12 @@
 export const fr: Record<string, string> = {
+  'Enviado: deve chegar ao telemóvel em segundos.': 'Envoyé : il devrait arriver sur le téléphone en quelques secondes.',
+  'Testar no telemóvel': 'Tester sur le téléphone',
+  'Testar lembrete aqui': 'Tester un rappel ici',
+  'A data é a da primeira vez; mudá-la muda todas as repetições': 'La date est celle de la première fois ; la changer change toutes les répétitions',
+  'Adiar': 'Reporter',
+  'Adiar por': 'Reporter de',
+  'Assim vais ver os lembretes da agenda.': 'Voici comment s’afficheront les rappels de l’agenda.',
+  'Teste de lembrete': 'Rappel de test',
   'Nada na agenda deste dia.': 'Rien à l’agenda ce jour-là.',
   'Ver o evento': 'Voir l’événement',
   'Abrir no ficheiro': 'Ouvrir dans son fichier',

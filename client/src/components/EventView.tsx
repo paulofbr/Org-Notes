@@ -10,7 +10,7 @@ import { tr } from '../i18n'
 
 /**
  * What a reminder is about (its `view`, see the server's Reminder.View): the day's agenda (`list=yyyy-MM-dd`, the daily
- * summary) or one entry (`path=…&line=…&title=…`). Listed; each one opens in its edit form, read only, over the list.
+ * summary) or one entry (`path=…&line=…&title=…`, and `&id=…` with an `:ID:`). Listed; each one opens in its edit form, read only, over the list.
  * `canOpen` lets that form go to the entry in its file (not in the desktop app's window, which shows only this).
  * `direct` (the app's "Ver") shows a single entry's form at once, without the list.
  */
@@ -24,7 +24,11 @@ export function EventDialog({ view, canOpen = true, direct }: { view: string; ca
     const path = q.get('path') ?? ''
     const line = Number(q.get('line'))
     const title = q.get('title') ?? ''
+    const id = q.get('id')
     const doc = app.store.docs[path]
+    // By its :ID: (anywhere, as it may have moved), else by its line, else by its title.
+    const byId = id ? Object.entries(app.store.docs).flatMap(([p, d]) => d.all.filter((x) => x.properties.ID === id).map((h) => ({ path: p, doc: d, h }))) : []
+    if (byId.length) return [byId[0]]
     // By its line; if the file changed since the reminder, by its title (the server's has no link syntax, hence includes).
     const atLine = doc?.all.find((x) => x.line === line)
     const byTitle = title ? doc?.all.find((x) => x.title.includes(title)) : undefined
